@@ -61,6 +61,14 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         }
     }
 
+    public boolean hasEntryForShift(String date, String timeIn, String timeOut) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT 1 FROM work_entries WHERE work_date = ? AND time_in = ? AND time_out = ? LIMIT 1",
+                new String[]{date, timeIn, timeOut})) {
+            return cursor.moveToFirst();
+        }
+    }
+
     public long insertEntry(String date, String timeIn, String timeOut, String breaks,
                             SalaryCalculator.Result result, BigDecimal hourlyRate,
                             BigDecimal overtimeMultiplier) {
