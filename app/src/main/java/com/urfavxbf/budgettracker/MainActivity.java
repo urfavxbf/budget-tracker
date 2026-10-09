@@ -227,20 +227,13 @@ public final class MainActivity extends Activity {
         addBreak.setOnClickListener(v -> addBreakRow(""));
         card.addView(addBreak);
 
-        addSection(card, "Pay rate and calculation");
+        // Load saved salary defaults for calculation, but keep rate configuration in Settings.
         payRateTypeInput = createRateTypeSpinner();
-        addField(card, "Pay rate type", payRateTypeInput);
         hourlyRateInput = field("Rate amount", pref("pay_rate", pref("hourly_rate", "100.00")), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         regularHoursInput = field("Regular hours per day", pref("regular_hours", "8"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         overtimeMultiplierInput = field("OT multiplier", pref("ot_multiplier", "1.25"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         allowanceInput = field("Daily allowance", pref("allowance", "0.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         deductionInput = field("Daily deduction", pref("deduction", "0.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        addField(card, "Rate amount (₱)", hourlyRateInput);
-        updateRateLabel(payRateTypeInput, hourlyRateInput);
-        addField(card, "Regular hours", regularHoursInput);
-        addField(card, "Ordinary OT multiplier", overtimeMultiplierInput);
-        addField(card, "Allowance (₱)", allowanceInput);
-        addField(card, "Deduction (₱)", deductionInput);
         Button calculate = button("Calculate and save shift", true);
         calculate.setOnClickListener(v -> calculateAndSave());
         card.addView(calculate);
