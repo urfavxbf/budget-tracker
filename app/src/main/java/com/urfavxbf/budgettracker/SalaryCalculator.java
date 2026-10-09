@@ -34,7 +34,10 @@ public final class SalaryCalculator {
 
         int start = timeIn.getHour() * 60 + timeIn.getMinute();
         int end = timeOut.getHour() * 60 + timeOut.getMinute();
-        if (end <= start) {
+        if (end == start) {
+            throw new IllegalArgumentException("Time in and time out cannot be the same.");
+        }
+        if (end < start) {
             end += MINUTES_PER_DAY;
         }
         int shiftMinutes = end - start;
