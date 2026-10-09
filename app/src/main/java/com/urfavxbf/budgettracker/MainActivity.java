@@ -1,6 +1,8 @@
 package com.urfavxbf.budgettracker;
 
 import android.app.Activity;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
@@ -8,6 +10,8 @@ import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
+import android.widget.Spinner;
+import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -32,6 +36,7 @@ public final class MainActivity extends Activity {
     private int currentTab = 0;
     private EditText dateInput, timeInInput, timeOutInput;
     private EditText hourlyRateInput, regularHoursInput, overtimeMultiplierInput, allowanceInput, deductionInput;
+    private Spinner payRateTypeInput;
     private EditText expenseDateInput, expenseCategoryInput, expenseAmountInput, expenseNoteInput;
     private LinearLayout breakContainer, historyContainer, expenseHistoryContainer;
     private TextView resultView, budgetSummaryView;
@@ -39,11 +44,21 @@ public final class MainActivity extends Activity {
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        applyImmersiveMode();
         database = new WorkDatabase(this);
         getWindow().setStatusBarColor(resolveColor(android.R.attr.colorBackground));
         getWindow().setNavigationBarColor(resolveColor(android.R.attr.colorBackground));
         buildShell();
         showTab(currentTab);
+    }
+
+    @Override public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) applyImmersiveMode();
+    }
+
+    private void applyImmersiveMode() {
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
     }
 
     @Override protected void onDestroy() {
@@ -122,23 +137,23 @@ public final class MainActivity extends Activity {
         LocalDate today = LocalDate.now();
         LocalDate start = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
         LocalDate end = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
-        BigDecimal earned = database.getEstimatedNetPayTotal(start.toString(), end.toString());
+        BigDecimal earned = database.getRecordedNetPayTotal(start.toString(), end.toString());
         BigDecimal spent = database.getExpenseTotal(start.toString(), end.toString());
         BigDecimal remaining = earned.subtract(spent);
 
         card("PAYDAY CUTOFF", (today.getDayOfMonth() <= 15 ? "15th cutoff" : "Month-end cutoff"),
                 start.format(DateTimeFormatter.ofPattern("MMM d")) + " – " + end.format(DateTimeFormatter.ofPattern("MMM d, yyyy")));
         LinearLayout balance = cardContainer();
-        TextView eyebrow = text("PROJECTED CUTOFF BALANCE", 12, true);
+        TextView eyebrow = text("RECORDED PAY MINUS EXPENSES", 12, true);
         eyebrow.setAlpha(0.78f);
         balance.addView(eyebrow);
         TextView amount = text(money(remaining), 32, true);
         amount.setPadding(0, dp(8), 0, dp(6));
         balance.addView(amount);
-        balance.addView(text("Based on saved pay estimates minus recorded expenses", 12, false));
+        balance.addView(text("Saved work-entry pay total minus recorded expenses", 12, false));
         page.addView(balance);
 
-        rowCards("ESTIMATED NET PAY", money(earned), "EXPENSES", money(spent));
+        rowCards("TOTAL RECORDED PAY", money(earned), "RECORDED EXPENSES", money(spent));
         section("Quick actions");
         actionButton("＋  Add work shift", "Record time-in, time-out and breaks", 1);
         actionButton("−  Add an expense", "Track spending for this cutoff", 2);
@@ -151,7 +166,7 @@ public final class MainActivity extends Activity {
         budgetSummaryView = text("", 14, false);
         page.addView(budgetSummaryView);
         refreshBudget();
-        TextView disclaimer = text("Estimates are not confirmed payroll payments or cash on hand.", 12, false);
+        TextView disclaimer = text("Calculated from saved work entries; not a confirmed employer payout.", 12, false);
         disclaimer.setAlpha(0.7f);
         disclaimer.setPadding(0, dp(16), 0, 0);
         page.addView(disclaimer);
@@ -161,33 +176,39 @@ public final class MainActivity extends Activity {
         header("Work tracker", "Log your shift and calculate your estimated daily pay.");
         LinearLayout card = cardContainer();
         page.addView(card);
-        dateInput = field("Work date (YYYY-MM-DD)", LocalDate.now().toString(), InputType.TYPE_CLASS_DATETIME);
+        dateInput = field("Select work date", LocalDate.now().toString(), InputType.TYPE_NULL);
+        configureDatePicker(dateInput);
         addField(card, "Work date", dateInput);
         LinearLayout times = new LinearLayout(this);
         times.setOrientation(LinearLayout.HORIZONTAL);
-        timeInInput = field("08:00", "08:00", InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
-        timeOutInput = field("17:00", "17:00", InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
+        timeInInput = field("Choose time", "08:00", InputType.TYPE_NULL);
+        timeOutInput = field("Choose time", "17:00", InputType.TYPE_NULL);
+        configureTimePicker(timeInInput);
+        configureTimePicker(timeOutInput);
         times.addView(timeInInput, new LinearLayout.LayoutParams(0, dp(56), 1f));
         times.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
         times.addView(timeOutInput, new LinearLayout.LayoutParams(0, dp(56), 1f));
         addField(card, "Time in / time out", times);
 
-        addSection(card, "Break periods");
+        addSection(card, "Break duration");
         breakContainer = new LinearLayout(this);
         breakContainer.setOrientation(LinearLayout.VERTICAL);
         card.addView(breakContainer);
-        addBreakRow("12:00", "13:00");
-        Button addBreak = button("＋ Add break period", false);
-        addBreak.setOnClickListener(v -> addBreakRow("", ""));
+        addBreakRow("1");
+        Button addBreak = button("＋ Add break duration", false);
+        addBreak.setOnClickListener(v -> addBreakRow(""));
         card.addView(addBreak);
 
-        addSection(card, "Daily salary calculation");
-        hourlyRateInput = field("Hourly rate", pref("hourly_rate", "100.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        addSection(card, "Pay rate and calculation");
+        payRateTypeInput = createRateTypeSpinner();
+        addField(card, "Pay rate type", payRateTypeInput);
+        hourlyRateInput = field("Rate amount", pref("pay_rate", pref("hourly_rate", "100.00")), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         regularHoursInput = field("Regular hours per day", pref("regular_hours", "8"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         overtimeMultiplierInput = field("OT multiplier", pref("ot_multiplier", "1.25"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         allowanceInput = field("Daily allowance", pref("allowance", "0.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         deductionInput = field("Daily deduction", pref("deduction", "0.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        addField(card, "Hourly rate (₱)", hourlyRateInput);
+        addField(card, "Rate amount (₱)", hourlyRateInput);
+        updateRateLabel(payRateTypeInput, hourlyRateInput);
         addField(card, "Regular hours", regularHoursInput);
         addField(card, "Ordinary OT multiplier", overtimeMultiplierInput);
         addField(card, "Allowance (₱)", allowanceInput);
@@ -207,7 +228,8 @@ public final class MainActivity extends Activity {
 
     private void buildExpensesScreen() {
         header("Expenses", "Record spending and see how it affects your cutoff.");
-        expenseDateInput = field("YYYY-MM-DD", LocalDate.now().toString(), InputType.TYPE_CLASS_DATETIME);
+        expenseDateInput = field("Select expense date", LocalDate.now().toString(), InputType.TYPE_NULL);
+        configureDatePicker(expenseDateInput);
         expenseCategoryInput = field("e.g. Food, Transport, Bills", "", InputType.TYPE_CLASS_TEXT);
         expenseAmountInput = field("0.00", "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         expenseNoteInput = field("Optional note", "", InputType.TYPE_CLASS_TEXT);
@@ -237,12 +259,15 @@ public final class MainActivity extends Activity {
         LinearLayout card = cardContainer();
         page.addView(card);
         addSection(card, "Salary defaults");
-        hourlyRateInput = field("Hourly rate", pref("hourly_rate", "100.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        hourlyRateInput = field("Rate amount", pref("pay_rate", pref("hourly_rate", "100.00")), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         regularHoursInput = field("Regular hours per day", pref("regular_hours", "8"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         overtimeMultiplierInput = field("OT multiplier", pref("ot_multiplier", "1.25"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         allowanceInput = field("Daily allowance", pref("allowance", "0.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         deductionInput = field("Daily deduction", pref("deduction", "0.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        addField(card, "Hourly rate (₱)", hourlyRateInput);
+        payRateTypeInput = createRateTypeSpinner();
+        addField(card, "Pay rate type", payRateTypeInput);
+        addField(card, "Rate amount (₱)", hourlyRateInput);
+        updateRateLabel(payRateTypeInput, hourlyRateInput);
         addField(card, "Regular hours", regularHoursInput);
         addField(card, "Ordinary OT multiplier", overtimeMultiplierInput);
         addField(card, "Daily allowance (₱)", allowanceInput);
@@ -270,25 +295,18 @@ public final class MainActivity extends Activity {
         page.addView(info);
     }
 
-    private void addBreakRow(String start, String end) {
+    private void addBreakRow(String hours) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        EditText breakStart = field("Start HH:mm", start, InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
-        EditText breakEnd = field("End HH:mm", end, InputType.TYPE_CLASS_DATETIME | InputType.TYPE_DATETIME_VARIATION_TIME);
-        row.addView(breakStart, new LinearLayout.LayoutParams(0, dp(56), 1f));
-        row.addView(breakEnd, new LinearLayout.LayoutParams(0, dp(56), 1f));
+        EditText breakHours = field("Total break hours (e.g. 0.5)", hours, InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        row.addView(breakHours, new LinearLayout.LayoutParams(0, dp(56), 1f));
         Button remove = button("×", false);
         row.addView(remove, new LinearLayout.LayoutParams(dp(48), dp(52)));
-        BreakInput input = new BreakInput(row, breakStart, breakEnd);
+        BreakInput input = new BreakInput(row, breakHours);
         remove.setOnClickListener(v -> {
-            if (breakInputs.size() == 1) {
-                breakStart.setText("");
-                breakEnd.setText("");
-            } else {
-                breakInputs.remove(input);
-                breakContainer.removeView(row);
-            }
+            if (breakInputs.size() == 1) breakHours.setText("");
+            else { breakInputs.remove(input); breakContainer.removeView(row); }
         });
         breakInputs.add(input);
         breakContainer.addView(row);
@@ -299,29 +317,33 @@ public final class MainActivity extends Activity {
             LocalDate date = LocalDate.parse(value(dateInput), DateTimeFormatter.ISO_LOCAL_DATE);
             LocalTime timeIn = LocalTime.parse(value(timeInInput), DateTimeFormatter.ofPattern("HH:mm"));
             LocalTime timeOut = LocalTime.parse(value(timeOutInput), DateTimeFormatter.ofPattern("HH:mm"));
-            BigDecimal rate = decimal(hourlyRateInput, "Hourly rate");
+            BigDecimal enteredRate = decimal(hourlyRateInput, "Pay rate");
+            String rateType = payRateTypeInput == null ? pref("pay_rate_type", "Hourly") : String.valueOf(payRateTypeInput.getSelectedItem());
             BigDecimal regularHours = decimal(regularHoursInput, "Regular hours");
             BigDecimal multiplier = decimal(overtimeMultiplierInput, "OT multiplier");
             BigDecimal allowance = decimal(allowanceInput, "Allowance");
             BigDecimal deduction = decimal(deductionInput, "Deduction");
             int regularMinutes = regularHours.multiply(BigDecimal.valueOf(60)).intValueExact();
-            List<BreakInterval> breaks = new ArrayList<>();
+            int totalBreakMinutes = 0;
             List<String> serializedBreaks = new ArrayList<>();
             for (BreakInput item : breakInputs) {
-                String a = value(item.start), b = value(item.end);
-                if (a.isEmpty() && b.isEmpty()) continue;
-                if (a.isEmpty() || b.isEmpty()) throw new IllegalArgumentException("Complete both times for each break.");
-                breaks.add(new BreakInterval(LocalTime.parse(a, DateTimeFormatter.ofPattern("HH:mm")),
-                        LocalTime.parse(b, DateTimeFormatter.ofPattern("HH:mm"))));
-                serializedBreaks.add(a + "-" + b);
+                String rawHours = value(item.hours);
+                if (rawHours.isEmpty()) continue;
+                BigDecimal breakHours = new BigDecimal(rawHours);
+                if (breakHours.signum() < 0) throw new IllegalArgumentException("Break duration cannot be negative.");
+                int minutes = breakHours.multiply(BigDecimal.valueOf(60)).intValueExact();
+                totalBreakMinutes = Math.addExact(totalBreakMinutes, minutes);
+                if (minutes > 0) serializedBreaks.add(breakHours.stripTrailingZeros().toPlainString() + "h");
             }
-            SalaryCalculator.Result result = SalaryCalculator.calculate(timeIn, timeOut, breaks,
-                    regularMinutes, rate, multiplier, allowance, deduction);
-            saveSalaryPreferences(rate, regularHours, multiplier, allowance, deduction);
+            BigDecimal effectiveHourlyRate = "Daily".equals(rateType)
+                    ? enteredRate.divide(regularHours, 8, java.math.RoundingMode.HALF_UP) : enteredRate;
+            SalaryCalculator.Result result = SalaryCalculator.calculateWithBreakMinutes(timeIn, timeOut,
+                    totalBreakMinutes, regularMinutes, effectiveHourlyRate, multiplier, allowance, deduction);
+            saveSalaryPreferences(enteredRate, rateType, regularHours, multiplier, allowance, deduction);
             database.insertEntry(date.toString(), timeIn.toString(), timeOut.toString(),
-                    serializedBreaks.isEmpty() ? "None" : android.text.TextUtils.join("; ", serializedBreaks),
-                    result, rate, multiplier);
-            resultView.setText("DAILY PAY ESTIMATE\n\nShift     " + duration(result.shiftMinutes)
+                    serializedBreaks.isEmpty() ? "0h" : android.text.TextUtils.join(", ", serializedBreaks),
+                    result, effectiveHourlyRate, multiplier);
+            resultView.setText("PAY BREAKDOWN (" + rateType.toUpperCase(Locale.ROOT) + " RATE)\n\nShift     " + duration(result.shiftMinutes)
                     + "\nBreak     " + duration(result.breakMinutes)
                     + "\nNet work  " + duration(result.netWorkMinutes)
                     + "\nRegular   " + duration(result.regularMinutes)
@@ -331,7 +353,7 @@ public final class MainActivity extends Activity {
                     + "\nAllowance     " + money(result.allowance)
                     + "\nDeduction     " + money(result.deduction)
                     + "\nGross pay     " + money(result.grossPay)
-                    + "\nEstimated net " + money(result.estimatedNetPay));
+                    + "\nNet pay      " + money(result.estimatedNetPay));
             refreshHistory();
             Toast.makeText(this, "Shift saved", Toast.LENGTH_SHORT).show();
         } catch (DateTimeParseException ex) {
@@ -394,14 +416,14 @@ public final class MainActivity extends Activity {
         LocalDate today = LocalDate.now();
         LocalDate start = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
         LocalDate end = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
-        BigDecimal earned = database.getEstimatedNetPayTotal(start.toString(), end.toString());
+        BigDecimal earned = database.getRecordedNetPayTotal(start.toString(), end.toString());
         BigDecimal spent = database.getExpenseTotal(start.toString(), end.toString());
         BigDecimal remaining = earned.subtract(spent);
         budgetSummaryView.setText("Cutoff  " + start + " to " + end
-                + "\nEstimated net earnings  " + money(earned)
-                + "\nRecorded expenses       " + money(spent)
-                + "\nProjected difference    " + money(remaining)
-                + "\n\nProjection only—not confirmed cash on hand.");
+                + "\nTotal recorded pay      " + money(earned)
+                + "\nRecorded expenses      " + money(spent)
+                + "\nRemaining after expenses " + money(remaining)
+                + "\n\nPay total comes from saved work entries.");
         if (currentTab == 0) {
             // Dashboard cards are rebuilt on tab selection so their totals always refresh.
         }
@@ -429,7 +451,8 @@ public final class MainActivity extends Activity {
 
     private void saveSalaryDefaults() {
         try {
-            BigDecimal rate = decimal(hourlyRateInput, "Hourly rate");
+            BigDecimal rate = decimal(hourlyRateInput, "Pay rate");
+            String rateType = payRateTypeInput == null ? pref("pay_rate_type", "Hourly") : String.valueOf(payRateTypeInput.getSelectedItem());
             BigDecimal hours = decimal(regularHoursInput, "Regular hours");
             BigDecimal multiplier = decimal(overtimeMultiplierInput, "OT multiplier");
             BigDecimal allowance = decimal(allowanceInput, "Allowance");
@@ -438,17 +461,19 @@ public final class MainActivity extends Activity {
                 throw new IllegalArgumentException("Regular hours must be positive and convert to whole minutes.");
             if (rate.signum() < 0 || allowance.signum() < 0 || deduction.signum() < 0 || multiplier.signum() <= 0)
                 throw new IllegalArgumentException("Rates and allowances must be non-negative; OT multiplier must be positive.");
-            saveSalaryPreferences(rate, hours, multiplier, allowance, deduction);
+            saveSalaryPreferences(rate, rateType, hours, multiplier, allowance, deduction);
             Toast.makeText(this, "Salary defaults saved", Toast.LENGTH_SHORT).show();
         } catch (IllegalArgumentException ex) {
             toast(ex.getMessage());
         }
     }
 
-    private void saveSalaryPreferences(BigDecimal rate, BigDecimal hours, BigDecimal multiplier,
+    private void saveSalaryPreferences(BigDecimal rate, String rateType, BigDecimal hours, BigDecimal multiplier,
                                        BigDecimal allowance, BigDecimal deduction) {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                .putString("hourly_rate", rate.toPlainString())
+                .putString("pay_rate", rate.toPlainString())
+                .putString("pay_rate_type", rateType)
+                .putString("hourly_rate", ("Daily".equals(rateType) ? rate.divide(hours, 8, java.math.RoundingMode.HALF_UP) : rate).toPlainString())
                 .putString("regular_hours", hours.toPlainString())
                 .putString("ot_multiplier", multiplier.toPlainString())
                 .putString("allowance", allowance.toPlainString())
@@ -458,6 +483,49 @@ public final class MainActivity extends Activity {
 
     private String pref(String key, String fallback) {
         return getSharedPreferences(PREFS, MODE_PRIVATE).getString(key, fallback);
+    }
+
+    private Spinner createRateTypeSpinner() {
+        Spinner spinner = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, new String[]{"Hourly", "Daily"});
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setSelection("Daily".equals(pref("pay_rate_type", "Hourly")) ? 1 : 0);
+        spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                if (hourlyRateInput != null) updateRateLabel(spinner, hourlyRateInput);
+            }
+            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
+        return spinner;
+    }
+
+    private void updateRateLabel(Spinner spinner, EditText input) {
+        if (spinner != null && input != null) input.setHint("Daily".equals(String.valueOf(spinner.getSelectedItem())) ? "Daily rate amount" : "Hourly rate amount");
+    }
+
+    private void configureDatePicker(EditText input) {
+        input.setFocusable(false);
+        input.setClickable(true);
+        input.setOnClickListener(v -> {
+            LocalDate current;
+            try { current = LocalDate.parse(value(input)); } catch (Exception ignored) { current = LocalDate.now(); }
+            new DatePickerDialog(this, (picker, year, month, day) ->
+                    input.setText(LocalDate.of(year, month + 1, day).toString()),
+                    current.getYear(), current.getMonthValue() - 1, current.getDayOfMonth()).show();
+        });
+    }
+
+    private void configureTimePicker(EditText input) {
+        input.setFocusable(false);
+        input.setClickable(true);
+        input.setOnClickListener(v -> {
+            LocalTime current;
+            try { current = LocalTime.parse(value(input)); } catch (Exception ignored) { current = LocalTime.of(8, 0); }
+            new TimePickerDialog(this, (picker, hour, minute) ->
+                    input.setText(String.format(Locale.ROOT, "%02d:%02d", hour, minute)),
+                    current.getHour(), current.getMinute(), true).show();
+        });
     }
 
     private void header(String title, String subtitle) {
@@ -668,12 +736,10 @@ public final class MainActivity extends Activity {
 
     private static final class BreakInput {
         final View row;
-        final EditText start;
-        final EditText end;
-        BreakInput(View row, EditText start, EditText end) {
+        final EditText hours;
+        BreakInput(View row, EditText hours) {
             this.row = row;
-            this.start = start;
-            this.end = end;
+            this.hours = hours;
         }
     }
 }
