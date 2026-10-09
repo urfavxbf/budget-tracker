@@ -64,4 +64,58 @@ public class SalaryCalculatorTest {
                 8 * 60, new BigDecimal("100"), new BigDecimal("1.25"),
                 BigDecimal.ZERO, BigDecimal.ZERO);
     }
+    @Test
+    public void roundsPartialHourPayToCents() {
+        SalaryCalculator.Result result = SalaryCalculator.calculateWithBreakMinutes(
+                LocalTime.of(8, 0), LocalTime.of(8, 7), 0,
+                8 * 60, new BigDecimal("10"), new BigDecimal("1.25"),
+                BigDecimal.ZERO, BigDecimal.ZERO);
+
+        assertEquals(new BigDecimal("1.17"), result.regularPay);
+        assertEquals(new BigDecimal("1.17"), result.estimatedNetPay);
+    }
+
+    @Test
+    public void preventsNegativeNetPayWhenDeductionExceedsGrossPay() {
+        SalaryCalculator.Result result = SalaryCalculator.calculateWithBreakMinutes(
+                LocalTime.of(8, 0), LocalTime.of(17, 0), 60,
+                8 * 60, new BigDecimal("100"), new BigDecimal("1.25"),
+                BigDecimal.ZERO, new BigDecimal("900"));
+
+        assertEquals(new BigDecimal("800.00"), result.grossPay);
+        assertEquals(new BigDecimal("0.00"), result.estimatedNetPay);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsBreakDurationEqualToShiftLength() {
+        SalaryCalculator.calculateWithBreakMinutes(
+                LocalTime.of(8, 0), LocalTime.of(17, 0), 540,
+                8 * 60, new BigDecimal("100"), new BigDecimal("1.25"),
+                BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsNegativeBreakDuration() {
+        SalaryCalculator.calculateWithBreakMinutes(
+                LocalTime.of(8, 0), LocalTime.of(17, 0), -1,
+                8 * 60, new BigDecimal("100"), new BigDecimal("1.25"),
+                BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsSameTimeInAndOut() {
+        SalaryCalculator.calculateWithBreakMinutes(
+                LocalTime.of(8, 0), LocalTime.of(8, 0), 0,
+                8 * 60, new BigDecimal("100"), new BigDecimal("1.25"),
+                BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsZeroOvertimeMultiplier() {
+        SalaryCalculator.calculateWithBreakMinutes(
+                LocalTime.of(8, 0), LocalTime.of(18, 0), 60,
+                8 * 60, new BigDecimal("100"), BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
 }
