@@ -383,7 +383,7 @@ public final class MainActivity extends Activity {
         } catch (DateTimeParseException ex) {
             toast("Check date format (YYYY-MM-DD) and time format (HH:mm).");
         } catch (ArithmeticException ex) {
-            toast("Regular hours must convert to a whole number of minutes.");
+            toast("Regular hours and break durations must convert to whole minutes.");
         } catch (IllegalArgumentException ex) {
             toast(ex.getMessage());
         } catch (Exception ex) {
