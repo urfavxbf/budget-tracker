@@ -149,12 +149,14 @@ public final class MainActivity extends Activity {
         LocalDate today = LocalDate.now();
         LocalDate start = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
         LocalDate end = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
+        LocalDate payday = getPaydayForCurrentCutoff(today);
         BigDecimal earned = database.getRecordedNetPayTotal(start.toString(), end.toString());
         BigDecimal spent = database.getExpenseTotal(start.toString(), end.toString());
         BigDecimal remaining = earned.subtract(spent);
 
         card("PAYDAY CUTOFF", (today.getDayOfMonth() <= 15 ? "15th cutoff" : "Month-end cutoff"),
-                start.format(DateTimeFormatter.ofPattern("MMM d")) + " – " + end.format(DateTimeFormatter.ofPattern("MMM d, yyyy")));
+                start.format(DateTimeFormatter.ofPattern("MMM d")) + " – " + end.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
+                        + "\nPayday: " + payday.format(DateTimeFormatter.ofPattern("MMM d, yyyy")));
         LinearLayout balance = cardContainer();
         TextView eyebrow = text("RECORDED PAY MINUS EXPENSES", 12, true);
         eyebrow.setAlpha(0.78f);
@@ -431,10 +433,12 @@ public final class MainActivity extends Activity {
         LocalDate today = LocalDate.now();
         LocalDate start = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
         LocalDate end = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
+        LocalDate payday = getPaydayForCurrentCutoff(today);
         BigDecimal earned = database.getRecordedNetPayTotal(start.toString(), end.toString());
         BigDecimal spent = database.getExpenseTotal(start.toString(), end.toString());
         BigDecimal remaining = earned.subtract(spent);
         budgetSummaryView.setText("Cutoff  " + start + " to " + end
+                + "\nPayday                 " + payday
                 + "\nTotal recorded pay      " + money(earned)
                 + "\nRecorded expenses      " + money(spent)
                 + "\nRemaining after expenses " + money(remaining)
@@ -442,6 +446,18 @@ public final class MainActivity extends Activity {
         if (currentTab == 0) {
             // Dashboard cards are rebuilt on tab selection so their totals always refresh.
         }
+    }
+
+    private LocalDate getPaydayForCurrentCutoff(LocalDate today) {
+        boolean firstCutoff = today.getDayOfMonth() <= 15;
+        int day;
+        try {
+            day = Integer.parseInt(pref(firstCutoff ? "first_cutoff_payday" : "second_cutoff_payday", firstCutoff ? "22" : "7"));
+        } catch (NumberFormatException ignored) {
+            day = firstCutoff ? 22 : 7;
+        }
+        LocalDate targetMonth = firstCutoff ? today : today.plusMonths(1);
+        return targetMonth.withDayOfMonth(Math.min(Math.max(day, 1), targetMonth.lengthOfMonth()));
     }
 
     private void savePaydaySettings() {
