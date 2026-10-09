@@ -441,13 +441,24 @@ public final class MainActivity extends Activity {
     private void refreshBudget() {
         if (budgetSummaryView == null) return;
         LocalDate today = LocalDate.now();
-        LocalDate start = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
-        LocalDate end = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
-        LocalDate payday = getPaydayForCurrentCutoff(today);
-        BigDecimal earned = database.getRecordedNetPayTotal(start.toString(), end.toString());
-        BigDecimal spent = database.getExpenseTotal(start.toString(), end.toString());
+        CutoffPeriod cutoff = CutoffPeriod.forDate(today);
+        int firstPayday;
+        int secondPayday;
+        try {
+            firstPayday = Integer.parseInt(pref("first_cutoff_payday", "22"));
+        } catch (NumberFormatException ignored) {
+            firstPayday = 22;
+        }
+        try {
+            secondPayday = Integer.parseInt(pref("second_cutoff_payday", "7"));
+        } catch (NumberFormatException ignored) {
+            secondPayday = 7;
+        }
+        LocalDate payday = cutoff.payday(firstPayday, secondPayday);
+        BigDecimal earned = database.getRecordedNetPayTotal(cutoff.startDate.toString(), cutoff.endDate.toString());
+        BigDecimal spent = database.getExpenseTotal(cutoff.startDate.toString(), cutoff.endDate.toString());
         BigDecimal remaining = earned.subtract(spent);
-        budgetSummaryView.setText("Cutoff  " + start + " to " + end
+        budgetSummaryView.setText("Cutoff  " + cutoff.startDate + " to " + cutoff.endDate
                 + "\nPayday                 " + payday
                 + "\nTotal recorded pay      " + money(earned)
                 + "\nRecorded expenses      " + money(spent)
@@ -456,18 +467,6 @@ public final class MainActivity extends Activity {
         if (currentTab == 0) {
             // Dashboard cards are rebuilt on tab selection so their totals always refresh.
         }
-    }
-
-    private LocalDate getPaydayForCurrentCutoff(LocalDate today) {
-        boolean firstCutoff = today.getDayOfMonth() <= 15;
-        int day;
-        try {
-            day = Integer.parseInt(pref(firstCutoff ? "first_cutoff_payday" : "second_cutoff_payday", firstCutoff ? "22" : "7"));
-        } catch (NumberFormatException ignored) {
-            day = firstCutoff ? 22 : 7;
-        }
-        LocalDate targetMonth = firstCutoff ? today : today.plusMonths(1);
-        return targetMonth.withDayOfMonth(Math.min(Math.max(day, 1), targetMonth.lengthOfMonth()));
     }
 
     private void savePaydaySettings() {
