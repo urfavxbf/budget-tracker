@@ -77,8 +77,6 @@ public final class MainActivity extends Activity {
                 controller.hide(android.view.WindowInsets.Type.navigationBars());
                 controller.setSystemBarsBehavior(
                         android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-            } else {
-                decorView.post(this::applyImmersiveMode);
             }
         } else {
             decorView.setSystemUiVisibility(
