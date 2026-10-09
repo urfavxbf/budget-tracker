@@ -13,7 +13,7 @@ import java.util.Locale;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
-    private static final int DATABASE_VERSION = 1;
+    private static final int DATABASE_VERSION = 2;
 
     public WorkDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -40,11 +40,25 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 "estimated_net_pay TEXT NOT NULL," +
                 "created_at INTEGER NOT NULL)");
         db.execSQL("CREATE INDEX index_work_entries_date ON work_entries(work_date)");
+        createExpensesTable(db);
+    }
+
+    private static void createExpensesTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS expenses (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "expense_date TEXT NOT NULL," +
+                "category TEXT NOT NULL," +
+                "note TEXT NOT NULL," +
+                "amount TEXT NOT NULL," +
+                "created_at INTEGER NOT NULL)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_expenses_date ON expenses(expense_date)");
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // Database migrations must preserve existing user data.
+        if (oldVersion < 2) {
+            createExpensesTable(db);
+        }
     }
 
     public long insertEntry(String date, String timeIn, String timeOut, String breaks,
@@ -68,6 +82,55 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         values.put("estimated_net_pay", result.estimatedNetPay.toPlainString());
         values.put("created_at", System.currentTimeMillis());
         return getWritableDatabase().insertOrThrow("work_entries", null, values);
+    }
+
+    public long insertExpense(String date, String category, String note, BigDecimal amount) {
+        ContentValues values = new ContentValues();
+        values.put("expense_date", date);
+        values.put("category", category);
+        values.put("note", note == null ? "" : note);
+        values.put("amount", amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        values.put("created_at", System.currentTimeMillis());
+        return getWritableDatabase().insertOrThrow("expenses", null, values);
+    }
+
+    public BigDecimal getEstimatedNetPayTotal(String startDate, String endDate) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT estimated_net_pay FROM work_entries WHERE work_date BETWEEN ? AND ?",
+                new String[]{startDate, endDate})) {
+            BigDecimal total = BigDecimal.ZERO;
+            while (cursor.moveToNext()) {
+                total = total.add(new BigDecimal(cursor.getString(0)));
+            }
+            return total.setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+    }
+
+    public BigDecimal getExpenseTotal(String startDate, String endDate) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT amount FROM expenses WHERE expense_date BETWEEN ? AND ?",
+                new String[]{startDate, endDate})) {
+            BigDecimal total = BigDecimal.ZERO;
+            while (cursor.moveToNext()) {
+                total = total.add(new BigDecimal(cursor.getString(0)));
+            }
+            return total.setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+    }
+
+    public List<String> getRecentExpenses(int limit) {
+        List<String> entries = new ArrayList<>();
+        try (Cursor cursor = getReadableDatabase().query(
+                "expenses", new String[]{"expense_date", "category", "note", "amount"},
+                null, null, null, null, "expense_date DESC, id DESC",
+                Integer.toString(Math.max(1, limit)))) {
+            while (cursor.moveToNext()) {
+                entries.add(String.format(Locale.getDefault(), "%s • %s • ₱%s%s",
+                        cursor.getString(0), cursor.getString(1), cursor.getString(3),
+                        cursor.getString(2).isEmpty() ? "" : "\\n" + cursor.getString(2)));
+            }
+        }
+        return entries;
     }
 
     public List<String> getRecentEntries(int limit) {
