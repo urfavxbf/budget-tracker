@@ -13,7 +13,7 @@ import java.util.Locale;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
-    private static final int DATABASE_VERSION = 2;
+    private static final int DATABASE_VERSION = 3;
 
     public WorkDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -31,6 +31,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 "break_minutes INTEGER NOT NULL," +
                 "net_minutes INTEGER NOT NULL," +
                 "regular_minutes INTEGER NOT NULL," +
+                "configured_regular_minutes INTEGER NOT NULL DEFAULT 480," +
                 "overtime_minutes INTEGER NOT NULL," +
                 "hourly_rate TEXT NOT NULL," +
                 "ot_multiplier TEXT NOT NULL," +
@@ -59,6 +60,10 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         if (oldVersion < 2) {
             createExpensesTable(db);
         }
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE work_entries ADD COLUMN configured_regular_minutes INTEGER NOT NULL DEFAULT 480");
+            db.execSQL("UPDATE work_entries SET configured_regular_minutes = regular_minutes WHERE overtime_minutes > 0");
+        }
     }
 
     public boolean hasEntryForShift(String date, String timeIn, String timeOut) {
@@ -71,7 +76,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
 
     public long insertEntry(String date, String timeIn, String timeOut, String breaks,
                             SalaryCalculator.Result result, BigDecimal hourlyRate,
-                            BigDecimal overtimeMultiplier) {
+                            BigDecimal overtimeMultiplier, int configuredRegularMinutes) {
         ContentValues values = new ContentValues();
         values.put("work_date", date);
         values.put("time_in", timeIn);
@@ -81,6 +86,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         values.put("break_minutes", result.breakMinutes);
         values.put("net_minutes", result.netWorkMinutes);
         values.put("regular_minutes", result.regularMinutes);
+        values.put("configured_regular_minutes", configuredRegularMinutes);
         values.put("overtime_minutes", result.overtimeMinutes);
         values.put("hourly_rate", hourlyRate.toPlainString());
         values.put("ot_multiplier", overtimeMultiplier.toPlainString());
@@ -112,7 +118,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
 
     public boolean updateEntry(long id, String date, String timeIn, String timeOut, String breaks,
                                SalaryCalculator.Result result, BigDecimal hourlyRate,
-                               BigDecimal overtimeMultiplier) {
+                               BigDecimal overtimeMultiplier, int configuredRegularMinutes) {
         ContentValues values = new ContentValues();
         values.put("work_date", date);
         values.put("time_in", timeIn);
@@ -122,6 +128,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         values.put("break_minutes", result.breakMinutes);
         values.put("net_minutes", result.netWorkMinutes);
         values.put("regular_minutes", result.regularMinutes);
+        values.put("configured_regular_minutes", configuredRegularMinutes);
         values.put("overtime_minutes", result.overtimeMinutes);
         values.put("hourly_rate", hourlyRate.toPlainString());
         values.put("ot_multiplier", overtimeMultiplier.toPlainString());
@@ -157,16 +164,16 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         List<WorkEntry> entries = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().query(
                 "work_entries",
-                new String[]{"id", "work_date", "time_in", "time_out", "breaks", "regular_minutes",
+                new String[]{"id", "work_date", "time_in", "time_out", "breaks", "regular_minutes", "configured_regular_minutes",
                         "break_minutes", "net_minutes", "overtime_minutes", "hourly_rate", "ot_multiplier",
                         "allowance", "deduction", "estimated_net_pay"},
                 null, null, null, null, "work_date DESC, id DESC",
                 Integer.toString(Math.max(1, limit)))) {
             while (cursor.moveToNext()) {
                 entries.add(new WorkEntry(cursor.getLong(0), cursor.getString(1), cursor.getString(2),
-                        cursor.getString(3), cursor.getString(4), cursor.getInt(5), cursor.getInt(6),
-                        cursor.getInt(7), cursor.getInt(8), cursor.getString(9), cursor.getString(10),
-                        cursor.getString(11), cursor.getString(12), cursor.getString(13)));
+                        cursor.getString(3), cursor.getString(4), cursor.getInt(5), cursor.getInt(6), cursor.getInt(7),
+                        cursor.getInt(8), cursor.getInt(9), cursor.getString(10), cursor.getString(11),
+                        cursor.getString(12), cursor.getString(13), cursor.getString(14)));
             }
         }
         return entries;
@@ -189,9 +196,9 @@ public final class WorkDatabase extends SQLiteOpenHelper {
     public static final class WorkEntry {
         public final long id;
         public final String date, timeIn, timeOut, breaks, hourlyRate, overtimeMultiplier, allowance, deduction, netPay;
-        public final int regularMinutes, breakMinutes, netMinutes, overtimeMinutes;
+        public final int regularMinutes, configuredRegularMinutes, breakMinutes, netMinutes, overtimeMinutes;
 
-        WorkEntry(long id, String date, String timeIn, String timeOut, String breaks, int regularMinutes,
+        WorkEntry(long id, String date, String timeIn, String timeOut, String breaks, int regularMinutes, int configuredRegularMinutes,
                   int breakMinutes, int netMinutes, int overtimeMinutes, String hourlyRate,
                   String overtimeMultiplier, String allowance, String deduction, String netPay) {
             this.id = id;
@@ -200,6 +207,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             this.timeOut = timeOut;
             this.breaks = breaks;
             this.regularMinutes = regularMinutes;
+            this.configuredRegularMinutes = configuredRegularMinutes;
             this.breakMinutes = breakMinutes;
             this.netMinutes = netMinutes;
             this.overtimeMinutes = overtimeMinutes;
