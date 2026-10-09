@@ -94,6 +94,10 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         return getWritableDatabase().insertOrThrow("expenses", null, values);
     }
 
+    public BigDecimal getRecordedNetPayTotal(String startDate, String endDate) {
+        return getEstimatedNetPayTotal(startDate, endDate);
+    }
+
     public BigDecimal getEstimatedNetPayTotal(String startDate, String endDate) {
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT estimated_net_pay FROM work_entries WHERE work_date BETWEEN ? AND ?",
@@ -150,7 +154,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 int overtimeMinutes = cursor.getInt(5);
                 String pay = cursor.getString(6);
                 entries.add(String.format(Locale.getDefault(),
-                        "%s  •  %s–%s\nWork %s  •  Break %s  •  OT %s\nEstimated net pay: ₱%s",
+                        "%s  •  %s–%s\nWork %s  •  Break %s  •  OT %s\nRecorded net pay: ₱%s",
                         date, timeIn, timeOut, formatMinutes(netMinutes),
                         formatMinutes(breakMinutes), formatMinutes(overtimeMinutes), pay));
             }
