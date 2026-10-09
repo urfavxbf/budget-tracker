@@ -137,6 +137,10 @@ public final class MainActivity extends Activity {
             item.addView(icon);
             item.addView(label);
             item.setOnClickListener(v -> {
+                if (tab != currentTab) {
+                    editingWorkEntryId = -1;
+                    editingExpenseId = -1;
+                }
                 currentTab = tab;
                 buildBottomNav();
                 showTab(tab);
