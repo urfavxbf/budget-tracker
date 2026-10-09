@@ -51,11 +51,11 @@ public final class MainActivity extends Activity {
             finish();
             return;
         }
-        applyImmersiveMode();
         database = new WorkDatabase(this);
         getWindow().setStatusBarColor(resolveColor(android.R.attr.colorBackground));
         getWindow().setNavigationBarColor(resolveColor(android.R.attr.colorBackground));
         buildShell();
+        applyImmersiveMode();
         showTab(currentTab);
     }
 
@@ -65,14 +65,23 @@ public final class MainActivity extends Activity {
     }
 
     private void applyImmersiveMode() {
+        android.view.Window window = getWindow();
+        if (window == null) return;
+
+        android.view.View decorView = window.getDecorView();
+        if (decorView == null) return;
+
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            android.view.WindowInsetsController controller = getWindow().getInsetsController();
+            android.view.WindowInsetsController controller = decorView.getWindowInsetsController();
             if (controller != null) {
                 controller.hide(android.view.WindowInsets.Type.navigationBars());
-                controller.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                controller.setSystemBarsBehavior(
+                        android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            } else {
+                decorView.post(this::applyImmersiveMode);
             }
         } else {
-            getWindow().getDecorView().setSystemUiVisibility(
+            decorView.setSystemUiVisibility(
                     View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
                             | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                             | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
