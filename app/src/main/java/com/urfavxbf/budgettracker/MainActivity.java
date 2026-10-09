@@ -36,6 +36,7 @@ public final class MainActivity extends Activity {
     private int currentTab = 0;
     private EditText dateInput, timeInInput, timeOutInput;
     private EditText hourlyRateInput, regularHoursInput, overtimeMultiplierInput, allowanceInput, deductionInput;
+    private EditText firstPaydayInput, secondPaydayInput;
     private Spinner payRateTypeInput;
     private EditText expenseDateInput, expenseCategoryInput, expenseAmountInput, expenseNoteInput;
     private LinearLayout breakContainer, historyContainer, expenseHistoryContainer;
