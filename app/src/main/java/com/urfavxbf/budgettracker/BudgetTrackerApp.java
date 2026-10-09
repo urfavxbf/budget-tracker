@@ -1,7 +1,6 @@
 package com.urfavxbf.budgettracker;
 
 import android.app.Application;
-import android.content.Intent;
 import android.os.Build;
 import android.os.Process;
 
@@ -39,21 +38,16 @@ public final class BudgetTrackerApp extends Application {
                         .edit()
                         .putString(CRASH_REPORT, report)
                         .commit();
-
-                Intent intent = new Intent(getApplicationContext(), CrashActivity.class);
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK
-                        | Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        | Intent.FLAG_ACTIVITY_NO_ANIMATION);
-                startActivity(intent);
-            } catch (Throwable handlerError) {
-                if (previousHandler != null) {
-                    previousHandler.uncaughtException(thread, throwable);
-                    return;
-                }
+            } catch (Throwable ignored) {
+                // Preserve the original crash even if report persistence fails.
             }
 
-            Process.killProcess(Process.myPid());
-            System.exit(10);
+            if (previousHandler != null) {
+                previousHandler.uncaughtException(thread, throwable);
+            } else {
+                Process.killProcess(Process.myPid());
+                System.exit(10);
+            }
         });
     }
 }
