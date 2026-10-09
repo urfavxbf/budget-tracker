@@ -78,7 +78,7 @@ public class CutoffPeriodTest {
 
     @Test
     public void paydayIsClampedToLastDayOfFebruary() {
-        CutoffPeriod cutoff = CutoffPeriod.forDate(LocalDate.of(2025, 12, 16));
+        CutoffPeriod cutoff = CutoffPeriod.forDate(LocalDate.of(2025, 1, 16));
 
         assertEquals(LocalDate.of(2026, 2, 28), cutoff.payday(22, 31));
     }
