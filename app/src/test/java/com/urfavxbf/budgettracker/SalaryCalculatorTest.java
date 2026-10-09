@@ -28,6 +28,19 @@ public class SalaryCalculatorTest {
     }
 
     @Test
+    public void calculatesUsingTotalBreakMinutesWithoutBreakClockTimes() {
+        SalaryCalculator.Result result = SalaryCalculator.calculateWithBreakMinutes(
+                LocalTime.of(8, 0), LocalTime.of(17, 0), 60,
+                8 * 60, new BigDecimal("100"), new BigDecimal("1.25"),
+                BigDecimal.ZERO, BigDecimal.ZERO);
+
+        assertEquals(540, result.shiftMinutes);
+        assertEquals(60, result.breakMinutes);
+        assertEquals(480, result.netWorkMinutes);
+        assertEquals(new BigDecimal("800.00"), result.estimatedNetPay);
+    }
+
+    @Test
     public void handlesOvernightShiftAndBreak() {
         SalaryCalculator.Result result = SalaryCalculator.calculate(
                 LocalTime.of(22, 0), LocalTime.of(6, 0),
