@@ -378,7 +378,7 @@ public final class MainActivity extends Activity {
             String savedBreaks = serializedBreaks.isEmpty() ? "0h" : android.text.TextUtils.join(", ", serializedBreaks);
             if (updatingEntry) {
                 if (!database.updateEntry(editingWorkEntryId, date.toString(), timeIn.toString(), timeOut.toString(),
-                        savedBreaks, result, effectiveHourlyRate, multiplier)) {
+                        savedBreaks, result, effectiveHourlyRate, multiplier, regularMinutes)) {
                     throw new IllegalArgumentException("This saved shift no longer exists.");
                 }
                 editingWorkEntryId = -1;
@@ -386,7 +386,7 @@ public final class MainActivity extends Activity {
             } else {
                 saveSalaryPreferences(enteredRate, rateType, regularHours, multiplier, allowance, deduction);
                 database.insertEntry(date.toString(), timeIn.toString(), timeOut.toString(),
-                        savedBreaks, result, effectiveHourlyRate, multiplier);
+                        savedBreaks, result, effectiveHourlyRate, multiplier, regularMinutes);
             }
             resultView.setText("PAY BREAKDOWN (" + rateType.toUpperCase(Locale.ROOT) + " RATE)\n\nShift     " + duration(result.shiftMinutes)
                     + "\nBreak     " + duration(result.breakMinutes)
@@ -506,7 +506,7 @@ public final class MainActivity extends Activity {
         timeOutInput.setText(entry.timeOut);
         payRateTypeInput.setSelection(0);
         hourlyRateInput.setText(entry.hourlyRate);
-        regularHoursInput.setText(BigDecimal.valueOf(entry.regularMinutes)
+        regularHoursInput.setText(BigDecimal.valueOf(entry.configuredRegularMinutes)
                 .divide(BigDecimal.valueOf(60), 2, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString());
         overtimeMultiplierInput.setText(entry.overtimeMultiplier);
         allowanceInput.setText(entry.allowance);
