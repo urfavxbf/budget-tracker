@@ -84,9 +84,9 @@ public final class MainActivity extends Activity {
             item.setPadding(dp(2), dp(5), dp(2), dp(5));
             TextView icon = text(new String[]{"⌂", "◷", "−", "⚙"}[i], 21, true);
             TextView label = text(TAB_NAMES[i], 11, currentTab == i);
-            int selected = currentTab == i;
+            boolean selected = currentTab == i;
             int accent = resolveColor(android.R.attr.colorAccent);
-            icon.setTextColor(selected == 1 ? accent : resolveColor(android.R.attr.textColorSecondary));
+            icon.setTextColor(selected ? accent : resolveColor(android.R.attr.textColorSecondary));
             label.setTextColor(selected == 1 ? accent : resolveColor(android.R.attr.textColorSecondary));
             item.addView(icon);
             item.addView(label);
@@ -509,9 +509,11 @@ public final class MainActivity extends Activity {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(16), dp(16), dp(16), dp(16));
         GradientDrawable bg = new GradientDrawable();
-        bg.setColor(resolveColor(android.R.attr.colorBackground) == 0xFFFFFFFF ? 0xFFF4F4F8 : resolveColor(android.R.attr.colorBackground));
+        boolean night = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+        bg.setColor(night ? 0xFF303038 : 0xFFF3F2F8);
         bg.setCornerRadius(dp(20));
-        bg.setStroke(dp(1), resolveColor(android.R.attr.colorBackground) == 0xFFFFFFFF ? 0xFFE6E6ED : 0x33444444);
+        bg.setStroke(dp(1), night ? 0xFF484852 : 0xFFE5E3EC);
         card.setBackground(bg);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
         params.bottomMargin = dp(10);
