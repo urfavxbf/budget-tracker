@@ -58,7 +58,19 @@ public final class MainActivity extends Activity {
     }
 
     private void applyImmersiveMode() {
-        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            android.view.WindowInsetsController controller = getWindow().getInsetsController();
+            if (controller != null) {
+                controller.hide(android.view.WindowInsets.Type.navigationBars());
+                controller.setSystemBarsBehavior(android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+            }
+        } else {
+            getWindow().getDecorView().setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+        }
     }
 
     @Override protected void onDestroy() {
@@ -323,6 +335,9 @@ public final class MainActivity extends Activity {
             BigDecimal multiplier = decimal(overtimeMultiplierInput, "OT multiplier");
             BigDecimal allowance = decimal(allowanceInput, "Allowance");
             BigDecimal deduction = decimal(deductionInput, "Deduction");
+            if (regularHours.signum() <= 0 || regularHours.multiply(BigDecimal.valueOf(60)).stripTrailingZeros().scale() > 0) {
+                throw new IllegalArgumentException("Regular hours must be positive and convert to whole minutes.");
+            }
             int regularMinutes = regularHours.multiply(BigDecimal.valueOf(60)).intValueExact();
             int totalBreakMinutes = 0;
             List<String> serializedBreaks = new ArrayList<>();
