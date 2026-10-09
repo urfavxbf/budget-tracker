@@ -469,6 +469,16 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private LocalDate getPaydayForCurrentCutoff(LocalDate today) {
+        boolean firstCutoff = today.getDayOfMonth() <= 15;
+        int day;
+        try {
+            day = Integer.parseInt(pref(firstCutoff ? "first_cutoff_payday" : "second_cutoff_payday", firstCutoff ? "22" : "7"));
+        } catch (NumberFormatException ignored) {
+            day = firstCutoff ? 22 : 7;
+        }
+        return CutoffPeriod.forDate(today).payday(firstCutoff ? day : 22, firstCutoff ? 7 : day);
+    }
     private void savePaydaySettings() {
         try {
             int first = Integer.parseInt(value(firstPaydayInput));
