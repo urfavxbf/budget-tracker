@@ -370,12 +370,13 @@ public final class MainActivity extends Activity {
                     ? enteredRate.divide(regularHours, 8, java.math.RoundingMode.HALF_UP) : enteredRate;
             SalaryCalculator.Result result = SalaryCalculator.calculateWithBreakMinutes(timeIn, timeOut,
                     totalBreakMinutes, regularMinutes, effectiveHourlyRate, multiplier, allowance, deduction);
-            boolean duplicate = editingWorkEntryId >= 0
+            boolean updatingEntry = editingWorkEntryId >= 0;
+            boolean duplicate = updatingEntry
                     ? database.hasEntryForShiftExceptId(date.toString(), timeIn.toString(), timeOut.toString(), editingWorkEntryId)
                     : database.hasEntryForShift(date.toString(), timeIn.toString(), timeOut.toString());
             if (duplicate) throw new IllegalArgumentException("A shift with this date, time in, and time out is already saved.");
             String savedBreaks = serializedBreaks.isEmpty() ? "0h" : android.text.TextUtils.join(", ", serializedBreaks);
-            if (editingWorkEntryId >= 0) {
+            if (updatingEntry) {
                 if (!database.updateEntry(editingWorkEntryId, date.toString(), timeIn.toString(), timeOut.toString(),
                         savedBreaks, result, effectiveHourlyRate, multiplier)) {
                     throw new IllegalArgumentException("This saved shift no longer exists.");
@@ -399,7 +400,7 @@ public final class MainActivity extends Activity {
                     + "\nGross pay     " + money(result.grossPay)
                     + "\nNet pay      " + money(result.estimatedNetPay));
             refreshHistory();
-            Toast.makeText(this, editingWorkEntryId >= 0 ? "Shift updated" : "Shift saved", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, updatingEntry ? "Shift updated" : "Shift saved", Toast.LENGTH_SHORT).show();
         } catch (DateTimeParseException ex) {
             toast("Check date format (YYYY-MM-DD) and time format (HH:mm).");
         } catch (ArithmeticException ex) {
@@ -418,7 +419,8 @@ public final class MainActivity extends Activity {
             if (category.isEmpty()) throw new IllegalArgumentException("Expense category is required.");
             BigDecimal amount = decimal(expenseAmountInput, "Expense amount");
             if (amount.signum() <= 0) throw new IllegalArgumentException("Amount must be greater than zero.");
-            if (editingExpenseId >= 0) {
+            boolean updatingExpense = editingExpenseId >= 0;
+            if (updatingExpense) {
                 if (!database.updateExpense(editingExpenseId, date.toString(), category, value(expenseNoteInput), amount)) {
                     throw new IllegalArgumentException("This saved expense no longer exists.");
                 }
@@ -431,7 +433,7 @@ public final class MainActivity extends Activity {
             expenseNoteInput.setText("");
             refreshBudget();
             refreshExpenseHistory();
-            Toast.makeText(this, editingExpenseId >= 0 ? "Expense updated" : "Expense saved", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, updatingExpense ? "Expense updated" : "Expense saved", Toast.LENGTH_SHORT).show();
         } catch (DateTimeParseException ex) {
             toast("Use YYYY-MM-DD for the expense date.");
         } catch (IllegalArgumentException ex) {
