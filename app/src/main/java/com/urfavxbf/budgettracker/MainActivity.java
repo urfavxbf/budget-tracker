@@ -87,7 +87,7 @@ public final class MainActivity extends Activity {
             boolean selected = currentTab == i;
             int accent = resolveColor(android.R.attr.colorAccent);
             icon.setTextColor(selected ? accent : resolveColor(android.R.attr.textColorSecondary));
-            label.setTextColor(selected == 1 ? accent : resolveColor(android.R.attr.textColorSecondary));
+            label.setTextColor(selected ? accent : resolveColor(android.R.attr.textColorSecondary));
             item.addView(icon);
             item.addView(label);
             item.setOnClickListener(v -> {
