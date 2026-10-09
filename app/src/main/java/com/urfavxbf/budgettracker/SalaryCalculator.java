@@ -97,6 +97,47 @@ public final class SalaryCalculator {
                 deduction.setScale(2, RoundingMode.HALF_UP), gross, net);
     }
 
+    public static Result calculateWithBreakMinutes(
+            LocalTime timeIn, LocalTime timeOut, int breakMinutes,
+            int regularMinutesPerDay, BigDecimal hourlyRate,
+            BigDecimal overtimeMultiplier, BigDecimal allowance, BigDecimal deduction) {
+        if (timeIn == null || timeOut == null) {
+            throw new IllegalArgumentException("Time in and time out are required.");
+        }
+        if (regularMinutesPerDay <= 0 || regularMinutesPerDay > MINUTES_PER_DAY) {
+            throw new IllegalArgumentException("Regular work duration must be between 1 minute and 24 hours.");
+        }
+        if (breakMinutes < 0) throw new IllegalArgumentException("Break duration cannot be negative.");
+        requireNonNegative(hourlyRate, "Hourly rate");
+        requirePositive(overtimeMultiplier, "Overtime multiplier");
+        requireNonNegative(allowance, "Allowance");
+        requireNonNegative(deduction, "Deduction");
+        int start = timeIn.getHour() * 60 + timeIn.getMinute();
+        int end = timeOut.getHour() * 60 + timeOut.getMinute();
+        if (start == end) throw new IllegalArgumentException("Time in and time out cannot be the same.");
+        if (end < start) end += MINUTES_PER_DAY;
+        int shiftMinutes = end - start;
+        if (shiftMinutes <= 0 || shiftMinutes > MINUTES_PER_DAY) {
+            throw new IllegalArgumentException("Shift duration must not exceed 24 hours.");
+        }
+        if (breakMinutes >= shiftMinutes) {
+            throw new IllegalArgumentException("Break time must be shorter than the total shift.");
+        }
+        int netMinutes = shiftMinutes - breakMinutes;
+        int regularMinutes = Math.min(netMinutes, regularMinutesPerDay);
+        int overtimeMinutes = Math.max(0, netMinutes - regularMinutesPerDay);
+        BigDecimal regularPay = hourlyRate.multiply(BigDecimal.valueOf(regularMinutes))
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        BigDecimal overtimePay = hourlyRate.multiply(overtimeMultiplier)
+                .multiply(BigDecimal.valueOf(overtimeMinutes))
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        BigDecimal gross = regularPay.add(overtimePay).add(allowance).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal net = gross.subtract(deduction).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+        return new Result(shiftMinutes, breakMinutes, netMinutes, regularMinutes, overtimeMinutes,
+                regularPay, overtimePay, allowance.setScale(2, RoundingMode.HALF_UP),
+                deduction.setScale(2, RoundingMode.HALF_UP), gross, net);
+    }
+
     private static void requireNonNegative(BigDecimal value, String label) {
         if (value == null || value.signum() < 0) {
             throw new IllegalArgumentException(label + " cannot be negative or missing.");
