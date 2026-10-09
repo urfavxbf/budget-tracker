@@ -172,7 +172,7 @@ public final class MainActivity extends Activity {
         times.addView(timeOutInput, new LinearLayout.LayoutParams(0, dp(56), 1f));
         addField(card, "Time in / time out", times);
 
-        section("Break periods");
+        addSection(card, "Break periods");
         breakContainer = new LinearLayout(this);
         breakContainer.setOrientation(LinearLayout.VERTICAL);
         card.addView(breakContainer);
@@ -181,7 +181,7 @@ public final class MainActivity extends Activity {
         addBreak.setOnClickListener(v -> addBreakRow("", ""));
         card.addView(addBreak);
 
-        section("Daily salary calculation");
+        addSection(card, "Daily salary calculation");
         hourlyRateInput = field("Hourly rate", pref("hourly_rate", "100.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         regularHoursInput = field("Regular hours per day", pref("regular_hours", "8"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         overtimeMultiplierInput = field("OT multiplier", pref("ot_multiplier", "1.25"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
@@ -236,7 +236,7 @@ public final class MainActivity extends Activity {
         header("Settings", "Set your usual pay rates and cutoff schedule.");
         LinearLayout card = cardContainer();
         page.addView(card);
-        section("Salary defaults");
+        addSection(card, "Salary defaults");
         hourlyRateInput = field("Hourly rate", pref("hourly_rate", "100.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         regularHoursInput = field("Regular hours per day", pref("regular_hours", "8"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         overtimeMultiplierInput = field("OT multiplier", pref("ot_multiplier", "1.25"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
@@ -441,9 +441,13 @@ public final class MainActivity extends Activity {
     }
 
     private void section(String label) {
+        addSection(page, label);
+    }
+
+    private void addSection(LinearLayout parent, String label) {
         TextView heading = text(label, 18, true);
-        heading.setPadding(0, dp(20), 0, dp(10));
-        page.addView(heading);
+        heading.setPadding(0, dp(12), 0, dp(8));
+        parent.addView(heading);
     }
 
     private void card(String title, String value, String detail) {
@@ -598,7 +602,7 @@ public final class MainActivity extends Activity {
     private int resolveColor(int attribute) {
         android.util.TypedValue value = new android.util.TypedValue();
         getTheme().resolveAttribute(attribute, value, true);
-        if (value.resourceId != 0) return getResources().getColor(value.resourceId, getTheme());
+        if (value.resourceId != 0) return getResources().getColorStateList(value.resourceId, getTheme()).getDefaultColor();
         return value.data;
     }
 
