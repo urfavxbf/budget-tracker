@@ -363,6 +363,9 @@ public final class MainActivity extends Activity {
                     ? enteredRate.divide(regularHours, 8, java.math.RoundingMode.HALF_UP) : enteredRate;
             SalaryCalculator.Result result = SalaryCalculator.calculateWithBreakMinutes(timeIn, timeOut,
                     totalBreakMinutes, regularMinutes, effectiveHourlyRate, multiplier, allowance, deduction);
+            if (database.hasEntryForShift(date.toString(), timeIn.toString(), timeOut.toString())) {
+                throw new IllegalArgumentException("A shift with this date, time in, and time out is already saved.");
+            }
             saveSalaryPreferences(enteredRate, rateType, regularHours, multiplier, allowance, deduction);
             database.insertEntry(date.toString(), timeIn.toString(), timeOut.toString(),
                     serializedBreaks.isEmpty() ? "0h" : android.text.TextUtils.join(", ", serializedBreaks),
