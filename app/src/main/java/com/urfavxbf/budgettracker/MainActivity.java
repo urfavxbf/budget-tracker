@@ -36,6 +36,12 @@ public final class MainActivity extends Activity {
     private EditText allowanceInput;
     private EditText deductionInput;
     private TextView resultView;
+    private TextView budgetSummaryView;
+    private LinearLayout expenseHistoryContainer;
+    private EditText expenseDateInput;
+    private EditText expenseCategoryInput;
+    private EditText expenseAmountInput;
+    private EditText expenseNoteInput;
     private WorkDatabase database;
 
     @Override
@@ -45,6 +51,7 @@ public final class MainActivity extends Activity {
         buildUi();
         addBreakRow("12:00", "13:00");
         refreshHistory();
+        refreshBudget();
     }
 
     @Override
@@ -110,10 +117,33 @@ public final class MainActivity extends Activity {
         historyContainer = new LinearLayout(this);
         historyContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(historyContainer);
-        TextView note = text("Local-first MVP. Estimated salary is not a confirmed payroll payment. Cloud sync and budget modules are planned next.", 12, false);
+        TextView note = text("Local-first MVP. Salary estimates are not confirmed payroll payments.", 12, false);
         note.setAlpha(0.7f);
         note.setPadding(0, dp(20), 0, 0);
         root.addView(note);
+
+        section("Current cutoff budget");
+        budgetSummaryView = text("Calculating cutoff...", 16, false);
+        budgetSummaryView.setPadding(dp(12), dp(12), dp(12), dp(12));
+        root.addView(budgetSummaryView);
+
+        section("Add expense");
+        expenseDateInput = field("Expense date (YYYY-MM-DD)", LocalDate.now().toString(), InputType.TYPE_CLASS_DATETIME);
+        root.addView(expenseDateInput);
+        expenseCategoryInput = field("Category (e.g. Food, Transport)", "", InputType.TYPE_CLASS_TEXT);
+        root.addView(expenseCategoryInput);
+        expenseAmountInput = field("Amount (₱)", "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        root.addView(expenseAmountInput);
+        expenseNoteInput = field("Note (optional)", "", InputType.TYPE_CLASS_TEXT);
+        root.addView(expenseNoteInput);
+        Button addExpenseButton = button("Save expense");
+        addExpenseButton.setOnClickListener(v -> addExpense());
+        root.addView(addExpenseButton);
+
+        section("Recent expenses");
+        expenseHistoryContainer = new LinearLayout(this);
+        expenseHistoryContainer.setOrientation(LinearLayout.VERTICAL);
+        root.addView(expenseHistoryContainer);
     }
 
     private void addBreakRow(String start, String end) {
@@ -187,6 +217,7 @@ public final class MainActivity extends Activity {
                     result.allowance.toPlainString(), result.deduction.toPlainString(),
                     result.grossPay.toPlainString(), result.estimatedNetPay.toPlainString()));
             refreshHistory();
+            refreshBudget();
             Toast.makeText(this, "Daily work entry saved", Toast.LENGTH_SHORT).show();
         } catch (DateTimeParseException ex) {
             Toast.makeText(this, "Check the date (YYYY-MM-DD) and times (HH:mm).", Toast.LENGTH_LONG).show();
@@ -216,6 +247,70 @@ public final class MainActivity extends Activity {
             divider.setBackgroundColor(0x33888888);
             historyContainer.addView(divider, new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, dp(1)));
+        }
+    }
+
+    private void addExpense() {
+        try {
+            LocalDate date = LocalDate.parse(value(expenseDateInput), DateTimeFormatter.ISO_LOCAL_DATE);
+            String category = value(expenseCategoryInput);
+            if (category.isEmpty()) {
+                throw new IllegalArgumentException("Expense category is required.");
+            }
+            BigDecimal amount = decimal(expenseAmountInput, "Expense amount");
+            if (amount.signum() <= 0) {
+                throw new IllegalArgumentException("Expense amount must be greater than zero.");
+            }
+            database.insertExpense(date.toString(), category, value(expenseNoteInput), amount);
+            expenseAmountInput.setText("");
+            expenseNoteInput.setText("");
+            refreshBudget();
+            Toast.makeText(this, "Expense saved", Toast.LENGTH_SHORT).show();
+        } catch (DateTimeParseException ex) {
+            Toast.makeText(this, "Use YYYY-MM-DD for the expense date.", Toast.LENGTH_LONG).show();
+        } catch (IllegalArgumentException ex) {
+            Toast.makeText(this, ex.getMessage(), Toast.LENGTH_LONG).show();
+        } catch (Exception ex) {
+            Toast.makeText(this, "Could not save expense: " + ex.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void refreshBudget() {
+        if (budgetSummaryView == null) return;
+        LocalDate today = LocalDate.now();
+        LocalDate start;
+        LocalDate end;
+        if (today.getDayOfMonth() <= 15) {
+            start = today.withDayOfMonth(1);
+            end = today.withDayOfMonth(15);
+        } else {
+            start = today.withDayOfMonth(16);
+            end = today.withDayOfMonth(today.lengthOfMonth());
+        }
+        BigDecimal estimatedEarnings = database.getEstimatedNetPayTotal(start.toString(), end.toString());
+        BigDecimal expenses = database.getExpenseTotal(start.toString(), end.toString());
+        BigDecimal projectedRemaining = estimatedEarnings.subtract(expenses);
+        budgetSummaryView.setText(String.format(Locale.getDefault(),
+                "Cutoff: %s to %s\\nRecorded estimated net earnings: ₱%s\\nRecorded expenses: ₱%s\\nProjected difference: ₱%s\\n\\nThis is a projection based on saved entries, not confirmed cash on hand.",
+                start, end, estimatedEarnings.toPlainString(), expenses.toPlainString(),
+                projectedRemaining.toPlainString()));
+
+        if (expenseHistoryContainer != null) {
+            expenseHistoryContainer.removeAllViews();
+            List<String> expensesList = database.getRecentExpenses(20);
+            if (expensesList.isEmpty()) {
+                expenseHistoryContainer.addView(text("No expenses recorded yet.", 14, false));
+            } else {
+                for (String expense : expensesList) {
+                    TextView item = text(expense, 14, false);
+                    item.setPadding(dp(12), dp(10), dp(12), dp(10));
+                    expenseHistoryContainer.addView(item);
+                    View divider = new View(this);
+                    divider.setBackgroundColor(0x33888888);
+                    expenseHistoryContainer.addView(divider, new LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT, dp(1)));
+                }
+            }
         }
     }
 
