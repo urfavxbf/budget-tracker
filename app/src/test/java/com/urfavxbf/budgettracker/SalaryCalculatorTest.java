@@ -18,7 +18,7 @@ public class SalaryCalculatorTest {
                 8 * 60, new BigDecimal("100"), new BigDecimal("1.25"),
                 BigDecimal.ZERO, BigDecimal.ZERO);
 
-        assertEquals(600, result.breakMinutes);
+        assertEquals(60, result.breakMinutes);
         assertEquals(540, result.netWorkMinutes);
         assertEquals(480, result.regularMinutes);
         assertEquals(60, result.overtimeMinutes);
