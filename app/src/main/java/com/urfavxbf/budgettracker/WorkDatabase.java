@@ -102,6 +102,128 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         return getWritableDatabase().insertOrThrow("expenses", null, values);
     }
 
+    public boolean hasEntryForShiftExceptId(String date, String timeIn, String timeOut, long excludedId) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT 1 FROM work_entries WHERE work_date = ? AND time_in = ? AND time_out = ? AND id != ? LIMIT 1",
+                new String[]{date, timeIn, timeOut, Long.toString(excludedId)})) {
+            return cursor.moveToFirst();
+        }
+    }
+
+    public boolean updateEntry(long id, String date, String timeIn, String timeOut, String breaks,
+                               SalaryCalculator.Result result, BigDecimal hourlyRate,
+                               BigDecimal overtimeMultiplier) {
+        ContentValues values = new ContentValues();
+        values.put("work_date", date);
+        values.put("time_in", timeIn);
+        values.put("time_out", timeOut);
+        values.put("breaks", breaks);
+        values.put("shift_minutes", result.shiftMinutes);
+        values.put("break_minutes", result.breakMinutes);
+        values.put("net_minutes", result.netWorkMinutes);
+        values.put("regular_minutes", result.regularMinutes);
+        values.put("overtime_minutes", result.overtimeMinutes);
+        values.put("hourly_rate", hourlyRate.toPlainString());
+        values.put("ot_multiplier", overtimeMultiplier.toPlainString());
+        values.put("allowance", result.allowance.toPlainString());
+        values.put("deduction", result.deduction.toPlainString());
+        values.put("gross_pay", result.grossPay.toPlainString());
+        values.put("estimated_net_pay", result.estimatedNetPay.toPlainString());
+        return getWritableDatabase().update("work_entries", values, "id = ?",
+                new String[]{Long.toString(id)}) == 1;
+    }
+
+    public boolean deleteEntry(long id) {
+        return getWritableDatabase().delete("work_entries", "id = ?",
+                new String[]{Long.toString(id)}) == 1;
+    }
+
+    public boolean updateExpense(long id, String date, String category, String note, BigDecimal amount) {
+        ContentValues values = new ContentValues();
+        values.put("expense_date", date);
+        values.put("category", category);
+        values.put("note", note == null ? "" : note);
+        values.put("amount", amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        return getWritableDatabase().update("expenses", values, "id = ?",
+                new String[]{Long.toString(id)}) == 1;
+    }
+
+    public boolean deleteExpense(long id) {
+        return getWritableDatabase().delete("expenses", "id = ?",
+                new String[]{Long.toString(id)}) == 1;
+    }
+
+    public List<WorkEntry> getRecentWorkEntries(int limit) {
+        List<WorkEntry> entries = new ArrayList<>();
+        try (Cursor cursor = getReadableDatabase().query(
+                "work_entries",
+                new String[]{"id", "work_date", "time_in", "time_out", "breaks", "regular_minutes",
+                        "break_minutes", "net_minutes", "overtime_minutes", "hourly_rate", "ot_multiplier",
+                        "allowance", "deduction", "estimated_net_pay"},
+                null, null, null, null, "work_date DESC, id DESC",
+                Integer.toString(Math.max(1, limit)))) {
+            while (cursor.moveToNext()) {
+                entries.add(new WorkEntry(cursor.getLong(0), cursor.getString(1), cursor.getString(2),
+                        cursor.getString(3), cursor.getString(4), cursor.getInt(5), cursor.getInt(6),
+                        cursor.getInt(7), cursor.getInt(8), cursor.getString(9), cursor.getString(10),
+                        cursor.getString(11), cursor.getString(12), cursor.getString(13)));
+            }
+        }
+        return entries;
+    }
+
+    public List<ExpenseEntry> getRecentExpenseEntries(int limit) {
+        List<ExpenseEntry> entries = new ArrayList<>();
+        try (Cursor cursor = getReadableDatabase().query(
+                "expenses", new String[]{"id", "expense_date", "category", "note", "amount"},
+                null, null, null, null, "expense_date DESC, id DESC",
+                Integer.toString(Math.max(1, limit)))) {
+            while (cursor.moveToNext()) {
+                entries.add(new ExpenseEntry(cursor.getLong(0), cursor.getString(1), cursor.getString(2),
+                        cursor.getString(3), cursor.getString(4)));
+            }
+        }
+        return entries;
+    }
+
+    public static final class WorkEntry {
+        public final long id;
+        public final String date, timeIn, timeOut, breaks, hourlyRate, overtimeMultiplier, allowance, deduction, netPay;
+        public final int regularMinutes, breakMinutes, netMinutes, overtimeMinutes;
+
+        WorkEntry(long id, String date, String timeIn, String timeOut, String breaks, int regularMinutes,
+                  int breakMinutes, int netMinutes, int overtimeMinutes, String hourlyRate,
+                  String overtimeMultiplier, String allowance, String deduction, String netPay) {
+            this.id = id;
+            this.date = date;
+            this.timeIn = timeIn;
+            this.timeOut = timeOut;
+            this.breaks = breaks;
+            this.regularMinutes = regularMinutes;
+            this.breakMinutes = breakMinutes;
+            this.netMinutes = netMinutes;
+            this.overtimeMinutes = overtimeMinutes;
+            this.hourlyRate = hourlyRate;
+            this.overtimeMultiplier = overtimeMultiplier;
+            this.allowance = allowance;
+            this.deduction = deduction;
+            this.netPay = netPay;
+        }
+    }
+
+    public static final class ExpenseEntry {
+        public final long id;
+        public final String date, category, note, amount;
+
+        ExpenseEntry(long id, String date, String category, String note, String amount) {
+            this.id = id;
+            this.date = date;
+            this.category = category;
+            this.note = note;
+            this.amount = amount;
+        }
+    }
+
     public BigDecimal getRecordedNetPayTotal(String startDate, String endDate) {
         return getEstimatedNetPayTotal(startDate, endDate);
     }
