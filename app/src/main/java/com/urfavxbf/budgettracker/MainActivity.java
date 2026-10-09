@@ -251,9 +251,19 @@ public final class MainActivity extends Activity {
         save.setOnClickListener(v -> saveSalaryDefaults());
         card.addView(save);
 
-        section("Payday schedule");
-        card("1st cutoff", "1st–15th of each month", "Expected payday: 15th");
-        card("2nd cutoff", "16th–last day of each month", "Expected payday: month-end");
+        section("Cutoff and payday schedule");
+        TextView scheduleInfo = text("Cutoff period and payday are different settings. The default cutoff periods stay 1st–15th and 16th–month-end; choose the separate payday for each period.", 13, false);
+        scheduleInfo.setPadding(0, 0, 0, dp(8));
+        page.addView(scheduleInfo);
+        firstPaydayInput = field("Payday day (1–31)", pref("first_cutoff_payday", "22"), InputType.TYPE_CLASS_NUMBER);
+        secondPaydayInput = field("Payday day (1–31)", pref("second_cutoff_payday", "7"), InputType.TYPE_CLASS_NUMBER);
+        addField(page, "Payday for 1st–15th cutoff (same month)", firstPaydayInput);
+        addField(page, "Payday for 16th–month-end cutoff (following month)", secondPaydayInput);
+        Button saveSchedule = button("Save cutoff and payday settings", true);
+        saveSchedule.setOnClickListener(v -> savePaydaySettings());
+        page.addView(saveSchedule);
+        card("1st cutoff", "1st–15th of each month", "Payday: " + pref("first_cutoff_payday", "22") + "th of the month");
+        card("2nd cutoff", "16th–last day of each month", "Payday: " + pref("second_cutoff_payday", "7") + "th of the following month");
         section("About your data");
         TextView info = text("Your entries are stored locally on this device. Pay amounts are estimates calculated from the hours and rates you enter. Cloud sync and confirmed payroll reconciliation are not enabled yet.", 14, false);
         info.setPadding(dp(4), dp(4), dp(4), dp(12));
@@ -394,6 +404,26 @@ public final class MainActivity extends Activity {
                 + "\n\nProjection only—not confirmed cash on hand.");
         if (currentTab == 0) {
             // Dashboard cards are rebuilt on tab selection so their totals always refresh.
+        }
+    }
+
+    private void savePaydaySettings() {
+        try {
+            int first = Integer.parseInt(value(firstPaydayInput));
+            int second = Integer.parseInt(value(secondPaydayInput));
+            if (first < 1 || first > 31 || second < 1 || second > 31) {
+                throw new IllegalArgumentException("Payday must be a day from 1 to 31.");
+            }
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putString("first_cutoff_payday", Integer.toString(first))
+                    .putString("second_cutoff_payday", Integer.toString(second))
+                    .apply();
+            Toast.makeText(this, "Cutoff and payday settings saved", Toast.LENGTH_SHORT).show();
+            showTab(3);
+        } catch (NumberFormatException ex) {
+            toast("Enter a valid payday day from 1 to 31.");
+        } catch (IllegalArgumentException ex) {
+            toast(ex.getMessage());
         }
     }
 
