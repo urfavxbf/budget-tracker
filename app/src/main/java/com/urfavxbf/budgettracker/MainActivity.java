@@ -45,6 +45,12 @@ public final class MainActivity extends Activity {
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (getSharedPreferences(BudgetTrackerApp.CRASH_PREFS, MODE_PRIVATE)
+                .contains(BudgetTrackerApp.CRASH_REPORT)) {
+            startActivity(new android.content.Intent(this, CrashActivity.class));
+            finish();
+            return;
+        }
         applyImmersiveMode();
         database = new WorkDatabase(this);
         getWindow().setStatusBarColor(resolveColor(android.R.attr.colorBackground));
