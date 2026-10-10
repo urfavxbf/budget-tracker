@@ -266,8 +266,9 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             }
             if (oldDate != null && (!oldDate.equals(paydayDate)
                     || new BigDecimal(oldReceived).compareTo(receivedAmount) != 0)) {
-                db.delete("budget_cycle_allocations", "cutoff_start = ? AND cutoff_end = ?",
-                        new String[]{cutoffStart, cutoffEnd});
+                db.execSQL("UPDATE budget_cycle_allocations SET needs_review = 1 " +
+                                "WHERE cutoff_start = ? AND cutoff_end = ?",
+                        new Object[]{cutoffStart, cutoffEnd});
             }
             ContentValues values = new ContentValues();
             values.put("cutoff_start", cutoffStart);
@@ -288,8 +289,14 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
-            db.delete("budget_cycle_allocations", "cutoff_start = ? AND cutoff_end = ?",
-                    new String[]{cutoffStart, cutoffEnd});
+            // A deleted salary must not silently erase money already reserved as savings.
+            // Convert any carryover from this cycle into savings before removing the payment,
+            // so the reserved amount remains accounted for and cannot be spent twice.
+            db.execSQL("UPDATE budget_cycle_allocations " +
+                            "SET savings_amount = CAST(savings_amount AS NUMERIC) + CAST(carryover_amount AS NUMERIC), " +
+                            "carryover_amount = '0.00', needs_review = 0 " +
+                            "WHERE cutoff_start = ? AND cutoff_end = ?",
+                    new Object[]{cutoffStart, cutoffEnd});
             int deleted = db.delete("payday_payments", "cutoff_start = ? AND cutoff_end = ?",
                     new String[]{cutoffStart, cutoffEnd});
             db.setTransactionSuccessful();
