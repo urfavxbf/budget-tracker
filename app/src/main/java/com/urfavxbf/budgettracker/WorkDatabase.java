@@ -324,6 +324,16 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
+            String deletedPaydayDate = null;
+            try (Cursor cursor = db.rawQuery(
+                    "SELECT payday_date FROM payday_payments " +
+                            "WHERE cutoff_start = ? AND cutoff_end = ? LIMIT 1",
+                    new String[]{cutoffStart, cutoffEnd})) {
+                if (cursor.moveToFirst()) deletedPaydayDate = cursor.getString(0);
+            }
+            if (deletedPaydayDate != null) {
+                invalidateAllocationsForPaydayChange(db, cutoffStart, cutoffEnd, deletedPaydayDate);
+            }
             // A deleted salary must not silently erase money already reserved as savings.
             // Convert any carryover from this cycle into savings before removing the payment,
             // so the reserved amount remains accounted for and cannot be spent twice.
