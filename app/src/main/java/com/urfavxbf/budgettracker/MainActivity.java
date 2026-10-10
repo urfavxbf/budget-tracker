@@ -675,18 +675,18 @@ public final class MainActivity extends FragmentActivity {
         page.addView(saveOpening);
 
         section("Spending budget");
-        TextView budgetInfo = text("Set a spending cap for each cutoff period. The dashboard tracks recorded expenses against this limit. Enter 0 to disable the limit.", 13, false);
+        TextView budgetInfo = text("Set a spending cap for each salary cycle. The dashboard tracks expenses since the most recently recorded payday against this limit. Enter 0 to disable the cap.", 13, false);
         budgetInfo.setPadding(0, 0, 0, dp(8));
         page.addView(budgetInfo);
         spendingBudgetInput = field("0.00", pref("spending_budget", "0.00"),
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        addField(page, "Spending limit per cutoff (₱)", spendingBudgetInput);
+        addField(page, "Spending limit per salary cycle (₱)", spendingBudgetInput);
         Button saveBudget = button("Save spending budget", true);
         saveBudget.setOnClickListener(v -> saveSpendingBudget());
         page.addView(saveBudget);
 
         section("About your data");
-        TextView info = text("Your entries are stored locally on this device. Expected pay is estimated from saved shifts. Record the amount actually received on payday to update available cash. Opening balance is adjusted against all expenses currently saved in the app.", 14, false);
+        TextView info = text("Your entries are stored locally on this device. Expected pay is estimated from saved shifts. Record the amount actually received on payday to update total cash. Savings are tracked separately and excluded from available-to-spend cash. Old salary and expense history is preserved when a new salary cycle begins.", 14, false);
         info.setPadding(dp(4), dp(4), dp(4), dp(12));
         page.addView(info);
     }
