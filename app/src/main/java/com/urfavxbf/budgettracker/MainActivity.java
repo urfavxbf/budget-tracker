@@ -56,7 +56,8 @@ public final class MainActivity extends FragmentActivity {
     private EditText hourlyRateInput, regularHoursInput, overtimeMultiplierInput, allowanceInput, deductionInput;
     private EditText firstPaydayInput, secondPaydayInput;
     private MaterialAutoCompleteTextView payRateTypeInput;
-    private EditText expenseDateInput, expenseCategoryInput, expenseAmountInput, expenseNoteInput;
+    private EditText expenseDateInput, expenseAmountInput, expenseNoteInput;
+    private MaterialAutoCompleteTextView expenseCategoryInput;
     private LinearLayout breakContainer, historyContainer, expenseHistoryContainer;
     private TextView resultView, budgetSummaryView;
     private EditText spendingBudgetInput;
@@ -178,7 +179,9 @@ public final class MainActivity extends FragmentActivity {
         breakInputs.clear();
         dateInput = timeInInput = timeOutInput = null;
         hourlyRateInput = regularHoursInput = overtimeMultiplierInput = allowanceInput = deductionInput = null;
-        expenseDateInput = expenseCategoryInput = expenseAmountInput = expenseNoteInput = null;
+        expenseDateInput = null;
+        expenseCategoryInput = null;
+        expenseAmountInput = expenseNoteInput = null;
         breakContainer = historyContainer = expenseHistoryContainer = null;
         resultView = budgetSummaryView = null;
         spendingBudgetInput = null;
@@ -351,7 +354,13 @@ public final class MainActivity extends FragmentActivity {
 
         expenseDateInput = field("Select expense date", entry == null ? LocalDate.now().toString() : entry.date, InputType.TYPE_NULL);
         configureDatePicker(expenseDateInput);
-        expenseCategoryInput = field("e.g. Food, Transport, Bills", entry == null ? "" : entry.category, InputType.TYPE_CLASS_TEXT);
+        expenseCategoryInput = new MaterialAutoCompleteTextView(this);
+        expenseCategoryInput.setSingleLine(true);
+        expenseCategoryInput.setInputType(InputType.TYPE_CLASS_TEXT);
+        expenseCategoryInput.setText(entry == null ? "" : entry.category, false);
+        expenseCategoryInput.setThreshold(1);
+        expenseCategoryInput.setAdapter(new ArrayAdapter<>(
+                this, android.R.layout.simple_dropdown_item_1line, getExpenseCategorySuggestions()));
         expenseAmountInput = field("0.00", entry == null ? "" : entry.amount,
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         expenseNoteInput = field("Optional note", entry == null ? "" : entry.note, InputType.TYPE_CLASS_TEXT);
@@ -385,6 +394,32 @@ public final class MainActivity extends FragmentActivity {
                 showTab(currentTab);
             }
         });
+    }
+
+    private List<String> getExpenseCategorySuggestions() {
+        List<String> categories = new ArrayList<>();
+        String[] commonCategories = {
+                "Food", "Transport", "Bills", "Groceries", "Health",
+                "Shopping", "Entertainment", "Rent", "Utilities",
+                "Education", "Personal care", "Other"
+        };
+        for (String category : commonCategories) {
+            addCategorySuggestion(categories, category);
+        }
+        for (String category : database.getDistinctExpenseCategories()) {
+            addCategorySuggestion(categories, category);
+        }
+        return categories;
+    }
+
+    private void addCategorySuggestion(List<String> categories, String category) {
+        if (category == null) return;
+        String trimmed = category.trim();
+        if (trimmed.isEmpty()) return;
+        for (String existing : categories) {
+            if (existing.equalsIgnoreCase(trimmed)) return;
+        }
+        categories.add(trimmed);
     }
 
     private void buildSettingsScreen() {
