@@ -124,6 +124,22 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 new Object[]{expenseDate, expenseDate});
     }
 
+    private static void invalidateAllocationsForPaydayChange(SQLiteDatabase db,
+                                                               String cutoffStart, String cutoffEnd,
+                                                               String affectedDate) {
+        if (affectedDate == null || affectedDate.isEmpty()) return;
+        db.execSQL("UPDATE budget_cycle_allocations SET needs_review = 1 " +
+                        "WHERE EXISTS (SELECT 1 FROM payday_payments p " +
+                        "WHERE p.cutoff_start = budget_cycle_allocations.cutoff_start " +
+                        "AND p.cutoff_end = budget_cycle_allocations.cutoff_end " +
+                        "AND ( (p.cutoff_start = ? AND p.cutoff_end = ?) " +
+                        "OR p.payday_date = (SELECT MAX(q.payday_date) FROM payday_payments q " +
+                        "WHERE q.payday_date < ?) " +
+                        "OR p.payday_date = (SELECT MIN(r.payday_date) FROM payday_payments r " +
+                        "WHERE r.payday_date > ?) ))",
+                new Object[]{cutoffStart, cutoffEnd, affectedDate, affectedDate});
+    }
+
     public boolean saveBudgetCycleAllocation(String cutoffStart, String cutoffEnd,
                                              BigDecimal savingsAmount, BigDecimal carryoverAmount) {
         ContentValues values = new ContentValues();
@@ -269,6 +285,10 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 db.execSQL("UPDATE budget_cycle_allocations SET needs_review = 1 " +
                                 "WHERE cutoff_start = ? AND cutoff_end = ?",
                         new Object[]{cutoffStart, cutoffEnd});
+                if (!oldDate.equals(paydayDate)) {
+                    invalidateAllocationsForPaydayChange(db, cutoffStart, cutoffEnd, oldDate);
+                    invalidateAllocationsForPaydayChange(db, cutoffStart, cutoffEnd, paydayDate);
+                }
             }
             ContentValues values = new ContentValues();
             values.put("cutoff_start", cutoffStart);
