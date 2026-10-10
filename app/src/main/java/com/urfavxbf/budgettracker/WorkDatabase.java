@@ -17,7 +17,7 @@ import java.util.TreeMap;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 4;
 
     public WorkDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -46,6 +46,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 "created_at INTEGER NOT NULL)");
         db.execSQL("CREATE INDEX index_work_entries_date ON work_entries(work_date)");
         createExpensesTable(db);
+        createPaydayPaymentsTable(db);
     }
 
     private static void createExpensesTable(SQLiteDatabase db) {
@@ -67,6 +68,58 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         if (oldVersion < 3) {
             db.execSQL("ALTER TABLE work_entries ADD COLUMN configured_regular_minutes INTEGER NOT NULL DEFAULT 480");
             db.execSQL("UPDATE work_entries SET configured_regular_minutes = regular_minutes WHERE overtime_minutes > 0");
+        }
+        if (oldVersion < 4) {
+            createPaydayPaymentsTable(db);
+        }
+    }
+
+    private static void createPaydayPaymentsTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS payday_payments (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "cutoff_start TEXT NOT NULL," +
+                "cutoff_end TEXT NOT NULL," +
+                "payday_date TEXT NOT NULL," +
+                "expected_amount TEXT NOT NULL," +
+                "received_amount TEXT NOT NULL," +
+                "created_at INTEGER NOT NULL," +
+                "UNIQUE(cutoff_start, cutoff_end))");
+    }
+
+    public boolean savePaydayPayment(String cutoffStart, String cutoffEnd, String paydayDate,
+                                     BigDecimal expectedAmount, BigDecimal receivedAmount) {
+        ContentValues values = new ContentValues();
+        values.put("cutoff_start", cutoffStart);
+        values.put("cutoff_end", cutoffEnd);
+        values.put("payday_date", paydayDate);
+        values.put("expected_amount", expectedAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        values.put("received_amount", receivedAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        values.put("created_at", System.currentTimeMillis());
+        return getWritableDatabase().insertWithOnConflict("payday_payments", null, values,
+                SQLiteDatabase.CONFLICT_REPLACE) != -1;
+    }
+
+    public BigDecimal getPaydayPayment(String cutoffStart, String cutoffEnd) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT received_amount FROM payday_payments WHERE cutoff_start = ? AND cutoff_end = ? LIMIT 1",
+                new String[]{cutoffStart, cutoffEnd})) {
+            return cursor.moveToFirst() ? new BigDecimal(cursor.getString(0)).setScale(2, java.math.RoundingMode.HALF_UP) : null;
+        }
+    }
+
+    public BigDecimal getTotalReceivedPay() {
+        try (Cursor cursor = getReadableDatabase().rawQuery("SELECT received_amount FROM payday_payments", null)) {
+            BigDecimal total = BigDecimal.ZERO;
+            while (cursor.moveToNext()) total = total.add(new BigDecimal(cursor.getString(0)));
+            return total.setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+    }
+
+    public BigDecimal getAllExpensesTotal() {
+        try (Cursor cursor = getReadableDatabase().rawQuery("SELECT amount FROM expenses", null)) {
+            BigDecimal total = BigDecimal.ZERO;
+            while (cursor.moveToNext()) total = total.add(new BigDecimal(cursor.getString(0)));
+            return total.setScale(2, java.math.RoundingMode.HALF_UP);
         }
     }
 
