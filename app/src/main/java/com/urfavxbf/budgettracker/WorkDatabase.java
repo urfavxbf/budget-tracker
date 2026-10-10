@@ -83,7 +83,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         if (oldVersion < 6) {
             createBudgetCycleAllocationsTable(db);
         }
-        if (oldVersion < 7) {
+        if (oldVersion == 6) {
             db.execSQL("ALTER TABLE budget_cycle_allocations ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0");
         }
     }
@@ -209,7 +209,8 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                         "WHERE EXISTS (SELECT 1 FROM payday_payments q " +
                         "WHERE q.payday_date > p.payday_date AND q.payday_date <= ?) " +
                         "AND NOT EXISTS (SELECT 1 FROM budget_cycle_allocations a " +
-                        "WHERE a.cutoff_start = p.cutoff_start AND a.cutoff_end = p.cutoff_end) " +
+                        "WHERE a.cutoff_start = p.cutoff_start AND a.cutoff_end = p.cutoff_end " +
+                        "AND a.needs_review = 0) " +
                         "ORDER BY p.payday_date ASC, p.id ASC LIMIT 1",
                 new String[]{throughDateInclusive, throughDateInclusive})) {
             if (!cursor.moveToFirst()) return null;
