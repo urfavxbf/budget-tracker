@@ -256,7 +256,7 @@ public final class MainActivity extends FragmentActivity {
         historyContainer = new LinearLayout(this);
         historyContainer.setOrientation(LinearLayout.VERTICAL);
         page.addView(historyContainer);
-        refreshHistory();
+        refreshDashboardActivity();
 
         section("Quick actions");
         LinearLayout actions = new LinearLayout(this);
@@ -293,6 +293,82 @@ public final class MainActivity extends FragmentActivity {
         drawable.setColor(color);
         drawable.setCornerRadius(radius);
         return drawable;
+    }
+
+    private void refreshDashboardActivity() {
+        if (historyContainer == null) return;
+        historyContainer.removeAllViews();
+        List<WorkDatabase.WorkEntry> workEntries = database.getRecentWorkEntries(5);
+        List<WorkDatabase.ExpenseEntry> expenseEntries = database.getRecentExpenseEntries(5);
+        class ActivityItem {
+            final String date;
+            final String title;
+            final String subtitle;
+            final String details;
+            final Runnable edit;
+            ActivityItem(String date, String title, String subtitle, String details, Runnable edit) {
+                this.date = date; this.title = title; this.subtitle = subtitle; this.details = details; this.edit = edit;
+            }
+        }
+        List<ActivityItem> items = new ArrayList<>();
+        for (WorkDatabase.WorkEntry entry : workEntries) {
+            items.add(new ActivityItem(entry.date, "Work shift", entry.timeIn + "–" + entry.timeOut
+                    + "  ·  " + money(new BigDecimal(entry.netPay)),
+                    "Net work: " + duration(entry.netMinutes) + "\nBreak: " + duration(entry.breakMinutes)
+                            + "\nOvertime: " + duration(entry.overtimeMinutes)
+                            + "\nRecorded net pay: " + money(new BigDecimal(entry.netPay)),
+                    () -> editWorkEntry(entry)));
+        }
+        for (WorkDatabase.ExpenseEntry entry : expenseEntries) {
+            String subtitle = entry.category + "  ·  " + money(new BigDecimal(entry.amount));
+            String details = "Date: " + entry.date + "\nCategory: " + entry.category
+                    + "\nAmount: " + money(new BigDecimal(entry.amount))
+                    + (entry.note == null || entry.note.trim().isEmpty() ? "" : "\nNote: " + entry.note);
+            items.add(new ActivityItem(entry.date, "Expense", subtitle, details, () -> editExpense(entry)));
+        }
+        items.sort((a, b) -> b.date.compareTo(a.date));
+        if (items.isEmpty()) {
+            historyContainer.addView(emptyState("No activity yet", "Your saved shifts and expenses will show here."));
+            return;
+        }
+        int count = Math.min(4, items.size());
+        for (int i = 0; i < count; i++) {
+            ActivityItem item = items.get(i);
+            LinearLayout itemCard = cardContainer();
+            itemCard.setPadding(dp(14), dp(10), dp(14), dp(10));
+            LinearLayout top = new LinearLayout(this);
+            top.setOrientation(LinearLayout.HORIZONTAL);
+            top.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout labels = new LinearLayout(this);
+            labels.setOrientation(LinearLayout.VERTICAL);
+            TextView title = text(item.title + "  ·  " + item.date, 13, true);
+            labels.addView(title);
+            TextView subtitle = text(item.subtitle, 12, false);
+            subtitle.setAlpha(0.8f);
+            subtitle.setPadding(0, dp(3), 0, 0);
+            labels.addView(subtitle);
+            top.addView(labels, new LinearLayout.LayoutParams(0, -2, 1f));
+            TextView arrow = text("⌄", 22, true);
+            arrow.setAlpha(0.7f);
+            top.addView(arrow);
+            itemCard.addView(top);
+            TextView details = text(item.details, 12, false);
+            details.setVisibility(View.GONE);
+            details.setPadding(0, dp(12), 0, dp(4));
+            itemCard.addView(details);
+            top.setOnClickListener(v -> {
+                boolean expanded = details.getVisibility() == View.VISIBLE;
+                details.setVisibility(expanded ? View.GONE : View.VISIBLE);
+                arrow.setText(expanded ? "⌄" : "⌃");
+            });
+            itemCard.setOnClickListener(v -> top.performClick());
+            historyContainer.addView(itemCard);
+        }
+        TextView seeAll = text("See all activity  →", 13, true);
+        seeAll.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
+        seeAll.setPadding(dp(4), dp(10), 0, dp(4));
+        seeAll.setOnClickListener(v -> showTab(1));
+        historyContainer.addView(seeAll);
     }
 
     private void buildHistoryScreen() {
