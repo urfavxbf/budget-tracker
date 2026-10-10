@@ -1019,53 +1019,44 @@ public final class MainActivity extends FragmentActivity {
             spendingLimit = BigDecimal.ZERO;
         }
 
-        StringBuilder summary = new StringBuilder()
-                .append("Cutoff  ").append(cutoff.startDate).append(" to ").append(cutoff.endDate)
-                .append("\nPayday                 ").append(payday)
-                .append("\nTotal recorded pay      ").append(money(earned))
-                .append("\nRecorded expenses      ").append(money(spent))
-                .append("\nRemaining after expenses ").append(money(remaining));
-
-        if (budgetProgressBar != null) {
-            if (spendingLimit.signum() > 0) {
-                budgetProgressBar.setVisibility(View.VISIBLE);
-                int usedPercent = spent.multiply(BigDecimal.valueOf(100))
-                        .divide(spendingLimit, 0, java.math.RoundingMode.HALF_UP)
-                        .min(BigDecimal.valueOf(100)).max(BigDecimal.ZERO).intValue();
-                budgetProgressBar.setProgress(usedPercent);
-                BigDecimal budgetRemaining = spendingLimit.subtract(spent);
-                BigDecimal actualPercent = spent.multiply(BigDecimal.valueOf(100))
-                        .divide(spendingLimit, 1, java.math.RoundingMode.HALF_UP);
-                summary.append("\n\nSpending limit          ").append(money(spendingLimit))
-                        .append("\nBudget used              ").append(actualPercent.toPlainString()).append("%")
-                        .append("\nBudget remaining         ").append(money(budgetRemaining));
-                if (spent.compareTo(spendingLimit) > 0) {
-                    summary.append("\n⚠ OVER BUDGET by ").append(money(spent.subtract(spendingLimit)));
-                } else if (spent.compareTo(spendingLimit.multiply(new BigDecimal("0.80"))) >= 0) {
-                    summary.append("\n⚠ Warning: 80% or more of the budget has been used.");
-                } else {
-                    summary.append("\n✓ Spending is within your budget.");
-                }
+        StringBuilder summary = new StringBuilder();
+        if (spendingLimit.signum() > 0) {
+            int usedPercent = spent.multiply(BigDecimal.valueOf(100))
+                    .divide(spendingLimit, 0, java.math.RoundingMode.HALF_UP)
+                    .max(BigDecimal.ZERO).intValue();
+            budgetProgressBar.setVisibility(View.VISIBLE);
+            budgetProgressBar.setProgress(Math.min(100, usedPercent));
+            BigDecimal budgetRemaining = spendingLimit.subtract(spent);
+            BigDecimal actualPercent = spent.multiply(BigDecimal.valueOf(100))
+                    .divide(spendingLimit, 1, java.math.RoundingMode.HALF_UP);
+            summary.append(money(spent)).append(" spent of ").append(money(spendingLimit))
+                    .append("  ·  ").append(actualPercent.toPlainString()).append("% used")
+                    .append("\\n").append(money(budgetRemaining)).append(" budget remaining");
+            if (spent.compareTo(spendingLimit) > 0) {
+                summary.append("\\n\\nOver budget by ").append(money(spent.subtract(spendingLimit)));
+                budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorError));
+            } else if (spent.compareTo(spendingLimit.multiply(new BigDecimal("0.80"))) >= 0) {
+                summary.append("\\n\\nYou’ve used 80% or more of your budget.");
+                budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorError));
             } else {
-                budgetProgressBar.setVisibility(View.GONE);
-                summary.append("\n\nSpending limit is disabled. Set a limit in Settings to track your budget.");
+                summary.append("\\n\\nYou’re within your spending limit.");
+                budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
             }
+        } else {
+            budgetProgressBar.setVisibility(View.GONE);
+            summary.append("Set a spending limit in Settings to track your budget.");
+            budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
         }
 
         Map<String, BigDecimal> categoryTotals =
                 database.getExpenseTotalsByCategory(cutoff.startDate.toString(), cutoff.endDate.toString());
         if (categoryTotals.isEmpty()) {
-            summary.append("\n\nSpending insights\nNo expenses recorded for this cutoff yet.");
+            summary.append("\\n\\nNo expenses recorded for this cutoff yet.");
         } else {
-            summary.append("\n\nSpending by category");
-            for (Map.Entry<String, BigDecimal> entry : categoryTotals.entrySet()) {
-                summary.append("\n• ").append(entry.getKey()).append("  ").append(money(entry.getValue()));
-            }
             Map.Entry<String, BigDecimal> topCategory = categoryTotals.entrySet().iterator().next();
-            summary.append("\n\nHighest spending: ").append(topCategory.getKey())
-                    .append(" (").append(money(topCategory.getValue())).append(")");
+            summary.append("\\n\\nTop category: ").append(topCategory.getKey())
+                    .append("  ·  ").append(money(topCategory.getValue()));
         }
-        summary.append("\n\nPay total comes from saved work entries.");
         budgetSummaryView.setText(summary.toString());
     }
 
