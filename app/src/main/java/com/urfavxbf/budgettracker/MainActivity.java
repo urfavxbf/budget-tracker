@@ -214,7 +214,9 @@ public final class MainActivity extends FragmentActivity {
         LocalDate payday = getPaydayForCurrentCutoff(today);
         BigDecimal earned = database.getRecordedNetPayTotal(start.toString(), end.toString());
         BigDecimal spent = database.getExpenseTotal(start.toString(), end.toString());
-        BigDecimal remaining = getAvailableCashBalance();
+        BigDecimal totalCash = getTotalCashBalance();
+        BigDecimal savings = database.getTotalSavingsBalance();
+        BigDecimal remaining = totalCash.subtract(savings).setScale(2, java.math.RoundingMode.HALF_UP);
 
         LinearLayout totals = new LinearLayout(this);
         totals.setOrientation(LinearLayout.HORIZONTAL);
@@ -238,13 +240,17 @@ public final class MainActivity extends FragmentActivity {
         cutoffLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
         cutoffLabel.setPadding(0, dp(4), 0, dp(14));
         snapshot.addView(cutoffLabel);
-        TextView remainingLabel = text("AVAILABLE CASH BALANCE", 11, true);
+        TextView remainingLabel = text("TOTAL CASH BALANCE", 11, true);
         remainingLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
         snapshot.addView(remainingLabel);
-        TextView amount = text(money(remaining), 30, true);
+        TextView amount = text(money(totalCash), 30, true);
         amount.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
-        amount.setPadding(0, dp(3), 0, dp(12));
+        amount.setPadding(0, dp(3), 0, dp(4));
         snapshot.addView(amount);
+        TextView savingsLabel = text("Savings: " + money(savings) + "   ·   Available to spend: " + money(remaining), 12, true);
+        savingsLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
+        savingsLabel.setPadding(0, 0, 0, dp(12));
+        snapshot.addView(savingsLabel);
         budgetProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         budgetProgressBar.setMax(100);
         budgetProgressBar.setProgressTintList(ColorStateList.valueOf(resolveColor(androidx.appcompat.R.attr.colorPrimary)));
@@ -276,6 +282,7 @@ public final class MainActivity extends FragmentActivity {
         historyContainer.setOrientation(LinearLayout.VERTICAL);
         page.addView(historyContainer);
         refreshDashboardActivity();
+        maybePromptForSavingsAllocation();
 
         section("Quick actions");
         LinearLayout actions = new LinearLayout(this);
@@ -1086,10 +1093,16 @@ public final class MainActivity extends FragmentActivity {
         }
 
         LocalDate payday = cutoff.payday(firstPayday, secondPayday);
+        WorkDatabase.PaydayPayment activePayment = database.getLatestPaydayPaymentOnOrBefore(today.toString());
+        LocalDate cycleStart = activePayment == null ? cutoff.startDate : LocalDate.parse(activePayment.paydayDate);
         long daysUntilPayday = Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(today, payday));
-        BigDecimal earned = database.getRecordedNetPayTotal(cutoff.startDate.toString(), cutoff.endDate.toString());
-        BigDecimal spent = database.getExpenseTotal(cutoff.startDate.toString(), cutoff.endDate.toString());
-        BigDecimal remaining = getAvailableCashBalance();
+        BigDecimal spent = database.getExpenseTotal(cycleStart.toString(), today.toString());
+        BigDecimal totalCash = getTotalCashBalance();
+        BigDecimal savings = database.getTotalSavingsBalance();
+        BigDecimal remaining = totalCash.subtract(savings).setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal cycleBudget = activePayment == null ? BigDecimal.ZERO
+                : new BigDecimal(activePayment.receivedAmount).add(getCarryoverIntoPayment(activePayment));
+        BigDecimal budgetBase;
 
         BigDecimal spendingLimit;
         try {
@@ -1099,15 +1112,21 @@ public final class MainActivity extends FragmentActivity {
             spendingLimit = BigDecimal.ZERO;
         }
 
+        budgetBase = cycleBudget.signum() > 0 ? cycleBudget : spendingLimit;
+        if (spendingLimit.signum() > 0 && budgetBase.signum() > 0) {
+            budgetBase = budgetBase.min(spendingLimit);
+        }
         StringBuilder summary = new StringBuilder();
-        summary.append("Payday in ").append(daysUntilPayday)
+        summary.append("Budget cycle: ").append(cycleStart)
+                .append("\nPayday in ").append(daysUntilPayday)
                 .append(daysUntilPayday == 1 ? " day" : " days")
-                .append("\nAvailable cash: ").append(money(remaining));
+                .append("\nAvailable to spend: ").append(money(remaining))
+                .append("\nSavings balance: ").append(money(savings));
 
         BigDecimal dailyGuide = BigDecimal.ZERO;
         boolean hasDailyGuide = false;
-        if (daysUntilPayday > 0 && spendingLimit.signum() > 0) {
-            BigDecimal budgetRemaining = spendingLimit.subtract(spent).max(BigDecimal.ZERO);
+        if (daysUntilPayday > 0 && budgetBase.signum() > 0) {
+            BigDecimal budgetRemaining = budgetBase.subtract(spent).max(BigDecimal.ZERO);
             dailyGuide = budgetRemaining.divide(BigDecimal.valueOf(daysUntilPayday),
                     2, java.math.RoundingMode.DOWN);
             hasDailyGuide = true;
@@ -1127,39 +1146,39 @@ public final class MainActivity extends FragmentActivity {
             summary.append("No daily guide yet. Add your spending limit in Settings, or record your income.");
         }
 
-        if (spendingLimit.signum() > 0) {
+        if (budgetBase.signum() > 0) {
             int usedPercent = spent.multiply(BigDecimal.valueOf(100))
-                    .divide(spendingLimit, 0, java.math.RoundingMode.HALF_UP)
+                    .divide(budgetBase, 0, java.math.RoundingMode.HALF_UP)
                     .max(BigDecimal.ZERO).intValue();
             budgetProgressBar.setVisibility(View.VISIBLE);
             budgetProgressBar.setProgress(Math.min(100, usedPercent));
 
-            BigDecimal budgetRemaining = spendingLimit.subtract(spent);
+            BigDecimal budgetRemaining = budgetBase.subtract(spent);
             BigDecimal actualPercent = spent.multiply(BigDecimal.valueOf(100))
-                    .divide(spendingLimit, 1, java.math.RoundingMode.HALF_UP);
-            summary.append("\n").append(money(spent)).append(" spent of ").append(money(spendingLimit))
+                    .divide(budgetBase, 1, java.math.RoundingMode.HALF_UP);
+            summary.append("\n").append(money(spent)).append(" spent of ").append(money(budgetBase))
                     .append(" · ").append(actualPercent.toPlainString()).append("% used")
                     .append("\n").append(money(budgetRemaining.max(BigDecimal.ZERO))).append(" budget remaining");
 
-            if (spent.compareTo(spendingLimit) > 0) {
-                summary.append("\nOver budget by ").append(money(spent.subtract(spendingLimit)))
-                        .append(". If possible, pause non-essential spending and review upcoming needs.");
+            if (spent.compareTo(budgetBase) > 0) {
+                summary.append("\nOver budget by ").append(money(spent.subtract(budgetBase)))
+                        .append(". Review non-essential spending and upcoming needs.");
                 budgetSummaryView.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
-            } else if (spent.compareTo(spendingLimit.multiply(new BigDecimal("0.80"))) >= 0) {
-                summary.append("\nMost of this cutoff’s budget is used. Check what still needs to be paid.");
+            } else if (spent.compareTo(budgetBase.multiply(new BigDecimal("0.80"))) >= 0) {
+                summary.append("\nMost of this cycle’s budget is used. Check upcoming bills.");
                 budgetSummaryView.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
             } else {
-                summary.append("\nYour spending is within the limit so far.");
+                summary.append("\nYour spending is within the cycle budget so far.");
                 budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
             }
         } else {
             budgetProgressBar.setVisibility(View.GONE);
-            summary.append("\nSet a spending limit in Settings for a more useful daily guide.");
+            summary.append("\nRecord a salary to track a salary-cycle budget, or set a spending limit in Settings.");
             budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
         }
 
         Map<String, BigDecimal> categoryTotals =
-                database.getExpenseTotalsByCategory(cutoff.startDate.toString(), cutoff.endDate.toString());
+                database.getExpenseTotalsByCategory(cycleStart.toString(), today.toString());
         if (categoryTotals.isEmpty()) {
             summary.append("\nNo expenses recorded for this cutoff yet.");
         } else {
@@ -1170,7 +1189,7 @@ public final class MainActivity extends FragmentActivity {
         budgetSummaryView.setText(summary.toString());
     }
 
-    private BigDecimal getAvailableCashBalance() {
+    private BigDecimal getTotalCashBalance() {
         BigDecimal opening;
         try {
             opening = new BigDecimal(pref("opening_cash_balance", "0.00"));
@@ -1180,6 +1199,89 @@ public final class MainActivity extends FragmentActivity {
         return opening.add(database.getTotalReceivedPay())
                 .subtract(database.getAllExpensesTotal())
                 .setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal getAvailableCashBalance() {
+        return getTotalCashBalance().subtract(database.getTotalSavingsBalance())
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal getCarryoverIntoPayment(WorkDatabase.PaydayPayment payment) {
+        WorkDatabase.PaydayPayment previous = database.getPreviousPaydayPayment(
+                payment.paydayDate, payment.cutoffStart, payment.cutoffEnd);
+        if (previous == null) return BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP);
+        WorkDatabase.BudgetCycleAllocation allocation =
+                database.getBudgetCycleAllocation(previous.cutoffStart, previous.cutoffEnd);
+        return allocation == null ? BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP)
+                : new BigDecimal(allocation.carryoverAmount).setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    private void maybePromptForSavingsAllocation() {
+        WorkDatabase.BudgetCyclePending pending = database.getPendingBudgetCycleAllocation();
+        if (pending == null || pending.nextPaydayDate == null) return;
+        BigDecimal cycleBudget = new BigDecimal(pending.payment.receivedAmount)
+                .add(getCarryoverIntoPayment(pending.payment));
+        BigDecimal expenses = database.getExpenseTotalAfterThrough(
+                pending.payment.paydayDate, pending.nextPaydayDate);
+        BigDecimal leftover = cycleBudget.subtract(expenses)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+        if (leftover.signum() <= 0) {
+            database.saveBudgetCycleAllocation(pending.payment.cutoffStart, pending.payment.cutoffEnd,
+                    BigDecimal.ZERO, BigDecimal.ZERO);
+            return;
+        }
+        showSavingsAllocationDialog(pending, leftover);
+    }
+
+    private void showSavingsAllocationDialog(WorkDatabase.BudgetCyclePending pending, BigDecimal leftover) {
+        String amount = money(leftover);
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("What should happen to your leftover budget?")
+                .setMessage("Your previous salary cycle has " + amount + " left. Choose how to allocate it. Your salary and expense history will stay saved.")
+                .setItems(new String[]{
+                        "Move all " + amount + " to savings",
+                        "Carry all " + amount + " into the new cycle",
+                        "Split between savings and carry-over"
+                }, (dialog, which) -> {
+                    if (which == 0) {
+                        saveBudgetAllocation(pending, leftover, BigDecimal.ZERO);
+                    } else if (which == 1) {
+                        saveBudgetAllocation(pending, BigDecimal.ZERO, leftover);
+                    } else {
+                        EditText savingsInput = field("Amount to save (₱)", leftover.toPlainString(),
+                                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                        new MaterialAlertDialogBuilder(this)
+                                .setTitle("Split leftover budget")
+                                .setMessage("Enter the amount for savings. The remainder will carry over.")
+                                .setView(savingsInput)
+                                .setNegativeButton("Cancel", (splitDialog, splitWhich) -> maybePromptForSavingsAllocation())
+                                .setPositiveButton("Save allocation", (splitDialog, splitWhich) -> {
+                                    try {
+                                        BigDecimal savings = decimal(savingsInput, "Savings amount");
+                                        if (savings.signum() < 0 || savings.compareTo(leftover) > 0) {
+                                            throw new IllegalArgumentException("Savings must be between ₱0 and " + amount + ".");
+                                        }
+                                        saveBudgetAllocation(pending, savings,
+                                                leftover.subtract(savings).setScale(2, java.math.RoundingMode.HALF_UP));
+                                    } catch (IllegalArgumentException ex) {
+                                        toast(ex.getMessage());
+                                    }
+                                }).show();
+                    }
+                })
+                .setCancelable(false)
+                .show();
+    }
+
+    private void saveBudgetAllocation(WorkDatabase.BudgetCyclePending pending,
+                                      BigDecimal savings, BigDecimal carryover) {
+        if (!database.saveBudgetCycleAllocation(pending.payment.cutoffStart, pending.payment.cutoffEnd,
+                savings, carryover)) {
+            toast("Could not save the leftover budget decision.");
+            return;
+        }
+        Toast.makeText(this, "Leftover budget allocation saved", Toast.LENGTH_SHORT).show();
+        showTab(0);
     }
 
     private void saveOpeningBalance() {
