@@ -1101,7 +1101,7 @@ public final class MainActivity extends FragmentActivity {
         StringBuilder summary = new StringBuilder();
         summary.append("Payday in ").append(daysUntilPayday)
                 .append(daysUntilPayday == 1 ? " day" : " days")
-                .append("\\nAvailable cash: ").append(money(remaining));
+                .append("\nAvailable cash: ").append(money(remaining));
 
         BigDecimal dailyGuide = BigDecimal.ZERO;
         boolean hasDailyGuide = false;
@@ -1313,8 +1313,8 @@ public final class MainActivity extends FragmentActivity {
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Delete saved salary?")
                 .setMessage("Received: " + money(new BigDecimal(payment.receivedAmount))
-                        + "\\nCutoff: " + payment.cutoffStart + " to " + payment.cutoffEnd
-                        + "\\nThis amount will be removed from your available cash balance. This cannot be undone.")
+                        + "\nCutoff: " + payment.cutoffStart + " to " + payment.cutoffEnd
+                        + "\nThis amount will be removed from your available cash balance. This cannot be undone.")
                 .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                 .setPositiveButton("Delete", (dialog, which) -> {
                     if (database.deletePaydayPayment(payment.cutoffStart, payment.cutoffEnd)) {
