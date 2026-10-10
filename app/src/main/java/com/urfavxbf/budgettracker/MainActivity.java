@@ -1228,7 +1228,8 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void maybePromptForSavingsAllocation() {
-        WorkDatabase.BudgetCyclePending pending = database.getPendingBudgetCycleAllocation();
+        WorkDatabase.BudgetCyclePending pending =
+                database.getPendingBudgetCycleAllocation(LocalDate.now().toString());
         if (pending == null || pending.nextPaydayDate == null) return;
         BigDecimal cycleBudget = new BigDecimal(pending.payment.receivedAmount)
                 .add(getCarryoverIntoPayment(pending.payment));
