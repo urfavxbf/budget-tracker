@@ -140,6 +140,17 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 new Object[]{cutoffStart, cutoffEnd, affectedDate, affectedDate});
     }
 
+    private static void invalidateNextAllocationAfterPayday(SQLiteDatabase db, String paydayDate) {
+        if (paydayDate == null || paydayDate.isEmpty()) return;
+        db.execSQL("UPDATE budget_cycle_allocations SET needs_review = 1 " +
+                        "WHERE EXISTS (SELECT 1 FROM payday_payments p " +
+                        "WHERE p.cutoff_start = budget_cycle_allocations.cutoff_start " +
+                        "AND p.cutoff_end = budget_cycle_allocations.cutoff_end " +
+                        "AND p.payday_date = (SELECT MIN(q.payday_date) FROM payday_payments q " +
+                        "WHERE q.payday_date > ?))",
+                new Object[]{paydayDate});
+    }
+
     public boolean saveBudgetCycleAllocation(String cutoffStart, String cutoffEnd,
                                              BigDecimal savingsAmount, BigDecimal carryoverAmount) {
         ContentValues values = new ContentValues();
@@ -281,8 +292,9 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 }
             }
             boolean paydayDateChanged = oldDate != null && !oldDate.equals(paydayDate);
-            if (oldDate != null && (paydayDateChanged
-                    || new BigDecimal(oldReceived).compareTo(receivedAmount) != 0)) {
+            boolean receivedAmountChanged = oldReceived != null
+                    && new BigDecimal(oldReceived).compareTo(receivedAmount) != 0;
+            if (oldDate != null && (paydayDateChanged || receivedAmountChanged)) {
                 db.execSQL("UPDATE budget_cycle_allocations SET needs_review = 1 " +
                                 "WHERE cutoff_start = ? AND cutoff_end = ?",
                         new Object[]{cutoffStart, cutoffEnd});
@@ -299,6 +311,8 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             if (paydayDateChanged) {
                 invalidateAllocationsForPaydayChange(db, cutoffStart, cutoffEnd, oldDate);
                 invalidateAllocationsForPaydayChange(db, cutoffStart, cutoffEnd, paydayDate);
+            } else if (receivedAmountChanged) {
+                invalidateNextAllocationAfterPayday(db, paydayDate);
             }
             db.setTransactionSuccessful();
             return true;
