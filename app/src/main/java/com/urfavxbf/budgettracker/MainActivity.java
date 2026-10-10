@@ -1092,7 +1092,7 @@ public final class MainActivity extends Activity {
         if (primary) {
             button.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnPrimary));
             button.setBackgroundTintList(ColorStateList.valueOf(
-                    resolveColor(com.google.android.material.R.attr.colorPrimary)));
+                    resolveColor(androidx.appcompat.R.attr.colorPrimary)));
         } else {
             button.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
             button.setBackgroundTintList(ColorStateList.valueOf(
