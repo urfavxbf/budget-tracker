@@ -41,7 +41,13 @@ public final class PaydayReminderScheduler {
             for (CutoffPeriod cutoff : cutoffs) {
                 LocalDate payday = cutoff.payday(firstPayday, secondPayday);
                 LocalDateTime trigger = payday.atTime(9, 0);
-                if (trigger.isBefore(now)) continue;
+                if (trigger.isBefore(now)) {
+                    if (payday.equals(today)) {
+                        trigger = now.plusSeconds(5);
+                    } else {
+                        continue;
+                    }
+                }
                 if (nextTrigger == null || trigger.isBefore(nextTrigger)) {
                     nextTrigger = trigger;
                     nextCutoff = cutoff;
