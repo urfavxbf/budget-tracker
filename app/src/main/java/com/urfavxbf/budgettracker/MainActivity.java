@@ -1,13 +1,12 @@
 package com.urfavxbf.budgettracker;
 
 import android.app.Activity;
-import android.app.AlertDialog;
+import androidx.appcompat.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.RippleDrawable;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
@@ -20,6 +19,11 @@ import android.widget.Spinner;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
+import com.google.android.material.textfield.TextInputLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -40,7 +44,10 @@ public final class MainActivity extends Activity {
     private static final String[] TAB_NAMES = {"Home", "History", "Settings"};
     private final List<BreakInput> breakInputs = new ArrayList<>();
     private LinearLayout page;
-    private LinearLayout bottomNav;
+    private BottomNavigationView bottomNav;
+    private static final int NAV_HOME_ID = 1;
+    private static final int NAV_HISTORY_ID = 2;
+    private static final int NAV_SETTINGS_ID = 3;
     private int currentTab = 0;
     private EditText dateInput, timeInInput, timeOutInput;
     private EditText hourlyRateInput, regularHoursInput, overtimeMultiplierInput, allowanceInput, deductionInput;
@@ -119,43 +126,45 @@ public final class MainActivity extends Activity {
         scroll.addView(page, new ScrollView.LayoutParams(-1, -2));
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
-        bottomNav = new LinearLayout(this);
-        bottomNav.setOrientation(LinearLayout.HORIZONTAL);
-        bottomNav.setGravity(Gravity.CENTER);
-        bottomNav.setPadding(dp(8), dp(6), dp(8), dp(6));
-        bottomNav.setBackgroundColor(resolveColor(android.R.attr.colorBackground));
-        shell.addView(bottomNav, new LinearLayout.LayoutParams(-1, dp(68)));
+        bottomNav = new BottomNavigationView(this);
+        bottomNav.setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface));
+        bottomNav.setElevation(dp(4));
+        bottomNav.setLabelVisibilityMode(BottomNavigationView.LABEL_VISIBILITY_LABELED);
+        bottomNav.setItemActiveIndicatorEnabled(true);
+        bottomNav.setItemActiveIndicatorColor(ColorStateList.valueOf(
+                resolveColor(com.google.android.material.R.attr.colorSecondaryContainer)));
+        bottomNav.setItemRippleColor(ColorStateList.valueOf(0x335267D8));
+        shell.addView(bottomNav, new LinearLayout.LayoutParams(-1, dp(80)));
         setContentView(shell);
         buildBottomNav();
     }
 
     private void buildBottomNav() {
-        bottomNav.removeAllViews();
-        for (int i = 0; i < TAB_NAMES.length; i++) {
-            final int tab = i;
-            LinearLayout item = new LinearLayout(this);
-            item.setOrientation(LinearLayout.VERTICAL);
-            item.setGravity(Gravity.CENTER);
-            item.setPadding(dp(2), dp(5), dp(2), dp(5));
-            TextView icon = text(new String[]{"⌂", "▤", "⚙"}[i], 21, true);
-            TextView label = text(TAB_NAMES[i], 11, currentTab == i);
-            boolean selected = currentTab == i;
-            int accent = resolveColor(android.R.attr.colorAccent);
-            icon.setTextColor(selected ? accent : resolveColor(android.R.attr.textColorSecondary));
-            label.setTextColor(selected ? accent : resolveColor(android.R.attr.textColorSecondary));
-            item.addView(icon);
-            item.addView(label);
-            item.setOnClickListener(v -> {
-                if (tab != currentTab) {
-                    editingWorkEntryId = -1;
-                    editingExpenseId = -1;
-                }
-                currentTab = tab;
-                buildBottomNav();
-                showTab(tab);
-            });
-            bottomNav.addView(item, new LinearLayout.LayoutParams(0, -1, 1f));
-        }
+        bottomNav.getMenu().clear();
+        bottomNav.getMenu().add(0, NAV_HOME_ID, 0, "Home").setIcon(R.drawable.ic_home);
+        bottomNav.getMenu().add(0, NAV_HISTORY_ID, 1, "History").setIcon(R.drawable.ic_history);
+        bottomNav.getMenu().add(0, NAV_SETTINGS_ID, 2, "Settings").setIcon(R.drawable.ic_settings);
+        bottomNav.setOnItemSelectedListener(item -> {
+            int tab;
+            if (item.getItemId() == NAV_HOME_ID) {
+                tab = 0;
+            } else if (item.getItemId() == NAV_HISTORY_ID) {
+                tab = 1;
+            } else if (item.getItemId() == NAV_SETTINGS_ID) {
+                tab = 2;
+            } else {
+                return false;
+            }
+            if (tab != currentTab) {
+                editingWorkEntryId = -1;
+                editingExpenseId = -1;
+            }
+            currentTab = tab;
+            showTab(tab);
+            return true;
+        });
+        bottomNav.setSelectedItemId(currentTab == 0 ? NAV_HOME_ID
+                : currentTab == 1 ? NAV_HISTORY_ID : NAV_SETTINGS_ID);
     }
 
     private void showTab(int tab) {
@@ -245,9 +254,11 @@ public final class MainActivity extends Activity {
         timeOutInput = field("Choose time", entry == null ? "17:00" : entry.timeOut, InputType.TYPE_NULL);
         configureTimePicker(timeInInput);
         configureTimePicker(timeOutInput);
-        times.addView(timeInInput, new LinearLayout.LayoutParams(0, dp(56), 1f));
+        TextInputLayout timeInLayout = inputLayout("Time in", timeInInput);
+        TextInputLayout timeOutLayout = inputLayout("Time out", timeOutInput);
+        times.addView(timeInLayout, new LinearLayout.LayoutParams(0, -2, 1f));
         times.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
-        times.addView(timeOutInput, new LinearLayout.LayoutParams(0, dp(56), 1f));
+        times.addView(timeOutLayout, new LinearLayout.LayoutParams(0, -2, 1f));
         addField(form, "Time in / time out", times);
 
         addSection(form, "Break duration");
@@ -291,7 +302,7 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(false);
         scroll.addView(form, new ScrollView.LayoutParams(-1, -2));
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
                 .setTitle(entry == null ? "Add work shift" : "Edit work shift")
                 .setView(scroll)
                 .setNegativeButton("Cancel", (d, which) -> {
@@ -615,25 +626,24 @@ public final class MainActivity extends Activity {
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER);
-        actions.setBackgroundColor(resolveColor(android.R.attr.colorBackground));
+        actions.setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface));
         FrameLayout.LayoutParams actionParams = new FrameLayout.LayoutParams(
                 revealWidth, -1, Gravity.END | Gravity.CENTER_VERTICAL);
         row.addView(actions, actionParams);
 
-        Button edit = button("Edit", false);
+        MaterialButton edit = button("Edit", false);
         edit.setTextSize(12);
-        edit.setTextColor(resolveColor(android.R.attr.colorAccent));
-        edit.setAllCaps(false);
+        edit.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
         edit.setPadding(0, 0, 0, 0);
         edit.setMinWidth(0);
         edit.setMinimumWidth(0);
         edit.setMinimumHeight(0);
-        edit.setElevation(dp(1));
-        GradientDrawable editBackground = new GradientDrawable();
-        editBackground.setColor(0x1F5267D8);
-        editBackground.setCornerRadius(dp(12));
-        edit.setBackground(new RippleDrawable(
-                ColorStateList.valueOf(0x225267D8), editBackground, null));
+        edit.setCornerRadius(dp(12));
+        edit.setBackgroundTintList(ColorStateList.valueOf(
+                resolveColor(com.google.android.material.R.attr.colorSecondaryContainer)));
+        edit.setRippleColor(ColorStateList.valueOf(0x335267D8));
+        edit.setInsetTop(0);
+        edit.setInsetBottom(0);
         LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(revealWidth / 2 - dp(8), dp(44));
         editParams.setMargins(dp(4), 0, dp(2), 0);
         edit.setLayoutParams(editParams);
@@ -642,20 +652,19 @@ public final class MainActivity extends Activity {
             editAction.onClick(v);
         });
 
-        Button delete = button("Delete", false);
+        MaterialButton delete = button("Delete", false);
         delete.setTextSize(12);
-        delete.setTextColor(0xFFD32F2F);
-        delete.setAllCaps(false);
+        delete.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnErrorContainer));
         delete.setPadding(0, 0, 0, 0);
         delete.setMinWidth(0);
         delete.setMinimumWidth(0);
         delete.setMinimumHeight(0);
-        delete.setElevation(dp(1));
-        GradientDrawable deleteBackground = new GradientDrawable();
-        deleteBackground.setColor(0x1FF44336);
-        deleteBackground.setCornerRadius(dp(12));
-        delete.setBackground(new RippleDrawable(
-                ColorStateList.valueOf(0x22F44336), deleteBackground, null));
+        delete.setCornerRadius(dp(12));
+        delete.setBackgroundTintList(ColorStateList.valueOf(
+                resolveColor(com.google.android.material.R.attr.colorErrorContainer)));
+        delete.setRippleColor(ColorStateList.valueOf(0x33BA1A1A));
+        delete.setInsetTop(0);
+        delete.setInsetBottom(0);
         LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(revealWidth / 2 - dp(8), dp(44));
         deleteParams.setMargins(dp(2), 0, dp(4), 0);
         delete.setLayoutParams(deleteParams);
@@ -668,7 +677,7 @@ public final class MainActivity extends Activity {
 
         recordContent.setPadding(dp(8), dp(8), dp(8), dp(8));
         recordContent.setMinimumHeight(dp(64));
-        recordContent.setBackgroundColor(resolveColor(android.R.attr.colorBackground));
+        recordContent.setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface));
         recordContent.setClickable(true);
         recordContent.setElevation(dp(2));
         FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(-1, -2, Gravity.START | Gravity.TOP);
@@ -1012,11 +1021,9 @@ public final class MainActivity extends Activity {
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(16), dp(16), dp(16), dp(16));
         GradientDrawable bg = new GradientDrawable();
-        boolean night = (getResources().getConfiguration().uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
-                == android.content.res.Configuration.UI_MODE_NIGHT_YES;
-        bg.setColor(night ? 0xFF303038 : 0xFFF3F2F8);
-        bg.setCornerRadius(dp(20));
-        bg.setStroke(dp(1), night ? 0xFF484852 : 0xFFE5E3EC);
+        bg.setColor(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant));
+        bg.setCornerRadius(dp(24));
+        bg.setStroke(dp(1), resolveColor(com.google.android.material.R.attr.colorOutlineVariant));
         card.setBackground(bg);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
         params.bottomMargin = dp(10);
@@ -1025,15 +1032,34 @@ public final class MainActivity extends Activity {
     }
 
     private void addField(LinearLayout parent, String label, View input) {
+        if (input instanceof EditText) {
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+            params.bottomMargin = dp(8);
+            parent.addView(inputLayout(label, (EditText) input), params);
+            return;
+        }
         TextView caption = text(label, 12, true);
-        caption.setTextColor(resolveColor(android.R.attr.textColorSecondary));
-        caption.setPadding(0, dp(8), 0, dp(2));
+        caption.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+        caption.setPadding(0, dp(8), 0, dp(4));
         parent.addView(caption);
         parent.addView(input);
     }
 
+    private TextInputLayout inputLayout(String label, EditText input) {
+        TextInputLayout layout = new TextInputLayout(this);
+        layout.setHint(label);
+        layout.setBoxBackgroundMode(TextInputLayout.BOX_BACKGROUND_FILLED);
+        layout.setBoxBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant));
+        layout.setBoxCornerRadii(dp(12), dp(12), dp(12), dp(12));
+        layout.setBoxStrokeColor(resolveColor(com.google.android.material.R.attr.colorOutline));
+        input.setHint(null);
+        input.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(56)));
+        layout.addView(input);
+        return layout;
+    }
+
     private EditText field(String hint, String initial, int inputType) {
-        EditText edit = new EditText(this);
+        EditText edit = new TextInputEditText(this);
         edit.setSingleLine(true);
         edit.setHint(hint);
         edit.setText(initial);
@@ -1041,23 +1067,29 @@ public final class MainActivity extends Activity {
         edit.setTextSize(16);
         edit.setPadding(dp(12), 0, dp(12), 0);
         edit.setSelectAllOnFocus(false);
-        edit.setBackgroundTintList(android.content.res.ColorStateList.valueOf(resolveColor(android.R.attr.colorAccent)));
         edit.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(52)));
         return edit;
     }
 
-    private Button button(String label, boolean primary) {
-        Button button = new Button(this);
+    private MaterialButton button(String label, boolean primary) {
+        MaterialButton button = new MaterialButton(this);
         button.setText(label);
         button.setAllCaps(false);
         button.setTextSize(14);
+        button.setCornerRadius(dp(16));
+        button.setInsetTop(0);
+        button.setInsetBottom(0);
+        button.setElevation(dp(1));
         if (primary) {
-            button.setTextColor(0xFFFFFFFF);
-            GradientDrawable bg = new GradientDrawable();
-            bg.setColor(resolveColor(android.R.attr.colorAccent));
-            bg.setCornerRadius(dp(16));
-            button.setBackground(bg);
+            button.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnPrimary));
+            button.setBackgroundTintList(ColorStateList.valueOf(
+                    resolveColor(com.google.android.material.R.attr.colorPrimary)));
+        } else {
+            button.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
+            button.setBackgroundTintList(ColorStateList.valueOf(
+                    resolveColor(com.google.android.material.R.attr.colorSecondaryContainer)));
         }
+        button.setRippleColor(ColorStateList.valueOf(0x335267D8));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(52));
         params.topMargin = dp(8);
         button.setLayoutParams(params);
