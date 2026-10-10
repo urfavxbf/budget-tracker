@@ -197,6 +197,8 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         values.put("configured_regular_minutes", configuredRegularMinutes);
         values.put("overtime_minutes", result.overtimeMinutes);
         values.put("hourly_rate", hourlyRate.toPlainString());
+        values.put("rate_type", "Daily".equals(rateType) ? "Daily" : "Hourly");
+        values.put("entered_rate", enteredRate.toPlainString());
         values.put("ot_multiplier", overtimeMultiplier.toPlainString());
         values.put("allowance", result.allowance.toPlainString());
         values.put("deduction", result.deduction.toPlainString());
