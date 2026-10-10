@@ -17,7 +17,7 @@ import java.util.TreeMap;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
-    private static final int DATABASE_VERSION = 6;
+    private static final int DATABASE_VERSION = 7;
 
     public WorkDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -83,6 +83,9 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         if (oldVersion < 6) {
             createBudgetCycleAllocationsTable(db);
         }
+        if (oldVersion < 7) {
+            db.execSQL("ALTER TABLE budget_cycle_allocations ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0");
+        }
     }
 
     private static void createPaydayPaymentsTable(SQLiteDatabase db) {
@@ -105,19 +108,20 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 "savings_amount TEXT NOT NULL," +
                 "carryover_amount TEXT NOT NULL," +
                 "created_at INTEGER NOT NULL," +
+                "needs_review INTEGER NOT NULL DEFAULT 0," +
                 "UNIQUE(cutoff_start, cutoff_end))");
     }
 
     private static void invalidateAllocationForExpenseDate(SQLiteDatabase db, String expenseDate) {
         if (expenseDate == null || expenseDate.isEmpty()) return;
-        db.delete("budget_cycle_allocations",
-                "EXISTS (SELECT 1 FROM payday_payments p " +
+        db.execSQL("UPDATE budget_cycle_allocations SET needs_review = 1 " +
+                "WHERE EXISTS (SELECT 1 FROM payday_payments p " +
                         "WHERE p.cutoff_start = budget_cycle_allocations.cutoff_start " +
                         "AND p.cutoff_end = budget_cycle_allocations.cutoff_end " +
                         "AND p.payday_date <= ? " +
                         "AND NOT EXISTS (SELECT 1 FROM payday_payments q " +
                         "WHERE q.payday_date > p.payday_date AND q.payday_date <= ?))",
-                new String[]{expenseDate, expenseDate});
+                new Object[]{expenseDate, expenseDate});
     }
 
     public boolean saveBudgetCycleAllocation(String cutoffStart, String cutoffEnd,
@@ -128,6 +132,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         values.put("savings_amount", savingsAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
         values.put("carryover_amount", carryoverAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
         values.put("created_at", System.currentTimeMillis());
+        values.put("needs_review", 0);
         return getWritableDatabase().insertWithOnConflict("budget_cycle_allocations", null, values,
                 SQLiteDatabase.CONFLICT_REPLACE) != -1;
     }
@@ -184,7 +189,8 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                         "FROM payday_payments p " +
                         "WHERE EXISTS (SELECT 1 FROM payday_payments q WHERE q.payday_date > p.payday_date) " +
                         "AND NOT EXISTS (SELECT 1 FROM budget_cycle_allocations a " +
-                        "WHERE a.cutoff_start = p.cutoff_start AND a.cutoff_end = p.cutoff_end) " +
+                        "WHERE a.cutoff_start = p.cutoff_start AND a.cutoff_end = p.cutoff_end " +
+                        "AND a.needs_review = 0) " +
                         "ORDER BY p.payday_date ASC, p.id ASC LIMIT 1", null)) {
             if (!cursor.moveToFirst()) return null;
             PaydayPayment payment = new PaydayPayment(cursor.getString(0), cursor.getString(1),
