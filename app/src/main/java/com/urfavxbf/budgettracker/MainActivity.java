@@ -122,11 +122,6 @@ public final class MainActivity extends FragmentActivity {
         }
     }
 
-    @Override protected void onResume() {
-        super.onResume();
-        maybePromptForPaydaySalary();
-    }
-
     @Override protected void onDestroy() {
         if (database != null) database.close();
         super.onDestroy();
@@ -296,7 +291,6 @@ public final class MainActivity extends FragmentActivity {
         expenseLp.setMargins(dp(6), 0, 0, 0);
         actions.addView(addExpense, expenseLp);
         page.addView(actions);
-        maybePromptForPaydaySalary();
     }
 
     private View metricCard(String label, String amount, int accent) {
@@ -644,6 +638,9 @@ public final class MainActivity extends FragmentActivity {
                     }
                 });
                 paymentCard.addView(editPayment);
+                Button deletePayment = button("Delete saved salary", false);
+                deletePayment.setOnClickListener(v -> confirmDeletePaydayPayment(payment));
+                paymentCard.addView(deletePayment);
                 page.addView(paymentCard);
             }
         }
@@ -1243,24 +1240,6 @@ public final class MainActivity extends FragmentActivity {
         }
     }
 
-    private void maybePromptForPaydaySalary() {
-        if (paydayDialogShowing || database == null || page == null || isFinishing() || isDestroyed()) return;
-        LocalDate today = LocalDate.now();
-        CutoffPeriod cutoff = getCutoffAwaitingPayment(today);
-        if (database.getPaydayPayment(cutoff.startDate.toString(), cutoff.endDate.toString()) != null) {
-            return;
-        }
-        if (!today.isBefore(getScheduledPayday(cutoff))) {
-            page.post(() -> {
-                if (!isFinishing() && !isDestroyed() && currentTab == 0
-                        && !paydayDialogShowing
-                        && database.getPaydayPayment(cutoff.startDate.toString(), cutoff.endDate.toString()) == null) {
-                    showPaydayPaymentDialog(cutoff);
-                }
-            });
-        }
-    }
-
     private void showPaydayPaymentDialog() {
         showPaydayPaymentDialog(getCutoffAwaitingPayment(LocalDate.now()));
     }
@@ -1326,6 +1305,23 @@ public final class MainActivity extends FragmentActivity {
                         toast("Select a valid payday date.");
                     } catch (IllegalArgumentException ex) {
                         toast(ex.getMessage());
+                    }
+                }).show();
+    }
+
+    private void confirmDeletePaydayPayment(WorkDatabase.PaydayPayment payment) {
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Delete saved salary?")
+                .setMessage("Received: " + money(new BigDecimal(payment.receivedAmount))
+                        + "\\nCutoff: " + payment.cutoffStart + " to " + payment.cutoffEnd
+                        + "\\nThis amount will be removed from your available cash balance. This cannot be undone.")
+                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                .setPositiveButton("Delete", (dialog, which) -> {
+                    if (database.deletePaydayPayment(payment.cutoffStart, payment.cutoffEnd)) {
+                        Toast.makeText(this, "Salary payment deleted", Toast.LENGTH_SHORT).show();
+                        showTab(2);
+                    } else {
+                        toast("Could not delete this salary payment.");
                     }
                 }).show();
     }
