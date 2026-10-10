@@ -198,7 +198,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void buildDashboard() {
-        header("Good day 👋", "Here’s your salary and budget overview.");
+        header("Good day 👋", "Your money, at a glance.");
         LocalDate today = LocalDate.now();
         LocalDate start = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
         LocalDate end = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
@@ -207,45 +207,92 @@ public final class MainActivity extends FragmentActivity {
         BigDecimal spent = database.getExpenseTotal(start.toString(), end.toString());
         BigDecimal remaining = earned.subtract(spent);
 
-        card("PAYDAY CUTOFF", (today.getDayOfMonth() <= 15 ? "15th cutoff" : "Month-end cutoff"),
-                start.format(DateTimeFormatter.ofPattern("MMM d")) + " – " + end.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
-                        + "\nPayday: " + payday.format(DateTimeFormatter.ofPattern("MMM d, yyyy")));
-        LinearLayout balance = cardContainer();
-        TextView eyebrow = text("RECORDED PAY MINUS EXPENSES", 12, true);
-        eyebrow.setAlpha(0.78f);
-        balance.addView(eyebrow);
-        TextView amount = text(money(remaining), 32, true);
-        amount.setPadding(0, dp(8), 0, dp(6));
-        balance.addView(amount);
-        balance.addView(text("Saved work-entry pay total minus recorded expenses", 12, false));
-        page.addView(balance);
+        LinearLayout totals = new LinearLayout(this);
+        totals.setOrientation(LinearLayout.HORIZONTAL);
+        totals.setGravity(Gravity.CENTER_VERTICAL);
+        totals.setPadding(0, dp(4), 0, dp(12));
+        totals.addView(metricCard("INCOME", money(earned), resolveColor(androidx.appcompat.R.attr.colorPrimary)), new LinearLayout.LayoutParams(0, -1, 1f));
+        View gap = new View(this);
+        totals.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
+        totals.addView(metricCard("EXPENSES", money(spent), resolveColor(com.google.android.material.R.attr.colorError)), new LinearLayout.LayoutParams(0, -1, 1f));
+        page.addView(totals);
 
-        rowCards("TOTAL RECORDED PAY", money(earned), "RECORDED EXPENSES", money(spent));
-        section("Quick actions");
-        actionButton("＋  Add work shift", "Record time-in, time-out and breaks", () -> showWorkDialog(null));
-        actionButton("−  Add an expense", "Track spending for this cutoff", () -> showExpenseDialog(null));
+        LinearLayout snapshot = cardContainer();
+        snapshot.setPadding(dp(18), dp(18), dp(18), dp(18));
+        snapshot.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSecondaryContainer), dp(22)));
+        TextView snapshotTitle = text("Budget snapshot", 18, true);
+        snapshot.addView(snapshotTitle);
+        TextView cutoffLabel = text((today.getDayOfMonth() <= 15 ? "1st–15th cutoff" : "16th–month-end cutoff")
+                + "  ·  Payday " + payday.format(DateTimeFormatter.ofPattern("MMM d")), 12, false);
+        cutoffLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
+        cutoffLabel.setPadding(0, dp(4), 0, dp(14));
+        snapshot.addView(cutoffLabel);
+        TextView remainingLabel = text("REMAINING AFTER EXPENSES", 11, true);
+        remainingLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
+        snapshot.addView(remainingLabel);
+        TextView amount = text(money(remaining), 30, true);
+        amount.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
+        amount.setPadding(0, dp(3), 0, dp(12));
+        snapshot.addView(amount);
+        budgetProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        budgetProgressBar.setMax(100);
+        budgetProgressBar.setProgressTintList(ColorStateList.valueOf(resolveColor(androidx.appcompat.R.attr.colorPrimary)));
+        budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(withAlpha(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer), 0x30)));
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(7));
+        progressParams.bottomMargin = dp(10);
+        snapshot.addView(budgetProgressBar, progressParams);
+        budgetSummaryView = text("", 13, false);
+        budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
+        snapshot.addView(budgetSummaryView);
+        page.addView(snapshot);
+        refreshBudget();
+
+        TextView disclaimer = text("Based on saved work entries and expenses · estimates only", 11, false);
+        disclaimer.setAlpha(0.75f);
+        disclaimer.setPadding(dp(2), dp(8), dp(2), dp(12));
+        page.addView(disclaimer);
+
         section("Recent activity");
         historyContainer = new LinearLayout(this);
         historyContainer.setOrientation(LinearLayout.VERTICAL);
         page.addView(historyContainer);
         refreshHistory();
-        section("Budget snapshot");
-        budgetProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        budgetProgressBar.setMax(100);
-        budgetProgressBar.setProgressTintList(ColorStateList.valueOf(
-                resolveColor(androidx.appcompat.R.attr.colorPrimary)));
-        budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(
-                resolveColor(com.google.android.material.R.attr.colorSurfaceVariant)));
-        LinearLayout.LayoutParams budgetProgressParams = new LinearLayout.LayoutParams(-1, dp(8));
-        budgetProgressParams.bottomMargin = dp(10);
-        page.addView(budgetProgressBar, budgetProgressParams);
-        budgetSummaryView = text("", 14, false);
-        page.addView(budgetSummaryView);
-        refreshBudget();
-        TextView disclaimer = text("Calculated from saved work entries; not a confirmed employer payout.", 12, false);
-        disclaimer.setAlpha(0.7f);
-        disclaimer.setPadding(0, dp(16), 0, 0);
-        page.addView(disclaimer);
+
+        section("Quick actions");
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        MaterialButton addShift = button("＋ Work shift", false);
+        addShift.setOnClickListener(v -> showWorkDialog(null));
+        MaterialButton addExpense = button("＋ Expense", false);
+        addExpense.setOnClickListener(v -> showExpenseDialog(null));
+        LinearLayout.LayoutParams actionLp = new LinearLayout.LayoutParams(0, dp(50), 1f);
+        actionLp.setMargins(0, 0, dp(6), 0);
+        actions.addView(addShift, actionLp);
+        LinearLayout.LayoutParams expenseLp = new LinearLayout.LayoutParams(0, dp(50), 1f);
+        expenseLp.setMargins(dp(6), 0, 0, 0);
+        actions.addView(addExpense, expenseLp);
+        page.addView(actions);
+    }
+
+    private View metricCard(String label, String amount, int accent) {
+        LinearLayout metric = cardContainer();
+        metric.setPadding(dp(14), dp(14), dp(10), dp(14));
+        TextView labelView = text(label, 11, true);
+        labelView.setAlpha(0.75f);
+        metric.addView(labelView);
+        TextView amountView = text(amount, 18, true);
+        amountView.setTextColor(accent);
+        amountView.setPadding(0, dp(8), 0, 0);
+        metric.addView(amountView);
+        return metric;
+    }
+
+    private android.graphics.drawable.GradientDrawable roundedBackground(int color, int radius) {
+        android.graphics.drawable.GradientDrawable drawable = new android.graphics.drawable.GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(radius);
+        return drawable;
     }
 
     private void buildHistoryScreen() {
