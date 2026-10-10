@@ -106,6 +106,12 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 SQLiteDatabase.CONFLICT_REPLACE) != -1;
     }
 
+    public boolean deletePaydayPayment(String cutoffStart, String cutoffEnd) {
+        return getWritableDatabase().delete("payday_payments",
+                "cutoff_start = ? AND cutoff_end = ?",
+                new String[]{cutoffStart, cutoffEnd}) > 0;
+    }
+
     public BigDecimal getPaydayPayment(String cutoffStart, String cutoffEnd) {
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT received_amount FROM payday_payments WHERE cutoff_start = ? AND cutoff_end = ? LIMIT 1",
