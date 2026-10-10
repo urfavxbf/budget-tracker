@@ -37,7 +37,7 @@ public final class CrashActivity extends Activity {
         int muted = MaterialColors.getColor(this,
                 com.google.android.material.R.attr.colorOnSurfaceVariant, Color.rgb(180, 187, 202));
         int accent = MaterialColors.getColor(this,
-                com.google.android.material.R.attr.colorError, Color.rgb(255, 94, 94));
+                androidx.appcompat.R.attr.colorError, Color.rgb(255, 94, 94));
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
