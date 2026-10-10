@@ -3,6 +3,7 @@ package com.urfavxbf.budgettracker;
 import android.app.Application;
 import android.os.Build;
 import android.os.Process;
+import com.google.android.material.color.DynamicColors;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -18,6 +19,7 @@ public final class BudgetTrackerApp extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+        DynamicColors.applyToActivitiesIfAvailable(this);
         previousHandler = Thread.getDefaultUncaughtExceptionHandler();
         Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
             try {
