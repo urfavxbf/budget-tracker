@@ -17,7 +17,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.widget.FrameLayout;
 import android.widget.Button;
-import android.widget.Spinner;
+import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -54,7 +54,7 @@ public final class MainActivity extends FragmentActivity {
     private EditText dateInput, timeInInput, timeOutInput;
     private EditText hourlyRateInput, regularHoursInput, overtimeMultiplierInput, allowanceInput, deductionInput;
     private EditText firstPaydayInput, secondPaydayInput;
-    private Spinner payRateTypeInput;
+    private MaterialAutoCompleteTextView payRateTypeInput;
     private EditText expenseDateInput, expenseCategoryInput, expenseAmountInput, expenseNoteInput;
     private LinearLayout breakContainer, historyContainer, expenseHistoryContainer;
     private TextView resultView, budgetSummaryView;
@@ -283,7 +283,7 @@ public final class MainActivity extends FragmentActivity {
         form.addView(addBreak);
 
         payRateTypeInput = createRateTypeSpinner();
-        if (entry != null) payRateTypeInput.setSelection(0);
+        if (entry != null) payRateTypeInput.setText("Hourly", false);
         hourlyRateInput = field("Rate amount", entry == null ? pref("pay_rate", pref("hourly_rate", "100.00")) : entry.hourlyRate,
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         regularHoursInput = field("Regular hours per day",
@@ -438,7 +438,7 @@ public final class MainActivity extends FragmentActivity {
             LocalTime timeIn = LocalTime.parse(value(timeInInput), DateTimeFormatter.ofPattern("HH:mm"));
             LocalTime timeOut = LocalTime.parse(value(timeOutInput), DateTimeFormatter.ofPattern("HH:mm"));
             BigDecimal enteredRate = decimal(hourlyRateInput, "Pay rate");
-            String rateType = payRateTypeInput == null ? pref("pay_rate_type", "Hourly") : String.valueOf(payRateTypeInput.getSelectedItem());
+            String rateType = payRateTypeInput == null ? pref("pay_rate_type", "Hourly") : payRateTypeInput.getText().toString();
             BigDecimal regularHours = decimal(regularHoursInput, "Regular hours");
             BigDecimal multiplier = decimal(overtimeMultiplierInput, "OT multiplier");
             BigDecimal allowance = decimal(allowanceInput, "Allowance");
@@ -904,23 +904,26 @@ public final class MainActivity extends FragmentActivity {
         return getSharedPreferences(PREFS, MODE_PRIVATE).getString(key, fallback);
     }
 
-    private Spinner createRateTypeSpinner() {
-        Spinner spinner = new Spinner(this);
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, new String[]{"Hourly", "Daily"});
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        spinner.setAdapter(adapter);
-        spinner.setSelection("Daily".equals(pref("pay_rate_type", "Hourly")) ? 1 : 0);
-        spinner.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
-            @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
-                if (hourlyRateInput != null) updateRateLabel(spinner, hourlyRateInput);
-            }
-            @Override public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+    private MaterialAutoCompleteTextView createRateTypeSpinner() {
+        MaterialAutoCompleteTextView dropdown = new MaterialAutoCompleteTextView(this);
+        dropdown.setInputType(InputType.TYPE_NULL);
+        dropdown.setKeyListener(null);
+        dropdown.setThreshold(0);
+        dropdown.setSimpleItems(new String[]{"Hourly", "Daily"});
+        dropdown.setText("Daily".equals(pref("pay_rate_type", "Hourly")) ? "Daily" : "Hourly", false);
+        dropdown.setOnItemClickListener((parent, view, position, id) -> {
+            if (hourlyRateInput != null) updateRateLabel(dropdown, hourlyRateInput);
         });
-        return spinner;
+        dropdown.setOnClickListener(v -> dropdown.showDropDown());
+        dropdown.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(56)));
+        return dropdown;
     }
 
-    private void updateRateLabel(Spinner spinner, EditText input) {
-        if (spinner != null && input != null) input.setHint("Daily".equals(String.valueOf(spinner.getSelectedItem())) ? "Daily rate amount" : "Hourly rate amount");
+    private void updateRateLabel(MaterialAutoCompleteTextView dropdown, EditText input) {
+        if (dropdown != null && input != null) {
+            input.setHint("Daily".equals(dropdown.getText().toString())
+                    ? "Daily rate amount" : "Hourly rate amount");
+        }
     }
 
     private void configureDatePicker(EditText input) {
@@ -1070,6 +1073,19 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void addField(LinearLayout parent, String label, View input) {
+        if (input instanceof MaterialAutoCompleteTextView) {
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+            params.bottomMargin = dp(8);
+            TextInputLayout dropdownLayout = new TextInputLayout(this);
+            dropdownLayout.setHint(label);
+            dropdownLayout.setBoxBackgroundMode(TextInputLayout.BOX_BACKGROUND_FILLED);
+            dropdownLayout.setBoxBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant));
+            dropdownLayout.setBoxCornerRadii(dp(12), dp(12), dp(12), dp(12));
+            dropdownLayout.setEndIconMode(TextInputLayout.END_ICON_DROPDOWN_MENU);
+            dropdownLayout.addView(input);
+            parent.addView(dropdownLayout, params);
+            return;
+        }
         if (input instanceof EditText) {
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
             params.bottomMargin = dp(8);
