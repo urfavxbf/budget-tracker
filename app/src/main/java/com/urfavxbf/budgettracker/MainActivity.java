@@ -136,7 +136,7 @@ public final class MainActivity extends FragmentActivity {
         bottomNav.setItemActiveIndicatorColor(ColorStateList.valueOf(
                 resolveColor(com.google.android.material.R.attr.colorSecondaryContainer)));
         bottomNav.setItemRippleColor(ColorStateList.valueOf(
-                withAlpha(resolveColor(com.google.android.material.R.attr.colorPrimary), 0x33)));
+                withAlpha(resolveColor(androidx.appcompat.R.attr.colorPrimary), 0x33)));
         shell.addView(bottomNav, new LinearLayout.LayoutParams(-1, dp(80)));
         setContentView(shell);
         buildBottomNav();
@@ -645,7 +645,7 @@ public final class MainActivity extends FragmentActivity {
         edit.setBackgroundTintList(ColorStateList.valueOf(
                 resolveColor(com.google.android.material.R.attr.colorSecondaryContainer)));
         edit.setRippleColor(ColorStateList.valueOf(
-                withAlpha(resolveColor(com.google.android.material.R.attr.colorPrimary), 0x33)));
+                withAlpha(resolveColor(androidx.appcompat.R.attr.colorPrimary), 0x33)));
         edit.setInsetTop(0);
         edit.setInsetBottom(0);
         LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(revealWidth / 2 - dp(8), dp(44));
@@ -1040,7 +1040,7 @@ public final class MainActivity extends FragmentActivity {
         actionBackground.setCornerRadius(dp(24));
         actionBackground.setStroke(dp(1), resolveColor(com.google.android.material.R.attr.colorOutlineVariant));
         item.setBackground(new RippleDrawable(
-                ColorStateList.valueOf(withAlpha(resolveColor(com.google.android.material.R.attr.colorPrimary), 0x1F)), actionBackground, null));
+                ColorStateList.valueOf(withAlpha(resolveColor(androidx.appcompat.R.attr.colorPrimary), 0x1F)), actionBackground, null));
         item.setClickable(true);
         item.setFocusable(true);
         LinearLayout words = new LinearLayout(this);
@@ -1051,7 +1051,7 @@ public final class MainActivity extends FragmentActivity {
         words.addView(desc);
         item.addView(words, new LinearLayout.LayoutParams(0, -2, 1f));
         TextView arrow = text("›", 26, false);
-        arrow.setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary));
+        arrow.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
         item.addView(arrow);
         item.setOnClickListener(v -> action.run());
         page.addView(item);
@@ -1144,7 +1144,7 @@ public final class MainActivity extends FragmentActivity {
                     resolveColor(com.google.android.material.R.attr.colorSecondaryContainer)));
         }
         button.setRippleColor(ColorStateList.valueOf(
-                withAlpha(resolveColor(com.google.android.material.R.attr.colorPrimary), 0x33)));
+                withAlpha(resolveColor(androidx.appcompat.R.attr.colorPrimary), 0x33)));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(52));
         params.topMargin = dp(8);
         button.setLayoutParams(params);
