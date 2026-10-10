@@ -181,6 +181,26 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         }
     }
 
+    public BudgetCyclePending getPendingBudgetCycleAllocation(String throughDateInclusive) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT p.cutoff_start, p.cutoff_end, p.payday_date, p.expected_amount, p.received_amount, " +
+                        "(SELECT q.payday_date FROM payday_payments q " +
+                        "WHERE q.payday_date > p.payday_date AND q.payday_date <= ? " +
+                        "ORDER BY q.payday_date ASC, q.id ASC LIMIT 1) " +
+                        "FROM payday_payments p " +
+                        "WHERE EXISTS (SELECT 1 FROM payday_payments q " +
+                        "WHERE q.payday_date > p.payday_date AND q.payday_date <= ?) " +
+                        "AND NOT EXISTS (SELECT 1 FROM budget_cycle_allocations a " +
+                        "WHERE a.cutoff_start = p.cutoff_start AND a.cutoff_end = p.cutoff_end) " +
+                        "ORDER BY p.payday_date ASC, p.id ASC LIMIT 1",
+                new String[]{throughDateInclusive, throughDateInclusive})) {
+            if (!cursor.moveToFirst()) return null;
+            PaydayPayment payment = new PaydayPayment(cursor.getString(0), cursor.getString(1),
+                    cursor.getString(2), cursor.getString(3), cursor.getString(4));
+            return new BudgetCyclePending(payment, cursor.getString(5));
+        }
+    }
+
     public BigDecimal getExpenseTotalBetweenPaydays(String startInclusive, String endExclusive) {
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT amount FROM expenses WHERE expense_date >= ? AND expense_date < ?",
