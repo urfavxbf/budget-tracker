@@ -86,6 +86,12 @@ public final class MainActivity extends FragmentActivity {
         buildShell();
         applyImmersiveMode();
         showTab(currentTab);
+        PaydayReminderScheduler.schedule(this);
+        if (android.os.Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 7127);
+        }
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus) {
@@ -1327,6 +1333,7 @@ public final class MainActivity extends FragmentActivity {
                     .putString("first_cutoff_payday", Integer.toString(first))
                     .putString("second_cutoff_payday", Integer.toString(second))
                     .apply();
+            PaydayReminderScheduler.schedule(this);
             Toast.makeText(this, "Cutoff and payday settings saved", Toast.LENGTH_SHORT).show();
             showTab(2);
         } catch (NumberFormatException ex) {
