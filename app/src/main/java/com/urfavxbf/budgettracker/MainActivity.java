@@ -1231,7 +1231,7 @@ public final class MainActivity extends FragmentActivity {
         if (pending == null || pending.nextPaydayDate == null) return;
         BigDecimal cycleBudget = new BigDecimal(pending.payment.receivedAmount)
                 .add(getCarryoverIntoPayment(pending.payment));
-        BigDecimal expenses = database.getExpenseTotalAfterThrough(
+        BigDecimal expenses = database.getExpenseTotalBetweenPaydays(
                 pending.payment.paydayDate, pending.nextPaydayDate);
         BigDecimal leftover = cycleBudget.subtract(expenses)
                 .setScale(2, java.math.RoundingMode.HALF_UP);
