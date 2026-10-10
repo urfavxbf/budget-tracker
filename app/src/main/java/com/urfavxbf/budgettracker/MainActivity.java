@@ -212,8 +212,15 @@ public final class MainActivity extends FragmentActivity {
         LocalDate start = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
         LocalDate end = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
         LocalDate payday = getPaydayForCurrentCutoff(today);
-        BigDecimal earned = database.getRecordedNetPayTotal(start.toString(), end.toString());
-        BigDecimal spent = database.getExpenseTotal(start.toString(), end.toString());
+        WorkDatabase.PaydayPayment activePayment = database.getLatestPaydayPaymentOnOrBefore(today.toString());
+        BigDecimal earned = activePayment == null
+                ? database.getRecordedNetPayTotal(start.toString(), end.toString())
+                : new BigDecimal(activePayment.receivedAmount);
+        BigDecimal spent = activePayment == null
+                ? database.getExpenseTotal(start.toString(), end.toString())
+                : database.getExpenseTotal(activePayment.paydayDate, today.toString());
+        String payMetricLabel = activePayment == null ? "EXPECTED PAY" : "CYCLE SALARY";
+        String expenseMetricLabel = activePayment == null ? "CUTOFF EXPENSES" : "CYCLE EXPENSES";
         BigDecimal totalCash = getTotalCashBalance();
         BigDecimal savings = database.getTotalSavingsBalance();
         BigDecimal remaining = totalCash.subtract(savings).setScale(2, java.math.RoundingMode.HALF_UP);
@@ -222,10 +229,10 @@ public final class MainActivity extends FragmentActivity {
         totals.setOrientation(LinearLayout.HORIZONTAL);
         totals.setGravity(Gravity.CENTER_VERTICAL);
         totals.setPadding(0, dp(4), 0, dp(12));
-        totals.addView(metricCard("EXPECTED PAY", money(earned), resolveColor(androidx.appcompat.R.attr.colorPrimary)), new LinearLayout.LayoutParams(0, dp(84), 1f));
+        totals.addView(metricCard(payMetricLabel, money(earned), resolveColor(androidx.appcompat.R.attr.colorPrimary)), new LinearLayout.LayoutParams(0, dp(84), 1f));
         View gap = new View(this);
         totals.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
-        totals.addView(metricCard("EXPENSES", money(spent), resolveColor(androidx.appcompat.R.attr.colorError)), new LinearLayout.LayoutParams(0, dp(84), 1f));
+        totals.addView(metricCard(expenseMetricLabel, money(spent), resolveColor(androidx.appcompat.R.attr.colorError)), new LinearLayout.LayoutParams(0, dp(84), 1f));
         LinearLayout.LayoutParams totalsParams = new LinearLayout.LayoutParams(-1, -2);
         totalsParams.bottomMargin = dp(2);
         page.addView(totals, totalsParams);
@@ -235,8 +242,11 @@ public final class MainActivity extends FragmentActivity {
         snapshot.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSecondaryContainer), dp(22)));
         TextView snapshotTitle = text("Budget snapshot", 18, true);
         snapshot.addView(snapshotTitle);
-        TextView cutoffLabel = text((today.getDayOfMonth() <= 15 ? "1st–15th cutoff" : "16th–month-end cutoff")
-                + "  ·  Payday " + payday.format(DateTimeFormatter.ofPattern("MMM d")), 12, false);
+        TextView cutoffLabel = text(activePayment == null
+                ? (today.getDayOfMonth() <= 15 ? "1st–15th cutoff" : "16th–month-end cutoff")
+                        + "  ·  Scheduled payday " + payday.format(DateTimeFormatter.ofPattern("MMM d"))
+                : "Salary cycle started " + activePayment.paydayDate
+                        + "  ·  Next scheduled payday " + payday.format(DateTimeFormatter.ofPattern("MMM d")), 12, false);
         cutoffLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
         cutoffLabel.setPadding(0, dp(4), 0, dp(14));
         snapshot.addView(cutoffLabel);
@@ -272,7 +282,7 @@ public final class MainActivity extends FragmentActivity {
         page.addView(recordPayday);
         refreshBudget();
 
-        TextView disclaimer = text("Expected pay is an estimate. Available cash uses your opening balance and confirmed salary payments, minus recorded expenses.", 11, false);
+        TextView disclaimer = text("Total cash is opening balance plus confirmed salary payments minus recorded expenses. Savings are reserved separately and excluded from available-to-spend cash.", 11, false);
         disclaimer.setAlpha(0.75f);
         disclaimer.setPadding(dp(2), dp(8), dp(2), dp(12));
         page.addView(disclaimer);
