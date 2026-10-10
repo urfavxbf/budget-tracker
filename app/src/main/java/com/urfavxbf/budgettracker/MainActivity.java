@@ -1248,36 +1248,31 @@ public final class MainActivity extends FragmentActivity {
         new MaterialAlertDialogBuilder(this)
                 .setTitle("What should happen to your leftover budget?")
                 .setMessage("Your previous salary cycle has " + amount + " left. Choose how to allocate it. Your salary and expense history will stay saved.")
-                .setItems(new String[]{
-                        "Move all " + amount + " to savings",
-                        "Carry all " + amount + " into the new cycle",
-                        "Split between savings and carry-over"
-                }, (dialog, which) -> {
-                    if (which == 0) {
-                        saveBudgetAllocation(pending, leftover, BigDecimal.ZERO);
-                    } else if (which == 1) {
-                        saveBudgetAllocation(pending, BigDecimal.ZERO, leftover);
-                    } else {
-                        EditText savingsInput = field("Amount to save (₱)", leftover.toPlainString(),
-                                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-                        new MaterialAlertDialogBuilder(this)
-                                .setTitle("Split leftover budget")
-                                .setMessage("Enter the amount for savings. The remainder will carry over.")
-                                .setView(savingsInput)
-                                .setNegativeButton("Cancel", (splitDialog, splitWhich) -> maybePromptForSavingsAllocation())
-                                .setPositiveButton("Save allocation", (splitDialog, splitWhich) -> {
-                                    try {
-                                        BigDecimal savings = decimal(savingsInput, "Savings amount");
-                                        if (savings.signum() < 0 || savings.compareTo(leftover) > 0) {
-                                            throw new IllegalArgumentException("Savings must be between ₱0 and " + amount + ".");
-                                        }
-                                        saveBudgetAllocation(pending, savings,
-                                                leftover.subtract(savings).setScale(2, java.math.RoundingMode.HALF_UP));
-                                    } catch (IllegalArgumentException ex) {
-                                        toast(ex.getMessage());
+                .setPositiveButton("Move to savings", (dialog, which) ->
+                        saveBudgetAllocation(pending, leftover, BigDecimal.ZERO))
+                .setNegativeButton("Carry over", (dialog, which) ->
+                        saveBudgetAllocation(pending, BigDecimal.ZERO, leftover))
+                .setNeutralButton("Split", (dialog, which) -> {
+                    EditText savingsInput = field("Amount to save (₱)", leftover.toPlainString(),
+                            InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                    new MaterialAlertDialogBuilder(this)
+                            .setTitle("Split leftover budget")
+                            .setMessage("Enter the amount for savings. The remainder will carry over.")
+                            .setView(savingsInput)
+                            .setNegativeButton("Cancel", (splitDialog, splitWhich) ->
+                                    maybePromptForSavingsAllocation())
+                            .setPositiveButton("Save allocation", (splitDialog, splitWhich) -> {
+                                try {
+                                    BigDecimal savings = decimal(savingsInput, "Savings amount");
+                                    if (savings.signum() < 0 || savings.compareTo(leftover) > 0) {
+                                        throw new IllegalArgumentException("Savings must be between ₱0 and " + amount + ".");
                                     }
-                                }).show();
-                    }
+                                    saveBudgetAllocation(pending, savings,
+                                            leftover.subtract(savings).setScale(2, java.math.RoundingMode.HALF_UP));
+                                } catch (IllegalArgumentException ex) {
+                                    toast(ex.getMessage());
+                                }
+                            }).show();
                 })
                 .setCancelable(false)
                 .show();
