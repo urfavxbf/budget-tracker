@@ -181,9 +181,9 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         }
     }
 
-    public BigDecimal getExpenseTotalBetweenPaydays(String startExclusive, String endExclusive) {
+    public BigDecimal getExpenseTotalBetweenPaydays(String startInclusive, String endExclusive) {
         try (Cursor cursor = getReadableDatabase().rawQuery(
-                "SELECT amount FROM expenses WHERE expense_date > ? AND expense_date < ?",
+                "SELECT amount FROM expenses WHERE expense_date >= ? AND expense_date < ?",
                 new String[]{startExclusive, endInclusive})) {
             BigDecimal total = BigDecimal.ZERO;
             while (cursor.moveToNext()) total = total.add(new BigDecimal(cursor.getString(0)));
