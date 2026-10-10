@@ -249,8 +249,12 @@ public final class MainActivity extends FragmentActivity {
         budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
         snapshot.addView(budgetSummaryView);
         page.addView(snapshot);
+        CutoffPeriod paymentCutoff = getCutoffAwaitingPayment(today);
+        boolean paymentAlreadyRecorded = database.getPaydayPayment(paymentCutoff.startDate.toString(),
+                paymentCutoff.endDate.toString()) != null;
         MaterialButton recordPayday = button("＋ Record payday salary", true);
         recordPayday.setOnClickListener(v -> showPaydayPaymentDialog());
+        recordPayday.setVisibility(paymentAlreadyRecorded ? View.GONE : View.VISIBLE);
         page.addView(recordPayday);
         refreshBudget();
 
@@ -280,6 +284,7 @@ public final class MainActivity extends FragmentActivity {
         expenseLp.setMargins(dp(6), 0, 0, 0);
         actions.addView(addExpense, expenseLp);
         page.addView(actions);
+        maybePromptForPaydaySalary();
     }
 
     private View metricCard(String label, String amount, int accent) {
@@ -1157,20 +1162,45 @@ public final class MainActivity extends FragmentActivity {
         }
     }
 
-    private void showPaydayPaymentDialog() {
-        LocalDate today = LocalDate.now();
+    private CutoffPeriod getCutoffAwaitingPayment(LocalDate today) {
         LocalDate referenceDate = today.getDayOfMonth() <= 15
                 ? today.minusMonths(1).withDayOfMonth(16)
                 : today.withDayOfMonth(1);
-        CutoffPeriod paidCutoff = CutoffPeriod.forDate(referenceDate);
-        LocalDate suggestedPayday;
+        return CutoffPeriod.forDate(referenceDate);
+    }
+
+    private LocalDate getScheduledPayday(CutoffPeriod cutoff) {
         try {
             int first = Integer.parseInt(pref("first_cutoff_payday", "22"));
             int second = Integer.parseInt(pref("second_cutoff_payday", "7"));
-            suggestedPayday = paidCutoff.payday(first, second);
+            return cutoff.payday(first, second);
         } catch (NumberFormatException ignored) {
-            suggestedPayday = paidCutoff.payday(22, 7);
+            return cutoff.payday(22, 7);
         }
+    }
+
+    private void maybePromptForPaydaySalary() {
+        LocalDate today = LocalDate.now();
+        CutoffPeriod cutoff = getCutoffAwaitingPayment(today);
+        if (database.getPaydayPayment(cutoff.startDate.toString(), cutoff.endDate.toString()) != null) {
+            return;
+        }
+        if (!today.isBefore(getScheduledPayday(cutoff))) {
+            page.post(() -> {
+                if (!isFinishing() && !isDestroyed() && currentTab == 0) {
+                    showPaydayPaymentDialog(cutoff);
+                }
+            });
+        }
+    }
+
+    private void showPaydayPaymentDialog() {
+        showPaydayPaymentDialog(getCutoffAwaitingPayment(LocalDate.now()));
+    }
+
+    private void showPaydayPaymentDialog(CutoffPeriod paidCutoff) {
+        LocalDate today = LocalDate.now();
+        LocalDate suggestedPayday = getScheduledPayday(paidCutoff);
 
         String start = paidCutoff.startDate.toString();
         String end = paidCutoff.endDate.toString();
