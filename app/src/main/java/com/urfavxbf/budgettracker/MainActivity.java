@@ -211,11 +211,13 @@ public final class MainActivity extends FragmentActivity {
         totals.setOrientation(LinearLayout.HORIZONTAL);
         totals.setGravity(Gravity.CENTER_VERTICAL);
         totals.setPadding(0, dp(4), 0, dp(12));
-        totals.addView(metricCard("INCOME", money(earned), resolveColor(androidx.appcompat.R.attr.colorPrimary)), new LinearLayout.LayoutParams(0, -1, 1f));
+        totals.addView(metricCard("INCOME", money(earned), resolveColor(androidx.appcompat.R.attr.colorPrimary)), new LinearLayout.LayoutParams(0, dp(84), 1f));
         View gap = new View(this);
         totals.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
-        totals.addView(metricCard("EXPENSES", money(spent), resolveColor(androidx.appcompat.R.attr.colorError)), new LinearLayout.LayoutParams(0, -1, 1f));
-        page.addView(totals);
+        totals.addView(metricCard("EXPENSES", money(spent), resolveColor(androidx.appcompat.R.attr.colorError)), new LinearLayout.LayoutParams(0, dp(84), 1f));
+        LinearLayout.LayoutParams totalsParams = new LinearLayout.LayoutParams(-1, -2);
+        totalsParams.bottomMargin = dp(2);
+        page.addView(totals, totalsParams);
 
         LinearLayout snapshot = cardContainer();
         snapshot.setPadding(dp(18), dp(18), dp(18), dp(18));
@@ -1031,7 +1033,7 @@ public final class MainActivity extends FragmentActivity {
                     .divide(spendingLimit, 1, java.math.RoundingMode.HALF_UP);
             summary.append(money(spent)).append(" spent of ").append(money(spendingLimit))
                     .append("  ·  ").append(actualPercent.toPlainString()).append("% used")
-                    .append("\\n").append(money(budgetRemaining)).append(" budget remaining");
+                    .append("\n").append(money(budgetRemaining)).append(" budget remaining");
             if (spent.compareTo(spendingLimit) > 0) {
                 summary.append("\\n\\nOver budget by ").append(money(spent.subtract(spendingLimit)));
                 budgetSummaryView.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
