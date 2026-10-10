@@ -1238,8 +1238,13 @@ public final class MainActivity extends FragmentActivity {
         BigDecimal leftover = cycleBudget.subtract(expenses)
                 .setScale(2, java.math.RoundingMode.HALF_UP);
         if (leftover.signum() <= 0) {
+            WorkDatabase.BudgetCycleAllocation existing =
+                    database.getBudgetCycleAllocation(pending.payment.cutoffStart, pending.payment.cutoffEnd);
+            BigDecimal preservedSavings = existing == null
+                    ? BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP)
+                    : new BigDecimal(existing.savingsAmount).setScale(2, java.math.RoundingMode.HALF_UP);
             database.saveBudgetCycleAllocation(pending.payment.cutoffStart, pending.payment.cutoffEnd,
-                    BigDecimal.ZERO, BigDecimal.ZERO);
+                    preservedSavings, BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP));
             return;
         }
         showSavingsAllocationDialog(pending, leftover);
