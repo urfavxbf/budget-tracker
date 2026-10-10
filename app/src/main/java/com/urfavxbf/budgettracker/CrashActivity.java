@@ -4,9 +4,12 @@ import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.color.MaterialColors;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
@@ -25,11 +28,16 @@ public final class CrashActivity extends Activity {
         report = getSharedPreferences(BudgetTrackerApp.CRASH_PREFS, MODE_PRIVATE)
                 .getString(BudgetTrackerApp.CRASH_REPORT, "No crash report was saved.");
 
-        int background = Color.rgb(18, 20, 28);
-        int surface = Color.rgb(30, 33, 43);
-        int foreground = Color.rgb(240, 242, 248);
-        int muted = Color.rgb(180, 187, 202);
-        int accent = Color.rgb(255, 94, 94);
+        int background = MaterialColors.getColor(this,
+                com.google.android.material.R.attr.colorSurface, Color.rgb(18, 20, 28));
+        int surface = MaterialColors.getColor(this,
+                com.google.android.material.R.attr.colorSurfaceVariant, Color.rgb(30, 33, 43));
+        int foreground = MaterialColors.getColor(this,
+                com.google.android.material.R.attr.colorOnSurface, Color.rgb(240, 242, 248));
+        int muted = MaterialColors.getColor(this,
+                com.google.android.material.R.attr.colorOnSurfaceVariant, Color.rgb(180, 187, 202));
+        int accent = MaterialColors.getColor(this,
+                com.google.android.material.R.attr.colorError, Color.rgb(255, 94, 94));
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -50,21 +58,31 @@ public final class CrashActivity extends Activity {
         subtitle.setPadding(0, dp(8), 0, dp(14));
         root.addView(subtitle);
 
-        Button copyButton = new Button(this);
+        MaterialButton copyButton = new MaterialButton(this);
         copyButton.setText("Copy Error Report");
         copyButton.setAllCaps(false);
-        copyButton.setTextSize(15);
-        copyButton.setTextColor(Color.WHITE);
-        GradientDrawable buttonBackground = new GradientDrawable();
-        buttonBackground.setColor(accent);
-        buttonBackground.setCornerRadius(dp(14));
-        copyButton.setBackground(buttonBackground);
+        copyButton.setTextSize(14);
+        copyButton.setCornerRadius(dp(16));
+        copyButton.setInsetTop(0);
+        copyButton.setInsetBottom(0);
+        copyButton.setTextColor(MaterialColors.getColor(this,
+                com.google.android.material.R.attr.colorOnError, Color.WHITE));
+        copyButton.setBackgroundTintList(ColorStateList.valueOf(accent));
+        copyButton.setRippleColor(ColorStateList.valueOf(0x33FFFFFF));
         copyButton.setOnClickListener(v -> copyReport());
         root.addView(copyButton, new LinearLayout.LayoutParams(-1, dp(52)));
 
-        Button restartButton = new Button(this);
+        MaterialButton restartButton = new MaterialButton(this);
         restartButton.setText("Try Open App Again");
         restartButton.setAllCaps(false);
+        restartButton.setCornerRadius(dp(16));
+        restartButton.setInsetTop(0);
+        restartButton.setInsetBottom(0);
+        restartButton.setBackgroundTintList(ColorStateList.valueOf(MaterialColors.getColor(this,
+                com.google.android.material.R.attr.colorSecondaryContainer, surface)));
+        restartButton.setTextColor(MaterialColors.getColor(this,
+                com.google.android.material.R.attr.colorOnSecondaryContainer, foreground));
+        restartButton.setRippleColor(ColorStateList.valueOf(0x335267D8));
         restartButton.setOnClickListener(v -> {
             getSharedPreferences(BudgetTrackerApp.CRASH_PREFS, MODE_PRIVATE)
                     .edit().remove(BudgetTrackerApp.CRASH_REPORT).apply();
@@ -91,8 +109,12 @@ public final class CrashActivity extends Activity {
         log.setTextSize(12);
         log.setTypeface(Typeface.MONOSPACE);
         log.setTextColor(foreground);
-        log.setPadding(dp(12), dp(12), dp(12), dp(12));
-        log.setBackgroundColor(surface);
+        log.setPadding(dp(14), dp(14), dp(14), dp(14));
+        GradientDrawable logBackground = new GradientDrawable();
+        logBackground.setColor(surface);
+        logBackground.setCornerRadius(dp(16));
+        log.setBackground(logBackground);
+        scroll.setClipToPadding(false);
         scroll.addView(log, new ScrollView.LayoutParams(-1, -2));
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
