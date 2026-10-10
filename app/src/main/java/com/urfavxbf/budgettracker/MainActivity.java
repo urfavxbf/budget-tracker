@@ -1255,24 +1255,30 @@ public final class MainActivity extends FragmentActivity {
                 .setNeutralButton("Split", (dialog, which) -> {
                     EditText savingsInput = field("Amount to save (₱)", leftover.toPlainString(),
                             InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-                    new MaterialAlertDialogBuilder(this)
+                    AlertDialog splitDialog = new MaterialAlertDialogBuilder(this)
                             .setTitle("Split leftover budget")
                             .setMessage("Enter the amount for savings. The remainder will carry over.")
                             .setView(savingsInput)
-                            .setNegativeButton("Cancel", (splitDialog, splitWhich) ->
+                            .setNegativeButton("Cancel", (splitDialogInterface, splitWhich) ->
                                     maybePromptForSavingsAllocation())
-                            .setPositiveButton("Save allocation", (splitDialog, splitWhich) -> {
+                            .setPositiveButton("Save allocation", null)
+                            .create();
+                    splitDialog.setOnShowListener(ignored -> splitDialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                            .setOnClickListener(saveView -> {
                                 try {
                                     BigDecimal savings = decimal(savingsInput, "Savings amount");
                                     if (savings.signum() < 0 || savings.compareTo(leftover) > 0) {
                                         throw new IllegalArgumentException("Savings must be between ₱0 and " + amount + ".");
                                     }
-                                    saveBudgetAllocation(pending, savings,
-                                            leftover.subtract(savings).setScale(2, java.math.RoundingMode.HALF_UP));
+                                    BigDecimal carryover = leftover.subtract(savings)
+                                            .setScale(2, java.math.RoundingMode.HALF_UP);
+                                    saveBudgetAllocation(pending, savings, carryover);
+                                    splitDialog.dismiss();
                                 } catch (IllegalArgumentException ex) {
                                     toast(ex.getMessage());
                                 }
-                            }).show();
+                            }));
+                    splitDialog.show();
                 })
                 .setCancelable(false)
                 .show();
