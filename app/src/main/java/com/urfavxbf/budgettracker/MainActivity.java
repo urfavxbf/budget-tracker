@@ -271,6 +271,7 @@ public final class MainActivity extends Activity {
         form.addView(addBreak);
 
         payRateTypeInput = createRateTypeSpinner();
+        if (entry != null) payRateTypeInput.setSelection(0);
         hourlyRateInput = field("Rate amount", entry == null ? pref("pay_rate", pref("hourly_rate", "100.00")) : entry.hourlyRate,
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         regularHoursInput = field("Regular hours per day",
