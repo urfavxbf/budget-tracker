@@ -457,8 +457,8 @@ public final class MainActivity extends FragmentActivity {
         form.addView(addBreak);
 
         payRateTypeInput = createRateTypeSpinner();
-        if (entry != null) payRateTypeInput.setText("Hourly", false);
-        hourlyRateInput = field("Rate amount", entry == null ? pref("pay_rate", pref("hourly_rate", "100.00")) : entry.hourlyRate,
+        if (entry != null) payRateTypeInput.setText(entry.rateType, false);
+        hourlyRateInput = field("Rate amount", entry == null ? pref("pay_rate", pref("hourly_rate", "100.00")) : entry.enteredRate,
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         regularHoursInput = field("Regular hours per day",
                 entry == null ? pref("regular_hours", "8")
@@ -699,7 +699,7 @@ public final class MainActivity extends FragmentActivity {
             String savedBreaks = serializedBreaks.isEmpty() ? "0h" : android.text.TextUtils.join(", ", serializedBreaks);
             if (updatingEntry) {
                 if (!database.updateEntry(editingWorkEntryId, date.toString(), timeIn.toString(), timeOut.toString(),
-                        savedBreaks, result, effectiveHourlyRate, multiplier, regularMinutes)) {
+                        savedBreaks, result, effectiveHourlyRate, rateType, enteredRate, multiplier, regularMinutes)) {
                     throw new IllegalArgumentException("This saved shift no longer exists.");
                 }
                 editingWorkEntryId = -1;
@@ -707,7 +707,7 @@ public final class MainActivity extends FragmentActivity {
             } else {
                 saveSalaryPreferences(enteredRate, rateType, regularHours, multiplier, allowance, deduction);
                 database.insertEntry(date.toString(), timeIn.toString(), timeOut.toString(),
-                        savedBreaks, result, effectiveHourlyRate, multiplier, regularMinutes);
+                        savedBreaks, result, effectiveHourlyRate, rateType, enteredRate, multiplier, regularMinutes);
             }
             resultView.setText("PAY BREAKDOWN (" + rateType.toUpperCase(Locale.ROOT) + " RATE)\n\nShift     " + duration(result.shiftMinutes)
                     + "\nBreak     " + duration(result.breakMinutes)
