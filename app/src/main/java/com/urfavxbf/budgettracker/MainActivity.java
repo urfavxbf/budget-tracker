@@ -4,8 +4,10 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
+import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
@@ -620,11 +622,21 @@ public final class MainActivity extends Activity {
 
         Button edit = button("Edit", false);
         edit.setTextSize(12);
+        edit.setTextColor(resolveColor(android.R.attr.colorAccent));
+        edit.setAllCaps(false);
         edit.setPadding(0, 0, 0, 0);
         edit.setMinWidth(0);
         edit.setMinimumWidth(0);
         edit.setMinimumHeight(0);
-        edit.setLayoutParams(new LinearLayout.LayoutParams(revealWidth / 2, dp(44)));
+        edit.setElevation(dp(1));
+        GradientDrawable editBackground = new GradientDrawable();
+        editBackground.setColor(0x1F5267D8);
+        editBackground.setCornerRadius(dp(12));
+        edit.setBackground(new RippleDrawable(
+                ColorStateList.valueOf(0x225267D8), editBackground, null));
+        LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(revealWidth / 2 - dp(8), dp(44));
+        editParams.setMargins(dp(4), 0, dp(2), 0);
+        edit.setLayoutParams(editParams);
         edit.setOnClickListener(v -> {
             closeSwipeContent();
             editAction.onClick(v);
@@ -633,11 +645,20 @@ public final class MainActivity extends Activity {
         Button delete = button("Delete", false);
         delete.setTextSize(12);
         delete.setTextColor(0xFFD32F2F);
+        delete.setAllCaps(false);
         delete.setPadding(0, 0, 0, 0);
         delete.setMinWidth(0);
         delete.setMinimumWidth(0);
         delete.setMinimumHeight(0);
-        delete.setLayoutParams(new LinearLayout.LayoutParams(revealWidth / 2, dp(44)));
+        delete.setElevation(dp(1));
+        GradientDrawable deleteBackground = new GradientDrawable();
+        deleteBackground.setColor(0x1FF44336);
+        deleteBackground.setCornerRadius(dp(12));
+        delete.setBackground(new RippleDrawable(
+                ColorStateList.valueOf(0x22F44336), deleteBackground, null));
+        LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(revealWidth / 2 - dp(8), dp(44));
+        deleteParams.setMargins(dp(2), 0, dp(4), 0);
+        delete.setLayoutParams(deleteParams);
         delete.setOnClickListener(v -> {
             closeSwipeContent();
             deleteAction.onClick(v);
