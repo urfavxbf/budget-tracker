@@ -214,7 +214,7 @@ public final class MainActivity extends FragmentActivity {
         totals.addView(metricCard("INCOME", money(earned), resolveColor(androidx.appcompat.R.attr.colorPrimary)), new LinearLayout.LayoutParams(0, -1, 1f));
         View gap = new View(this);
         totals.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
-        totals.addView(metricCard("EXPENSES", money(spent), resolveColor(com.google.android.material.R.attr.colorError)), new LinearLayout.LayoutParams(0, -1, 1f));
+        totals.addView(metricCard("EXPENSES", money(spent), resolveColor(androidx.appcompat.R.attr.colorError)), new LinearLayout.LayoutParams(0, -1, 1f));
         page.addView(totals);
 
         LinearLayout snapshot = cardContainer();
@@ -1034,10 +1034,10 @@ public final class MainActivity extends FragmentActivity {
                     .append("\\n").append(money(budgetRemaining)).append(" budget remaining");
             if (spent.compareTo(spendingLimit) > 0) {
                 summary.append("\\n\\nOver budget by ").append(money(spent.subtract(spendingLimit)));
-                budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorError));
+                budgetSummaryView.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
             } else if (spent.compareTo(spendingLimit.multiply(new BigDecimal("0.80"))) >= 0) {
                 summary.append("\\n\\nYou’ve used 80% or more of your budget.");
-                budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorError));
+                budgetSummaryView.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
             } else {
                 summary.append("\\n\\nYou’re within your spending limit.");
                 budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
