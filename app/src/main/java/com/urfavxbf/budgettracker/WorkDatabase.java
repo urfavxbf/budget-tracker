@@ -114,6 +114,34 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         }
     }
 
+    public List<PaydayPayment> getPaydayPayments(int limit) {
+        List<PaydayPayment> payments = new ArrayList<>();
+        try (Cursor cursor = getReadableDatabase().query(
+                "payday_payments",
+                new String[]{"cutoff_start", "cutoff_end", "payday_date", "expected_amount", "received_amount"},
+                null, null, null, null, "payday_date DESC, id DESC",
+                Integer.toString(Math.max(1, limit)))) {
+            while (cursor.moveToNext()) {
+                payments.add(new PaydayPayment(cursor.getString(0), cursor.getString(1),
+                        cursor.getString(2), cursor.getString(3), cursor.getString(4)));
+            }
+        }
+        return payments;
+    }
+
+    public static final class PaydayPayment {
+        public final String cutoffStart, cutoffEnd, paydayDate, expectedAmount, receivedAmount;
+
+        PaydayPayment(String cutoffStart, String cutoffEnd, String paydayDate,
+                      String expectedAmount, String receivedAmount) {
+            this.cutoffStart = cutoffStart;
+            this.cutoffEnd = cutoffEnd;
+            this.paydayDate = paydayDate;
+            this.expectedAmount = expectedAmount;
+            this.receivedAmount = receivedAmount;
+        }
+    }
+
     public BigDecimal getTotalReceivedPay() {
         try (Cursor cursor = getReadableDatabase().rawQuery("SELECT received_amount FROM payday_payments", null)) {
             BigDecimal total = BigDecimal.ZERO;
