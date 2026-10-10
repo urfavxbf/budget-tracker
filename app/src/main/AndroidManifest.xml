@@ -11,16 +11,9 @@
         <receiver
             android:name=".PaydayReminderReceiver"
             android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.urfavxbf.budgettracker.ACTION_PAYDAY_REMINDER" />
-            </intent-filter>
-        </receiver>
-        <receiver
-            android:name=".PaydayBootReceiver"
-            android:enabled="true"
             android:exported="true">
             <intent-filter>
+                <action android:name="com.urfavxbf.budgettracker.ACTION_PAYDAY_REMINDER" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
