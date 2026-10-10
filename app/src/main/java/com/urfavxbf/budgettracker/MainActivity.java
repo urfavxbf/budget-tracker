@@ -9,7 +9,10 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
+import android.widget.FrameLayout;
 import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.ArrayAdapter;
@@ -50,6 +53,7 @@ public final class MainActivity extends Activity {
     private Button saveWorkButton;
     private Button saveExpenseButton;
     private boolean lastSaveSucceeded;
+    private View openSwipeContent;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -524,6 +528,7 @@ public final class MainActivity extends Activity {
     private void refreshHistory() {
         if (historyContainer == null) return;
         historyContainer.removeAllViews();
+        openSwipeContent = null;
 
         Map<String, DayHistory> days = new TreeMap<>(java.util.Collections.reverseOrder());
         List<WorkDatabase.WorkEntry> workEntries = database.getRecentWorkEntries(100);
@@ -560,29 +565,19 @@ public final class MainActivity extends Activity {
             dayCard.addView(dateTitle);
 
             for (WorkDatabase.WorkEntry entry : day.workEntries) {
+                LinearLayout recordContent = new LinearLayout(this);
+                recordContent.setOrientation(LinearLayout.VERTICAL);
                 TextView shiftTime = text(entry.timeIn + " - " + entry.timeOut, 14, true);
                 shiftTime.setPadding(0, dp(3), 0, dp(2));
-                dayCard.addView(shiftTime);
-                dayCard.addView(text("Work " + duration(entry.netMinutes) + "  Break " + duration(entry.breakMinutes),
+                recordContent.addView(shiftTime);
+                recordContent.addView(text("Work " + duration(entry.netMinutes) + "  Break " + duration(entry.breakMinutes),
                         13, false));
                 if (entry.overtimeMinutes > 0) {
-                    dayCard.addView(text("Overtime: " + duration(entry.overtimeMinutes), 13, false));
+                    recordContent.addView(text("Overtime: " + duration(entry.overtimeMinutes), 13, false));
                 }
-                dayCard.addView(text("Recorded net pay: " + money(new BigDecimal(entry.netPay)), 14, true));
-
-                LinearLayout actions = new LinearLayout(this);
-                actions.setOrientation(LinearLayout.HORIZONTAL);
-                Button edit = button("Edit shift", false);
-                Button delete = button("Delete shift", false);
-                edit.setOnClickListener(v -> editWorkEntry(entry));
-                delete.setOnClickListener(v -> confirmDeleteWorkEntry(entry));
-                actions.addView(edit, new LinearLayout.LayoutParams(0, dp(44), 1f));
-                actions.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
-                actions.addView(delete, new LinearLayout.LayoutParams(0, dp(44), 1f));
-                LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2);
-                actionParams.topMargin = dp(4);
-                actionParams.bottomMargin = dp(8);
-                dayCard.addView(actions, actionParams);
+                recordContent.addView(text("Recorded net pay: " + money(new BigDecimal(entry.netPay)), 14, true));
+                addSwipeReveal(dayCard, recordContent, "Edit shift", "Delete shift",
+                        v -> editWorkEntry(entry), v -> confirmDeleteWorkEntry(entry));
             }
 
             if (!day.expenses.isEmpty()) {
@@ -590,28 +585,135 @@ public final class MainActivity extends Activity {
                 expensesTitle.setPadding(0, dp(5), 0, dp(3));
                 dayCard.addView(expensesTitle);
                 for (WorkDatabase.ExpenseEntry entry : day.expenses) {
-                    dayCard.addView(text(entry.category + "  " + money(new BigDecimal(entry.amount)), 14, true));
+                    LinearLayout recordContent = new LinearLayout(this);
+                    recordContent.setOrientation(LinearLayout.VERTICAL);
+                    recordContent.addView(text(entry.category + "  " + money(new BigDecimal(entry.amount)), 14, true));
                     if (!entry.note.isEmpty()) {
                         TextView note = text(entry.note, 12, false);
                         note.setTextColor(resolveColor(android.R.attr.textColorSecondary));
-                        dayCard.addView(note);
+                        recordContent.addView(note);
                     }
-                    LinearLayout actions = new LinearLayout(this);
-                    actions.setOrientation(LinearLayout.HORIZONTAL);
-                    Button edit = button("Edit expense", false);
-                    Button delete = button("Delete expense", false);
-                    edit.setOnClickListener(v -> editExpense(entry));
-                    delete.setOnClickListener(v -> confirmDeleteExpense(entry));
-                    actions.addView(edit, new LinearLayout.LayoutParams(0, dp(44), 1f));
-                    actions.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
-                    actions.addView(delete, new LinearLayout.LayoutParams(0, dp(44), 1f));
-                    LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2);
-                    actionParams.topMargin = dp(2);
-                    actionParams.bottomMargin = dp(6);
-                    dayCard.addView(actions, actionParams);
+                    addSwipeReveal(dayCard, recordContent, "Edit expense", "Delete expense",
+                            v -> editExpense(entry), v -> confirmDeleteExpense(entry));
                 }
             }
             historyContainer.addView(dayCard);
+        }
+    }
+
+    private void addSwipeReveal(LinearLayout parent, LinearLayout recordContent, String editLabel,
+                                String deleteLabel, View.OnClickListener editAction,
+                                View.OnClickListener deleteAction) {
+        int revealWidth = dp(152);
+        FrameLayout row = new FrameLayout(this);
+        row.setClipChildren(true);
+        row.setClipToPadding(true);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER);
+        actions.setBackgroundColor(resolveColor(android.R.attr.colorBackground));
+        FrameLayout.LayoutParams actionParams = new FrameLayout.LayoutParams(
+                revealWidth, -1, Gravity.END | Gravity.CENTER_VERTICAL);
+        row.addView(actions, actionParams);
+
+        Button edit = button("Edit", false);
+        edit.setTextSize(12);
+        edit.setPadding(0, 0, 0, 0);
+        edit.setMinWidth(0);
+        edit.setMinimumWidth(0);
+        edit.setLayoutParams(new LinearLayout.LayoutParams(revealWidth / 2, -1));
+        edit.setOnClickListener(v -> {
+            closeSwipeContent();
+            editAction.onClick(v);
+        });
+
+        Button delete = button("Delete", false);
+        delete.setTextSize(12);
+        delete.setTextColor(0xFFD32F2F);
+        delete.setPadding(0, 0, 0, 0);
+        delete.setMinWidth(0);
+        delete.setMinimumWidth(0);
+        delete.setLayoutParams(new LinearLayout.LayoutParams(revealWidth / 2, -1));
+        delete.setOnClickListener(v -> {
+            closeSwipeContent();
+            deleteAction.onClick(v);
+        });
+        actions.addView(edit);
+        actions.addView(delete);
+
+        recordContent.setPadding(dp(8), dp(8), dp(8), dp(8));
+        recordContent.setBackgroundColor(resolveColor(android.R.attr.colorBackground));
+        recordContent.setClickable(true);
+        FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(-1, -2, Gravity.START | Gravity.TOP);
+        row.addView(recordContent, contentParams);
+
+        int touchSlop = ViewConfiguration.get(this).getScaledTouchSlop();
+        recordContent.setOnTouchListener(new View.OnTouchListener() {
+            float downX;
+            float downY;
+            float startTranslation;
+            boolean horizontalGesture;
+            boolean moved;
+
+            @Override
+            public boolean onTouch(View view, MotionEvent event) {
+                switch (event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        downX = event.getRawX();
+                        downY = event.getRawY();
+                        startTranslation = recordContent.getTranslationX();
+                        horizontalGesture = false;
+                        moved = false;
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        float dx = event.getRawX() - downX;
+                        float dy = event.getRawY() - downY;
+                        if (!horizontalGesture && Math.abs(dx) > touchSlop && Math.abs(dx) > Math.abs(dy)) {
+                            horizontalGesture = true;
+                            moved = true;
+                            view.getParent().requestDisallowInterceptTouchEvent(true);
+                            if (openSwipeContent != null && openSwipeContent != recordContent) {
+                                openSwipeContent.setTranslationX(0f);
+                            }
+                            openSwipeContent = recordContent;
+                        }
+                        if (horizontalGesture) {
+                            float translation = Math.max(-revealWidth, Math.min(0f, startTranslation + dx));
+                            recordContent.setTranslationX(translation);
+                        }
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        if (horizontalGesture) {
+                            view.getParent().requestDisallowInterceptTouchEvent(false);
+                            if (recordContent.getTranslationX() <= -revealWidth / 2f) {
+                                recordContent.animate().translationX(-revealWidth).setDuration(160).start();
+                                openSwipeContent = recordContent;
+                            } else {
+                                recordContent.animate().translationX(0f).setDuration(160).start();
+                                if (openSwipeContent == recordContent) openSwipeContent = null;
+                            }
+                        } else if (!moved && recordContent.getTranslationX() < 0f) {
+                            closeSwipeContent();
+                        }
+                        return true;
+                    default:
+                        return true;
+                }
+            }
+        });
+
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(-1, -2);
+        rowParams.topMargin = dp(2);
+        rowParams.bottomMargin = dp(6);
+        parent.addView(row, rowParams);
+    }
+
+    private void closeSwipeContent() {
+        if (openSwipeContent != null) {
+            openSwipeContent.animate().translationX(0f).setDuration(160).start();
+            openSwipeContent = null;
         }
     }
 
