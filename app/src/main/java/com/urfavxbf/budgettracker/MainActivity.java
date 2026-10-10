@@ -1206,8 +1206,9 @@ public final class MainActivity extends FragmentActivity {
         } catch (NumberFormatException ignored) {
             opening = BigDecimal.ZERO;
         }
-        return opening.add(database.getTotalReceivedPay())
-                .subtract(database.getAllExpensesTotal())
+        String today = LocalDate.now().toString();
+        return opening.add(database.getTotalReceivedPayOnOrBefore(today))
+                .subtract(database.getAllExpensesTotalOnOrBefore(today))
                 .setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
