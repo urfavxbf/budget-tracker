@@ -17,7 +17,7 @@ import java.util.TreeMap;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 5;
 
     public WorkDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -38,6 +38,8 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 "configured_regular_minutes INTEGER NOT NULL DEFAULT 480," +
                 "overtime_minutes INTEGER NOT NULL," +
                 "hourly_rate TEXT NOT NULL," +
+                "rate_type TEXT NOT NULL DEFAULT 'Hourly'," +
+                "entered_rate TEXT NOT NULL DEFAULT '0'," +
                 "ot_multiplier TEXT NOT NULL," +
                 "allowance TEXT NOT NULL," +
                 "deduction TEXT NOT NULL," +
@@ -71,6 +73,11 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         }
         if (oldVersion < 4) {
             createPaydayPaymentsTable(db);
+        }
+        if (oldVersion < 5) {
+            db.execSQL("ALTER TABLE work_entries ADD COLUMN rate_type TEXT NOT NULL DEFAULT 'Hourly'");
+            db.execSQL("ALTER TABLE work_entries ADD COLUMN entered_rate TEXT NOT NULL DEFAULT '0'");
+            db.execSQL("UPDATE work_entries SET entered_rate = hourly_rate WHERE entered_rate = '0'");
         }
     }
 
@@ -132,7 +139,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
     }
 
     public long insertEntry(String date, String timeIn, String timeOut, String breaks,
-                            SalaryCalculator.Result result, BigDecimal hourlyRate,
+                            SalaryCalculator.Result result, BigDecimal hourlyRate, String rateType, BigDecimal enteredRate,
                             BigDecimal overtimeMultiplier, int configuredRegularMinutes) {
         ContentValues values = new ContentValues();
         values.put("work_date", date);
@@ -146,6 +153,8 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         values.put("configured_regular_minutes", configuredRegularMinutes);
         values.put("overtime_minutes", result.overtimeMinutes);
         values.put("hourly_rate", hourlyRate.toPlainString());
+        values.put("rate_type", "Daily".equals(rateType) ? "Daily" : "Hourly");
+        values.put("entered_rate", enteredRate.toPlainString());
         values.put("ot_multiplier", overtimeMultiplier.toPlainString());
         values.put("allowance", result.allowance.toPlainString());
         values.put("deduction", result.deduction.toPlainString());
@@ -174,7 +183,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
     }
 
     public boolean updateEntry(long id, String date, String timeIn, String timeOut, String breaks,
-                               SalaryCalculator.Result result, BigDecimal hourlyRate,
+                               SalaryCalculator.Result result, BigDecimal hourlyRate, String rateType, BigDecimal enteredRate,
                                BigDecimal overtimeMultiplier, int configuredRegularMinutes) {
         ContentValues values = new ContentValues();
         values.put("work_date", date);
@@ -222,7 +231,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         try (Cursor cursor = getReadableDatabase().query(
                 "work_entries",
                 new String[]{"id", "work_date", "time_in", "time_out", "breaks", "regular_minutes", "configured_regular_minutes",
-                        "break_minutes", "net_minutes", "overtime_minutes", "hourly_rate", "ot_multiplier",
+                        "break_minutes", "net_minutes", "overtime_minutes", "hourly_rate", "rate_type", "entered_rate", "ot_multiplier",
                         "allowance", "deduction", "estimated_net_pay"},
                 null, null, null, null, "work_date DESC, id DESC",
                 Integer.toString(Math.max(1, limit)))) {
@@ -230,7 +239,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 entries.add(new WorkEntry(cursor.getLong(0), cursor.getString(1), cursor.getString(2),
                         cursor.getString(3), cursor.getString(4), cursor.getInt(5), cursor.getInt(6), cursor.getInt(7),
                         cursor.getInt(8), cursor.getInt(9), cursor.getString(10), cursor.getString(11),
-                        cursor.getString(12), cursor.getString(13), cursor.getString(14)));
+                        cursor.getString(12), cursor.getString(13), cursor.getString(14), cursor.getString(15), cursor.getString(16)));
             }
         }
         return entries;
@@ -252,12 +261,12 @@ public final class WorkDatabase extends SQLiteOpenHelper {
 
     public static final class WorkEntry {
         public final long id;
-        public final String date, timeIn, timeOut, breaks, hourlyRate, overtimeMultiplier, allowance, deduction, netPay;
+        public final String date, timeIn, timeOut, breaks, hourlyRate, rateType, enteredRate, overtimeMultiplier, allowance, deduction, netPay;
         public final int regularMinutes, configuredRegularMinutes, breakMinutes, netMinutes, overtimeMinutes;
 
         WorkEntry(long id, String date, String timeIn, String timeOut, String breaks, int regularMinutes, int configuredRegularMinutes,
-                  int breakMinutes, int netMinutes, int overtimeMinutes, String hourlyRate,
-                  String overtimeMultiplier, String allowance, String deduction, String netPay) {
+                  int breakMinutes, int netMinutes, int overtimeMinutes, String hourlyRate, String rateType,
+                  String enteredRate, String overtimeMultiplier, String allowance, String deduction, String netPay) {
             this.id = id;
             this.date = date;
             this.timeIn = timeIn;
@@ -269,6 +278,8 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             this.netMinutes = netMinutes;
             this.overtimeMinutes = overtimeMinutes;
             this.hourlyRate = hourlyRate;
+            this.rateType = rateType;
+            this.enteredRate = enteredRate;
             this.overtimeMultiplier = overtimeMultiplier;
             this.allowance = allowance;
             this.deduction = deduction;
