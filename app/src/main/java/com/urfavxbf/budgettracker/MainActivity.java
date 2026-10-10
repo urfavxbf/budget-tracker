@@ -30,7 +30,7 @@ import java.util.Locale;
 
 public final class MainActivity extends Activity {
     private static final String PREFS = "salary_preferences";
-    private static final String[] TAB_NAMES = {"Home", "Work", "Expenses", "Settings"};
+    private static final String[] TAB_NAMES = {"Home", "History", "Settings"};
     private final List<BreakInput> breakInputs = new ArrayList<>();
     private LinearLayout page;
     private LinearLayout bottomNav;
@@ -47,6 +47,7 @@ public final class MainActivity extends Activity {
     private long editingExpenseId = -1;
     private Button saveWorkButton;
     private Button saveExpenseButton;
+    private boolean lastSaveSucceeded;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -128,7 +129,7 @@ public final class MainActivity extends Activity {
             item.setOrientation(LinearLayout.VERTICAL);
             item.setGravity(Gravity.CENTER);
             item.setPadding(dp(2), dp(5), dp(2), dp(5));
-            TextView icon = text(new String[]{"⌂", "◷", "−", "⚙"}[i], 21, true);
+            TextView icon = text(new String[]{"⌂", "▤", "⚙"}[i], 21, true);
             TextView label = text(TAB_NAMES[i], 11, currentTab == i);
             boolean selected = currentTab == i;
             int accent = resolveColor(android.R.attr.colorAccent);
@@ -162,9 +163,8 @@ public final class MainActivity extends Activity {
 
         switch (tab) {
             case 0: buildDashboard(); break;
-            case 1: buildWorkScreen(); break;
-            case 2: buildExpensesScreen(); break;
-            case 3: buildSettingsScreen(); break;
+            case 1: buildHistoryScreen(); break;
+            case 2: buildSettingsScreen(); break;
             default: buildDashboard();
         }
     }
@@ -194,13 +194,18 @@ public final class MainActivity extends Activity {
 
         rowCards("TOTAL RECORDED PAY", money(earned), "RECORDED EXPENSES", money(spent));
         section("Quick actions");
-        actionButton("＋  Add work shift", "Record time-in, time-out and breaks", 1);
-        actionButton("−  Add an expense", "Track spending for this cutoff", 2);
+        actionButton("＋  Add work shift", "Record time-in, time-out and breaks", () -> showWorkDialog(null));
+        actionButton("−  Add an expense", "Track spending for this cutoff", () -> showExpenseDialog(null));
         section("Recent work entries");
         historyContainer = new LinearLayout(this);
         historyContainer.setOrientation(LinearLayout.VERTICAL);
         page.addView(historyContainer);
         refreshHistory();
+        section("Recent expenses");
+        expenseHistoryContainer = new LinearLayout(this);
+        expenseHistoryContainer.setOrientation(LinearLayout.VERTICAL);
+        page.addView(expenseHistoryContainer);
+        refreshExpenseHistory();
         section("Budget snapshot");
         budgetSummaryView = text("", 14, false);
         page.addView(budgetSummaryView);
@@ -211,79 +216,148 @@ public final class MainActivity extends Activity {
         page.addView(disclaimer);
     }
 
-    private void buildWorkScreen() {
-        header("Work tracker", "Log your shift and calculate your estimated daily pay.");
-        LinearLayout card = cardContainer();
-        page.addView(card);
-        dateInput = field("Select work date", LocalDate.now().toString(), InputType.TYPE_NULL);
-        configureDatePicker(dateInput);
-        addField(card, "Work date", dateInput);
-        LinearLayout times = new LinearLayout(this);
-        times.setOrientation(LinearLayout.HORIZONTAL);
-        timeInInput = field("Choose time", "08:00", InputType.TYPE_NULL);
-        timeOutInput = field("Choose time", "17:00", InputType.TYPE_NULL);
-        configureTimePicker(timeInInput);
-        configureTimePicker(timeOutInput);
-        times.addView(timeInInput, new LinearLayout.LayoutParams(0, dp(56), 1f));
-        times.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
-        times.addView(timeOutInput, new LinearLayout.LayoutParams(0, dp(56), 1f));
-        addField(card, "Time in / time out", times);
-
-        addSection(card, "Break duration");
-        breakContainer = new LinearLayout(this);
-        breakContainer.setOrientation(LinearLayout.VERTICAL);
-        card.addView(breakContainer);
-        addBreakRow("1");
-        Button addBreak = button("＋ Add break duration", false);
-        addBreak.setOnClickListener(v -> addBreakRow(""));
-        card.addView(addBreak);
-
-        // Load saved salary defaults for calculation, but keep rate configuration in Settings.
-        payRateTypeInput = createRateTypeSpinner();
-        hourlyRateInput = field("Rate amount", pref("pay_rate", pref("hourly_rate", "100.00")), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        regularHoursInput = field("Regular hours per day", pref("regular_hours", "8"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        overtimeMultiplierInput = field("OT multiplier", pref("ot_multiplier", "1.25"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        allowanceInput = field("Daily allowance", pref("allowance", "0.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        deductionInput = field("Daily deduction", pref("deduction", "0.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        saveWorkButton = button("Calculate and save shift", true);
-        saveWorkButton.setOnClickListener(v -> calculateAndSave());
-        card.addView(saveWorkButton);
-        resultView = text("Your pay breakdown will appear here after calculation.", 14, false);
-        resultView.setPadding(0, dp(14), 0, 0);
-        card.addView(resultView);
-        section("Recent shifts");
+    private void buildHistoryScreen() {
+        header("History", "Review, edit, or delete your saved shifts and expenses.");
+        section("Recent work entries");
         historyContainer = new LinearLayout(this);
         historyContainer.setOrientation(LinearLayout.VERTICAL);
         page.addView(historyContainer);
         refreshHistory();
-    }
-
-    private void buildExpensesScreen() {
-        header("Expenses", "Record spending and see how it affects your cutoff.");
-        expenseDateInput = field("Select expense date", LocalDate.now().toString(), InputType.TYPE_NULL);
-        configureDatePicker(expenseDateInput);
-        expenseCategoryInput = field("e.g. Food, Transport, Bills", "", InputType.TYPE_CLASS_TEXT);
-        expenseAmountInput = field("0.00", "", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        expenseNoteInput = field("Optional note", "", InputType.TYPE_CLASS_TEXT);
-        LinearLayout form = cardContainer();
-        page.addView(form);
-        addField(form, "Date", expenseDateInput);
-        addField(form, "Category", expenseCategoryInput);
-        addField(form, "Amount (₱)", expenseAmountInput);
-        addField(form, "Note", expenseNoteInput);
-        saveExpenseButton = button("Save expense", true);
-        saveExpenseButton.setOnClickListener(v -> addExpense());
-        form.addView(saveExpenseButton);
-
-        section("Current cutoff");
-        budgetSummaryView = text("", 14, false);
-        page.addView(budgetSummaryView);
-        refreshBudget();
         section("Recent expenses");
         expenseHistoryContainer = new LinearLayout(this);
         expenseHistoryContainer.setOrientation(LinearLayout.VERTICAL);
         page.addView(expenseHistoryContainer);
         refreshExpenseHistory();
+    }
+
+    private void showWorkDialog(WorkDatabase.WorkEntry entry) {
+        editingWorkEntryId = entry == null ? -1 : entry.id;
+        breakInputs.clear();
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(4), dp(4), dp(4), dp(4));
+
+        dateInput = field("Select work date", entry == null ? LocalDate.now().toString() : entry.date, InputType.TYPE_NULL);
+        configureDatePicker(dateInput);
+        addField(form, "Work date", dateInput);
+
+        LinearLayout times = new LinearLayout(this);
+        times.setOrientation(LinearLayout.HORIZONTAL);
+        timeInInput = field("Choose time", entry == null ? "08:00" : entry.timeIn, InputType.TYPE_NULL);
+        timeOutInput = field("Choose time", entry == null ? "17:00" : entry.timeOut, InputType.TYPE_NULL);
+        configureTimePicker(timeInInput);
+        configureTimePicker(timeOutInput);
+        times.addView(timeInInput, new LinearLayout.LayoutParams(0, dp(56), 1f));
+        times.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
+        times.addView(timeOutInput, new LinearLayout.LayoutParams(0, dp(56), 1f));
+        addField(form, "Time in / time out", times);
+
+        addSection(form, "Break duration");
+        breakContainer = new LinearLayout(this);
+        breakContainer.setOrientation(LinearLayout.VERTICAL);
+        form.addView(breakContainer);
+        if (entry == null) {
+            addBreakRow("1");
+        } else {
+            String[] parts = entry.breaks.split(",");
+            for (String part : parts) {
+                String value = part.trim().replace("h", "").trim();
+                if (!value.isEmpty() && !"0".equals(value)) addBreakRow(value);
+            }
+            if (breakInputs.isEmpty()) addBreakRow("0");
+        }
+        Button addBreak = button("＋ Add break duration", false);
+        addBreak.setOnClickListener(v -> addBreakRow(""));
+        form.addView(addBreak);
+
+        payRateTypeInput = createRateTypeSpinner();
+        hourlyRateInput = field("Rate amount", entry == null ? pref("pay_rate", pref("hourly_rate", "100.00")) : entry.hourlyRate,
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        regularHoursInput = field("Regular hours per day",
+                entry == null ? pref("regular_hours", "8")
+                        : BigDecimal.valueOf(entry.configuredRegularMinutes).divide(BigDecimal.valueOf(60), 2,
+                                java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString(),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        overtimeMultiplierInput = field("OT multiplier", entry == null ? pref("ot_multiplier", "1.25") : entry.overtimeMultiplier,
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        allowanceInput = field("Daily allowance", entry == null ? pref("allowance", "0.00") : entry.allowance,
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        deductionInput = field("Daily deduction", entry == null ? pref("deduction", "0.00") : entry.deduction,
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        resultView = text(entry == null ? "Your pay breakdown will appear here after saving."
+                : "Editing saved shift. Saving will recalculate this record using the values above.", 14, false);
+        resultView.setPadding(0, dp(12), 0, dp(4));
+        form.addView(resultView);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.addView(form, new ScrollView.LayoutParams(-1, -2));
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(entry == null ? "Add work shift" : "Edit work shift")
+                .setView(scroll)
+                .setNegativeButton("Cancel", (d, which) -> {
+                    editingWorkEntryId = -1;
+                    d.dismiss();
+                })
+                .setPositiveButton(entry == null ? "Calculate and save" : "Update shift", null)
+                .create();
+        dialog.setOnCancelListener(d -> editingWorkEntryId = -1);
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.92f), -2);
+        }
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            lastSaveSucceeded = false;
+            calculateAndSave();
+            if (lastSaveSucceeded) {
+                dialog.dismiss();
+                showTab(currentTab);
+            }
+        });
+    }
+
+    private void showExpenseDialog(WorkDatabase.ExpenseEntry entry) {
+        editingExpenseId = entry == null ? -1 : entry.id;
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(4), dp(4), dp(4), dp(4));
+
+        expenseDateInput = field("Select expense date", entry == null ? LocalDate.now().toString() : entry.date, InputType.TYPE_NULL);
+        configureDatePicker(expenseDateInput);
+        expenseCategoryInput = field("e.g. Food, Transport, Bills", entry == null ? "" : entry.category, InputType.TYPE_CLASS_TEXT);
+        expenseAmountInput = field("0.00", entry == null ? "" : entry.amount,
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        expenseNoteInput = field("Optional note", entry == null ? "" : entry.note, InputType.TYPE_CLASS_TEXT);
+        addField(form, "Date", expenseDateInput);
+        addField(form, "Category", expenseCategoryInput);
+        addField(form, "Amount (₱)", expenseAmountInput);
+        addField(form, "Note", expenseNoteInput);
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.addView(form, new ScrollView.LayoutParams(-1, -2));
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(entry == null ? "Add an expense" : "Edit expense")
+                .setView(scroll)
+                .setNegativeButton("Cancel", (d, which) -> {
+                    editingExpenseId = -1;
+                    d.dismiss();
+                })
+                .setPositiveButton(entry == null ? "Save expense" : "Update expense", null)
+                .create();
+        dialog.setOnCancelListener(d -> editingExpenseId = -1);
+        dialog.show();
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.92f), -2);
+        }
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            lastSaveSucceeded = false;
+            addExpense();
+            if (lastSaveSucceeded) {
+                dialog.dismiss();
+                showTab(currentTab);
+            }
+        });
     }
 
     private void buildSettingsScreen() {
@@ -345,6 +419,7 @@ public final class MainActivity extends Activity {
     }
 
     private void calculateAndSave() {
+        lastSaveSucceeded = false;
         try {
             LocalDate date = LocalDate.parse(value(dateInput), DateTimeFormatter.ISO_LOCAL_DATE);
             LocalTime timeIn = LocalTime.parse(value(timeInInput), DateTimeFormatter.ofPattern("HH:mm"));
@@ -404,7 +479,9 @@ public final class MainActivity extends Activity {
                     + "\nGross pay     " + money(result.grossPay)
                     + "\nNet pay      " + money(result.estimatedNetPay));
             refreshHistory();
+            refreshBudget();
             Toast.makeText(this, updatingEntry ? "Shift updated" : "Shift saved", Toast.LENGTH_SHORT).show();
+            lastSaveSucceeded = true;
         } catch (DateTimeParseException ex) {
             toast("Check date format (YYYY-MM-DD) and time format (HH:mm).");
         } catch (ArithmeticException ex) {
@@ -417,6 +494,7 @@ public final class MainActivity extends Activity {
     }
 
     private void addExpense() {
+        lastSaveSucceeded = false;
         try {
             LocalDate date = LocalDate.parse(value(expenseDateInput), DateTimeFormatter.ISO_LOCAL_DATE);
             String category = value(expenseCategoryInput);
@@ -433,11 +511,14 @@ public final class MainActivity extends Activity {
             } else {
                 database.insertExpense(date.toString(), category, value(expenseNoteInput), amount);
             }
-            expenseAmountInput.setText("");
-            expenseNoteInput.setText("");
+            if (!updatingExpense) {
+                expenseAmountInput.setText("");
+                expenseNoteInput.setText("");
+            }
             refreshBudget();
             refreshExpenseHistory();
             Toast.makeText(this, updatingExpense ? "Expense updated" : "Expense saved", Toast.LENGTH_SHORT).show();
+            lastSaveSucceeded = true;
         } catch (DateTimeParseException ex) {
             toast("Use YYYY-MM-DD for the expense date.");
         } catch (IllegalArgumentException ex) {
@@ -479,7 +560,7 @@ public final class MainActivity extends Activity {
         expenseHistoryContainer.removeAllViews();
         List<WorkDatabase.ExpenseEntry> entries = database.getRecentExpenseEntries(20);
         if (entries.isEmpty()) {
-            expenseHistoryContainer.addView(emptyState("No expenses yet", "Add your first expense above."));
+            expenseHistoryContainer.addView(emptyState("No expenses yet", "Your saved expenses will appear here."));
             return;
         }
         for (WorkDatabase.ExpenseEntry entry : entries) {
@@ -501,31 +582,7 @@ public final class MainActivity extends Activity {
     }
 
     private void editWorkEntry(WorkDatabase.WorkEntry entry) {
-        currentTab = 1;
-        buildBottomNav();
-        showTab(1);
-        editingWorkEntryId = entry.id;
-        dateInput.setText(entry.date);
-        timeInInput.setText(entry.timeIn);
-        timeOutInput.setText(entry.timeOut);
-        payRateTypeInput.setSelection(0);
-        hourlyRateInput.setText(entry.hourlyRate);
-        regularHoursInput.setText(BigDecimal.valueOf(entry.configuredRegularMinutes)
-                .divide(BigDecimal.valueOf(60), 2, java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString());
-        overtimeMultiplierInput.setText(entry.overtimeMultiplier);
-        allowanceInput.setText(entry.allowance);
-        deductionInput.setText(entry.deduction);
-        breakInputs.clear();
-        breakContainer.removeAllViews();
-        String[] parts = entry.breaks.split(",");
-        for (String part : parts) {
-            String value = part.trim().replace("h", "").trim();
-            if (!value.isEmpty() && !"0".equals(value)) addBreakRow(value);
-        }
-        if (breakInputs.isEmpty()) addBreakRow("0");
-        saveWorkButton.setText("Update saved shift");
-        resultView.setText("Editing saved shift. Saving will recalculate this record using the values above.");
-        page.scrollTo(0, 0);
+        showWorkDialog(entry);
     }
 
     private void confirmDeleteWorkEntry(WorkDatabase.WorkEntry entry) {
@@ -536,25 +593,14 @@ public final class MainActivity extends Activity {
                 .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                 .setPositiveButton("Delete", (dialog, which) -> {
                     if (database.deleteEntry(entry.id)) {
-                        refreshHistory();
-                        refreshBudget();
                         Toast.makeText(this, "Shift deleted", Toast.LENGTH_SHORT).show();
-                        if (currentTab == 0) showTab(0);
+                        showTab(currentTab);
                     } else toast("Could not delete this shift.");
                 }).show();
     }
 
     private void editExpense(WorkDatabase.ExpenseEntry entry) {
-        currentTab = 2;
-        buildBottomNav();
-        showTab(2);
-        editingExpenseId = entry.id;
-        expenseDateInput.setText(entry.date);
-        expenseCategoryInput.setText(entry.category);
-        expenseAmountInput.setText(entry.amount);
-        expenseNoteInput.setText(entry.note);
-        saveExpenseButton.setText("Update expense");
-        page.scrollTo(0, 0);
+        showExpenseDialog(entry);
     }
 
     private void confirmDeleteExpense(WorkDatabase.ExpenseEntry entry) {
@@ -565,10 +611,8 @@ public final class MainActivity extends Activity {
                 .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                 .setPositiveButton("Delete", (dialog, which) -> {
                     if (database.deleteExpense(entry.id)) {
-                        refreshExpenseHistory();
-                        refreshBudget();
                         Toast.makeText(this, "Expense deleted", Toast.LENGTH_SHORT).show();
-                        if (currentTab == 0) showTab(0);
+                        showTab(currentTab);
                     } else toast("Could not delete this expense.");
                 }).show();
     }
@@ -626,7 +670,7 @@ public final class MainActivity extends Activity {
                     .putString("second_cutoff_payday", Integer.toString(second))
                     .apply();
             Toast.makeText(this, "Cutoff and payday settings saved", Toast.LENGTH_SHORT).show();
-            showTab(3);
+            showTab(2);
         } catch (NumberFormatException ex) {
             toast("Enter a valid payday day from 1 to 31.");
         } catch (IllegalArgumentException ex) {
@@ -771,7 +815,7 @@ public final class MainActivity extends Activity {
         page.addView(row, params);
     }
 
-    private void actionButton(String title, String detail, int tab) {
+    private void actionButton(String title, String detail, Runnable action) {
         LinearLayout item = cardContainer();
         item.setOrientation(LinearLayout.HORIZONTAL);
         item.setGravity(Gravity.CENTER_VERTICAL);
@@ -783,11 +827,7 @@ public final class MainActivity extends Activity {
         words.addView(desc);
         item.addView(words, new LinearLayout.LayoutParams(0, -2, 1f));
         item.addView(text("›", 26, false));
-        item.setOnClickListener(v -> {
-            currentTab = tab;
-            buildBottomNav();
-            showTab(tab);
-        });
+        item.setOnClickListener(v -> action.run());
         page.addView(item);
     }
 
