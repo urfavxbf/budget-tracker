@@ -1011,6 +1011,7 @@ public final class MainActivity extends FragmentActivity {
 
     private void refreshBudget() {
         if (budgetSummaryView == null) return;
+
         LocalDate today = LocalDate.now();
         CutoffPeriod cutoff = CutoffPeriod.forDate(today);
         int firstPayday;
@@ -1025,10 +1026,13 @@ public final class MainActivity extends FragmentActivity {
         } catch (NumberFormatException ignored) {
             secondPayday = 7;
         }
+
         LocalDate payday = cutoff.payday(firstPayday, secondPayday);
+        long daysUntilPayday = Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(today, payday));
         BigDecimal earned = database.getRecordedNetPayTotal(cutoff.startDate.toString(), cutoff.endDate.toString());
         BigDecimal spent = database.getExpenseTotal(cutoff.startDate.toString(), cutoff.endDate.toString());
         BigDecimal remaining = earned.subtract(spent);
+
         BigDecimal spendingLimit;
         try {
             spendingLimit = new BigDecimal(pref("spending_budget", "0.00"));
@@ -1038,42 +1042,71 @@ public final class MainActivity extends FragmentActivity {
         }
 
         StringBuilder summary = new StringBuilder();
+        summary.append("Payday in ").append(daysUntilPayday)
+                .append(daysUntilPayday == 1 ? " day" : " days");
+
+        BigDecimal dailyGuide = BigDecimal.ZERO;
+        boolean hasDailyGuide = false;
+        if (daysUntilPayday > 0 && spendingLimit.signum() > 0) {
+            BigDecimal budgetRemaining = spendingLimit.subtract(spent).max(BigDecimal.ZERO);
+            dailyGuide = budgetRemaining.divide(BigDecimal.valueOf(daysUntilPayday),
+                    2, java.math.RoundingMode.DOWN);
+            hasDailyGuide = true;
+        } else if (daysUntilPayday > 0 && remaining.signum() > 0) {
+            dailyGuide = remaining.divide(BigDecimal.valueOf(daysUntilPayday),
+                    2, java.math.RoundingMode.DOWN);
+            hasDailyGuide = true;
+        }
+
+        summary.append("\n");
+        if (hasDailyGuide) {
+            summary.append("Daily spending guide: ").append(money(dailyGuide))
+                    .append("\nUse this as a guide, not a guarantee; account for bills due before payday.");
+        } else if (daysUntilPayday == 0) {
+            summary.append("Payday is today. Review any expenses due before your next pay.");
+        } else {
+            summary.append("No daily guide yet. Add your spending limit in Settings, or record your income.");
+        }
+
         if (spendingLimit.signum() > 0) {
             int usedPercent = spent.multiply(BigDecimal.valueOf(100))
                     .divide(spendingLimit, 0, java.math.RoundingMode.HALF_UP)
                     .max(BigDecimal.ZERO).intValue();
             budgetProgressBar.setVisibility(View.VISIBLE);
             budgetProgressBar.setProgress(Math.min(100, usedPercent));
+
             BigDecimal budgetRemaining = spendingLimit.subtract(spent);
             BigDecimal actualPercent = spent.multiply(BigDecimal.valueOf(100))
                     .divide(spendingLimit, 1, java.math.RoundingMode.HALF_UP);
-            summary.append(money(spent)).append(" spent of ").append(money(spendingLimit))
-                    .append("  ·  ").append(actualPercent.toPlainString()).append("% used")
-                    .append("\n").append(money(budgetRemaining)).append(" budget remaining");
+            summary.append("\n").append(money(spent)).append(" spent of ").append(money(spendingLimit))
+                    .append(" · ").append(actualPercent.toPlainString()).append("% used")
+                    .append("\n").append(money(budgetRemaining.max(BigDecimal.ZERO))).append(" budget remaining");
+
             if (spent.compareTo(spendingLimit) > 0) {
-                summary.append("\\n\\nOver budget by ").append(money(spent.subtract(spendingLimit)));
+                summary.append("\nOver budget by ").append(money(spent.subtract(spendingLimit)))
+                        .append(". If possible, pause non-essential spending and review upcoming needs.");
                 budgetSummaryView.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
             } else if (spent.compareTo(spendingLimit.multiply(new BigDecimal("0.80"))) >= 0) {
-                summary.append("\\n\\nYou’ve used 80% or more of your budget.");
+                summary.append("\nMost of this cutoff’s budget is used. Check what still needs to be paid.");
                 budgetSummaryView.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
             } else {
-                summary.append("\\n\\nYou’re within your spending limit.");
+                summary.append("\nYour spending is within the limit so far.");
                 budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
             }
         } else {
             budgetProgressBar.setVisibility(View.GONE);
-            summary.append("Set a spending limit in Settings to track your budget.");
+            summary.append("\nSet a spending limit in Settings for a more useful daily guide.");
             budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
         }
 
         Map<String, BigDecimal> categoryTotals =
                 database.getExpenseTotalsByCategory(cutoff.startDate.toString(), cutoff.endDate.toString());
         if (categoryTotals.isEmpty()) {
-            summary.append("\\n\\nNo expenses recorded for this cutoff yet.");
+            summary.append("\nNo expenses recorded for this cutoff yet.");
         } else {
             Map.Entry<String, BigDecimal> topCategory = categoryTotals.entrySet().iterator().next();
-            summary.append("\\n\\nTop category: ").append(topCategory.getKey())
-                    .append("  ·  ").append(money(topCategory.getValue()));
+            summary.append("\nTop category: ").append(topCategory.getKey())
+                    .append(" · ").append(money(topCategory.getValue()));
         }
         budgetSummaryView.setText(summary.toString());
     }
