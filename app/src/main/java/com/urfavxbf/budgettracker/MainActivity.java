@@ -1435,7 +1435,7 @@ public final class MainActivity extends FragmentActivity {
                 .setTitle("Delete saved salary?")
                 .setMessage("Received: " + money(new BigDecimal(payment.receivedAmount))
                         + "\nCutoff: " + payment.cutoffStart + " to " + payment.cutoffEnd
-                        + "\nThis amount will be removed from your available cash balance. This cannot be undone.")
+                        + "\nThis salary will be removed from your cash balance. Any carryover already assigned to this cycle will be moved into savings so it is not lost. This cannot be undone.")
                 .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                 .setPositiveButton("Delete", (dialog, which) -> {
                     if (database.deletePaydayPayment(payment.cutoffStart, payment.cutoffEnd)) {
