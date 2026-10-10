@@ -17,7 +17,7 @@ import java.util.TreeMap;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
-    private static final int DATABASE_VERSION = 5;
+    private static final int DATABASE_VERSION = 6;
 
     public WorkDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -49,6 +49,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         db.execSQL("CREATE INDEX index_work_entries_date ON work_entries(work_date)");
         createExpensesTable(db);
         createPaydayPaymentsTable(db);
+        createBudgetCycleAllocationsTable(db);
     }
 
     private static void createExpensesTable(SQLiteDatabase db) {
@@ -79,6 +80,9 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             db.execSQL("ALTER TABLE work_entries ADD COLUMN entered_rate TEXT NOT NULL DEFAULT '0'");
             db.execSQL("UPDATE work_entries SET entered_rate = hourly_rate WHERE entered_rate = '0'");
         }
+        if (oldVersion < 6) {
+            createBudgetCycleAllocationsTable(db);
+        }
     }
 
     private static void createPaydayPaymentsTable(SQLiteDatabase db) {
@@ -91,6 +95,119 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 "received_amount TEXT NOT NULL," +
                 "created_at INTEGER NOT NULL," +
                 "UNIQUE(cutoff_start, cutoff_end))");
+    }
+
+    private static void createBudgetCycleAllocationsTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS budget_cycle_allocations (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "cutoff_start TEXT NOT NULL," +
+                "cutoff_end TEXT NOT NULL," +
+                "savings_amount TEXT NOT NULL," +
+                "carryover_amount TEXT NOT NULL," +
+                "created_at INTEGER NOT NULL," +
+                "UNIQUE(cutoff_start, cutoff_end))");
+    }
+
+    public boolean saveBudgetCycleAllocation(String cutoffStart, String cutoffEnd,
+                                             BigDecimal savingsAmount, BigDecimal carryoverAmount) {
+        ContentValues values = new ContentValues();
+        values.put("cutoff_start", cutoffStart);
+        values.put("cutoff_end", cutoffEnd);
+        values.put("savings_amount", savingsAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        values.put("carryover_amount", carryoverAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        values.put("created_at", System.currentTimeMillis());
+        return getWritableDatabase().insertWithOnConflict("budget_cycle_allocations", null, values,
+                SQLiteDatabase.CONFLICT_REPLACE) != -1;
+    }
+
+    public BudgetCycleAllocation getBudgetCycleAllocation(String cutoffStart, String cutoffEnd) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT savings_amount, carryover_amount FROM budget_cycle_allocations " +
+                        "WHERE cutoff_start = ? AND cutoff_end = ? LIMIT 1",
+                new String[]{cutoffStart, cutoffEnd})) {
+            if (!cursor.moveToFirst()) return null;
+            return new BudgetCycleAllocation(cursor.getString(0), cursor.getString(1));
+        }
+    }
+
+    public BigDecimal getTotalSavingsBalance() {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT savings_amount FROM budget_cycle_allocations", null)) {
+            BigDecimal total = BigDecimal.ZERO;
+            while (cursor.moveToNext()) total = total.add(new BigDecimal(cursor.getString(0)));
+            return total.setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+    }
+
+    public PaydayPayment getLatestPaydayPaymentOnOrBefore(String date) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT cutoff_start, cutoff_end, payday_date, expected_amount, received_amount " +
+                        "FROM payday_payments WHERE payday_date <= ? ORDER BY payday_date DESC, id DESC LIMIT 1",
+                new String[]{date})) {
+            if (!cursor.moveToFirst()) return null;
+            return new PaydayPayment(cursor.getString(0), cursor.getString(1), cursor.getString(2),
+                    cursor.getString(3), cursor.getString(4));
+        }
+    }
+
+    public PaydayPayment getPreviousPaydayPayment(String paydayDate, String excludedCutoffStart,
+                                                   String excludedCutoffEnd) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT cutoff_start, cutoff_end, payday_date, expected_amount, received_amount " +
+                        "FROM payday_payments WHERE payday_date < ? " +
+                        "AND NOT (cutoff_start = ? AND cutoff_end = ?) " +
+                        "ORDER BY payday_date DESC, id DESC LIMIT 1",
+                new String[]{paydayDate, excludedCutoffStart, excludedCutoffEnd})) {
+            if (!cursor.moveToFirst()) return null;
+            return new PaydayPayment(cursor.getString(0), cursor.getString(1), cursor.getString(2),
+                    cursor.getString(3), cursor.getString(4));
+        }
+    }
+
+    public BudgetCyclePending getPendingBudgetCycleAllocation() {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT p.cutoff_start, p.cutoff_end, p.payday_date, p.expected_amount, p.received_amount, " +
+                        "(SELECT q.payday_date FROM payday_payments q WHERE q.payday_date > p.payday_date " +
+                        "ORDER BY q.payday_date ASC, q.id ASC LIMIT 1) " +
+                        "FROM payday_payments p " +
+                        "WHERE EXISTS (SELECT 1 FROM payday_payments q WHERE q.payday_date > p.payday_date) " +
+                        "AND NOT EXISTS (SELECT 1 FROM budget_cycle_allocations a " +
+                        "WHERE a.cutoff_start = p.cutoff_start AND a.cutoff_end = p.cutoff_end) " +
+                        "ORDER BY p.payday_date DESC, p.id DESC LIMIT 1", null)) {
+            if (!cursor.moveToFirst()) return null;
+            PaydayPayment payment = new PaydayPayment(cursor.getString(0), cursor.getString(1),
+                    cursor.getString(2), cursor.getString(3), cursor.getString(4));
+            return new BudgetCyclePending(payment, cursor.getString(5));
+        }
+    }
+
+    public BigDecimal getExpenseTotalAfterThrough(String startExclusive, String endInclusive) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT amount FROM expenses WHERE expense_date > ? AND expense_date <= ?",
+                new String[]{startExclusive, endInclusive})) {
+            BigDecimal total = BigDecimal.ZERO;
+            while (cursor.moveToNext()) total = total.add(new BigDecimal(cursor.getString(0)));
+            return total.setScale(2, java.math.RoundingMode.HALF_UP);
+        }
+    }
+
+    public static final class BudgetCycleAllocation {
+        public final String savingsAmount, carryoverAmount;
+
+        BudgetCycleAllocation(String savingsAmount, String carryoverAmount) {
+            this.savingsAmount = savingsAmount;
+            this.carryoverAmount = carryoverAmount;
+        }
+    }
+
+    public static final class BudgetCyclePending {
+        public final PaydayPayment payment;
+        public final String nextPaydayDate;
+
+        BudgetCyclePending(PaydayPayment payment, String nextPaydayDate) {
+            this.payment = payment;
+            this.nextPaydayDate = nextPaydayDate;
+        }
     }
 
     public boolean savePaydayPayment(String cutoffStart, String cutoffEnd, String paydayDate,
@@ -107,9 +224,18 @@ public final class WorkDatabase extends SQLiteOpenHelper {
     }
 
     public boolean deletePaydayPayment(String cutoffStart, String cutoffEnd) {
-        return getWritableDatabase().delete("payday_payments",
-                "cutoff_start = ? AND cutoff_end = ?",
-                new String[]{cutoffStart, cutoffEnd}) > 0;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            db.delete("budget_cycle_allocations", "cutoff_start = ? AND cutoff_end = ?",
+                    new String[]{cutoffStart, cutoffEnd});
+            int deleted = db.delete("payday_payments", "cutoff_start = ? AND cutoff_end = ?",
+                    new String[]{cutoffStart, cutoffEnd});
+            db.setTransactionSuccessful();
+            return deleted > 0;
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public BigDecimal getPaydayPayment(String cutoffStart, String cutoffEnd) {
