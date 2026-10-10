@@ -608,6 +608,7 @@ public final class MainActivity extends Activity {
         FrameLayout row = new FrameLayout(this);
         row.setClipChildren(true);
         row.setClipToPadding(true);
+        row.setMinimumHeight(dp(64));
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
@@ -622,7 +623,10 @@ public final class MainActivity extends Activity {
         edit.setPadding(0, 0, 0, 0);
         edit.setMinWidth(0);
         edit.setMinimumWidth(0);
-        edit.setLayoutParams(new LinearLayout.LayoutParams(revealWidth / 2, -1));
+        edit.setMinimumHeight(0);
+        edit.setInsetTop(0);
+        edit.setInsetBottom(0);
+        edit.setLayoutParams(new LinearLayout.LayoutParams(revealWidth / 2, dp(44)));
         edit.setOnClickListener(v -> {
             closeSwipeContent();
             editAction.onClick(v);
@@ -634,7 +638,10 @@ public final class MainActivity extends Activity {
         delete.setPadding(0, 0, 0, 0);
         delete.setMinWidth(0);
         delete.setMinimumWidth(0);
-        delete.setLayoutParams(new LinearLayout.LayoutParams(revealWidth / 2, -1));
+        delete.setMinimumHeight(0);
+        delete.setInsetTop(0);
+        delete.setInsetBottom(0);
+        delete.setLayoutParams(new LinearLayout.LayoutParams(revealWidth / 2, dp(44)));
         delete.setOnClickListener(v -> {
             closeSwipeContent();
             deleteAction.onClick(v);
@@ -643,8 +650,10 @@ public final class MainActivity extends Activity {
         actions.addView(delete);
 
         recordContent.setPadding(dp(8), dp(8), dp(8), dp(8));
+        recordContent.setMinimumHeight(dp(64));
         recordContent.setBackgroundColor(resolveColor(android.R.attr.colorBackground));
         recordContent.setClickable(true);
+        recordContent.setElevation(dp(2));
         FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(-1, -2, Gravity.START | Gravity.TOP);
         row.addView(recordContent, contentParams);
 
