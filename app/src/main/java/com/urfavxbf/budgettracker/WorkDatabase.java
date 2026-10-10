@@ -108,6 +108,18 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 "UNIQUE(cutoff_start, cutoff_end))");
     }
 
+    private static void invalidateAllocationForExpenseDate(SQLiteDatabase db, String expenseDate) {
+        if (expenseDate == null || expenseDate.isEmpty()) return;
+        db.delete("budget_cycle_allocations",
+                "EXISTS (SELECT 1 FROM payday_payments p " +
+                        "WHERE p.cutoff_start = budget_cycle_allocations.cutoff_start " +
+                        "AND p.cutoff_end = budget_cycle_allocations.cutoff_end " +
+                        "AND p.payday_date <= ? " +
+                        "AND NOT EXISTS (SELECT 1 FROM payday_payments q " +
+                        "WHERE q.payday_date > p.payday_date AND q.payday_date <= ?))",
+                new String[]{expenseDate, expenseDate});
+    }
+
     public boolean saveBudgetCycleAllocation(String cutoffStart, String cutoffEnd,
                                              BigDecimal savingsAmount, BigDecimal carryoverAmount) {
         ContentValues values = new ContentValues();
@@ -371,13 +383,22 @@ public final class WorkDatabase extends SQLiteOpenHelper {
     }
 
     public long insertExpense(String date, String category, String note, BigDecimal amount) {
-        ContentValues values = new ContentValues();
-        values.put("expense_date", date);
-        values.put("category", category);
-        values.put("note", note == null ? "" : note);
-        values.put("amount", amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
-        values.put("created_at", System.currentTimeMillis());
-        return getWritableDatabase().insertOrThrow("expenses", null, values);
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            ContentValues values = new ContentValues();
+            values.put("expense_date", date);
+            values.put("category", category);
+            values.put("note", note == null ? "" : note);
+            values.put("amount", amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+            values.put("created_at", System.currentTimeMillis());
+            long id = db.insertOrThrow("expenses", null, values);
+            invalidateAllocationForExpenseDate(db, date);
+            db.setTransactionSuccessful();
+            return id;
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public boolean hasEntryForShiftExceptId(String date, String timeIn, String timeOut, long excludedId) {
@@ -420,18 +441,49 @@ public final class WorkDatabase extends SQLiteOpenHelper {
     }
 
     public boolean updateExpense(long id, String date, String category, String note, BigDecimal amount) {
-        ContentValues values = new ContentValues();
-        values.put("expense_date", date);
-        values.put("category", category);
-        values.put("note", note == null ? "" : note);
-        values.put("amount", amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
-        return getWritableDatabase().update("expenses", values, "id = ?",
-                new String[]{Long.toString(id)}) == 1;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            String oldDate = null;
+            try (Cursor cursor = db.rawQuery(
+                    "SELECT expense_date FROM expenses WHERE id = ? LIMIT 1",
+                    new String[]{Long.toString(id)})) {
+                if (cursor.moveToFirst()) oldDate = cursor.getString(0);
+            }
+            ContentValues values = new ContentValues();
+            values.put("expense_date", date);
+            values.put("category", category);
+            values.put("note", note == null ? "" : note);
+            values.put("amount", amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+            int updated = db.update("expenses", values, "id = ?", new String[]{Long.toString(id)});
+            if (updated == 1) {
+                invalidateAllocationForExpenseDate(db, oldDate);
+                if (!date.equals(oldDate)) invalidateAllocationForExpenseDate(db, date);
+            }
+            db.setTransactionSuccessful();
+            return updated == 1;
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public boolean deleteExpense(long id) {
-        return getWritableDatabase().delete("expenses", "id = ?",
-                new String[]{Long.toString(id)}) == 1;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            String oldDate = null;
+            try (Cursor cursor = db.rawQuery(
+                    "SELECT expense_date FROM expenses WHERE id = ? LIMIT 1",
+                    new String[]{Long.toString(id)})) {
+                if (cursor.moveToFirst()) oldDate = cursor.getString(0);
+            }
+            int deleted = db.delete("expenses", "id = ?", new String[]{Long.toString(id)});
+            if (deleted == 1) invalidateAllocationForExpenseDate(db, oldDate);
+            db.setTransactionSuccessful();
+            return deleted == 1;
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public List<WorkEntry> getRecentWorkEntries(int limit) {
