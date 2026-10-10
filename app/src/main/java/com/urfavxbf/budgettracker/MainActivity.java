@@ -621,6 +621,33 @@ public final class MainActivity extends FragmentActivity {
         card("1st cutoff", "1st–15th of each month", "Payday: " + pref("first_cutoff_payday", "22") + "th of the month");
         card("2nd cutoff", "16th–last day of each month", "Payday: " + pref("second_cutoff_payday", "7") + "th of the following month");
 
+        section("Saved salary payments");
+        TextView paymentsInfo = text("Edit a salary payment here if you need to correct the amount or date. Editing updates the existing cutoff record, so it will not add the salary to your balance twice.", 13, false);
+        paymentsInfo.setPadding(0, 0, 0, dp(8));
+        page.addView(paymentsInfo);
+        List<WorkDatabase.PaydayPayment> savedPayments = database.getPaydayPayments(100);
+        if (savedPayments.isEmpty()) {
+            page.addView(emptyState("No salary payments saved", "Recorded payday salaries will appear here for editing."));
+        } else {
+            for (WorkDatabase.PaydayPayment payment : savedPayments) {
+                LinearLayout paymentCard = cardContainer();
+                paymentCard.addView(text("Received: " + money(new BigDecimal(payment.receivedAmount)), 16, true));
+                paymentCard.addView(text("Date received: " + payment.paydayDate, 13, false));
+                paymentCard.addView(text("Cutoff: " + payment.cutoffStart + " to " + payment.cutoffEnd, 13, false));
+                paymentCard.addView(text("Expected: " + money(new BigDecimal(payment.expectedAmount)), 13, false));
+                Button editPayment = button("Edit saved salary", false);
+                editPayment.setOnClickListener(v -> {
+                    try {
+                        showPaydayPaymentDialog(CutoffPeriod.forDate(LocalDate.parse(payment.cutoffStart)));
+                    } catch (DateTimeParseException ex) {
+                        toast("Could not open this saved salary payment.");
+                    }
+                });
+                paymentCard.addView(editPayment);
+                page.addView(paymentCard);
+            }
+        }
+
         section("Starting cash balance");
         TextView openingInfo = text("Enter the cash you had when you began tracking. All expenses saved in this app are subtracted from this amount, and confirmed payday payments are added.", 13, false);
         openingInfo.setPadding(0, 0, 0, dp(8));
@@ -1263,7 +1290,15 @@ public final class MainActivity extends FragmentActivity {
                         : existing.toPlainString(),
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         addField(form, "Actual salary received (₱)", receivedInput);
-        EditText paydayInput = field("Payday date", existing == null ? suggestedPayday.toString() : suggestedPayday.toString(),
+        WorkDatabase.PaydayPayment existingPayment = null;
+        for (WorkDatabase.PaydayPayment payment : database.getPaydayPayments(1000)) {
+            if (payment.cutoffStart.equals(start) && payment.cutoffEnd.equals(end)) {
+                existingPayment = payment;
+                break;
+            }
+        }
+        EditText paydayInput = field("Payday date",
+                existingPayment == null ? suggestedPayday.toString() : existingPayment.paydayDate,
                 InputType.TYPE_NULL);
         configureDatePicker(paydayInput);
         addField(form, "Date received", paydayInput);
