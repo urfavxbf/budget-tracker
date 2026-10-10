@@ -296,16 +296,20 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         }
     }
 
-    public BigDecimal getTotalReceivedPay() {
-        try (Cursor cursor = getReadableDatabase().rawQuery("SELECT received_amount FROM payday_payments", null)) {
+    public BigDecimal getTotalReceivedPayOnOrBefore(String dateInclusive) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT received_amount FROM payday_payments WHERE payday_date <= ?",
+                new String[]{dateInclusive})) {
             BigDecimal total = BigDecimal.ZERO;
             while (cursor.moveToNext()) total = total.add(new BigDecimal(cursor.getString(0)));
             return total.setScale(2, java.math.RoundingMode.HALF_UP);
         }
     }
 
-    public BigDecimal getAllExpensesTotal() {
-        try (Cursor cursor = getReadableDatabase().rawQuery("SELECT amount FROM expenses", null)) {
+    public BigDecimal getAllExpensesTotalOnOrBefore(String dateInclusive) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT amount FROM expenses WHERE expense_date <= ?",
+                new String[]{dateInclusive})) {
             BigDecimal total = BigDecimal.ZERO;
             while (cursor.moveToNext()) total = total.add(new BigDecimal(cursor.getString(0)));
             return total.setScale(2, java.math.RoundingMode.HALF_UP);
