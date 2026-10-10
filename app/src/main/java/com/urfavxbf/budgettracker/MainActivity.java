@@ -27,6 +27,8 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
 
 public final class MainActivity extends Activity {
     private static final String PREFS = "salary_preferences";
@@ -196,16 +198,11 @@ public final class MainActivity extends Activity {
         section("Quick actions");
         actionButton("＋  Add work shift", "Record time-in, time-out and breaks", () -> showWorkDialog(null));
         actionButton("−  Add an expense", "Track spending for this cutoff", () -> showExpenseDialog(null));
-        section("Recent work entries");
+        section("Recent activity");
         historyContainer = new LinearLayout(this);
         historyContainer.setOrientation(LinearLayout.VERTICAL);
         page.addView(historyContainer);
         refreshHistory();
-        section("Recent expenses");
-        expenseHistoryContainer = new LinearLayout(this);
-        expenseHistoryContainer.setOrientation(LinearLayout.VERTICAL);
-        page.addView(expenseHistoryContainer);
-        refreshExpenseHistory();
         section("Budget snapshot");
         budgetSummaryView = text("", 14, false);
         page.addView(budgetSummaryView);
@@ -218,16 +215,11 @@ public final class MainActivity extends Activity {
 
     private void buildHistoryScreen() {
         header("History", "Review, edit, or delete your saved shifts and expenses.");
-        section("Recent work entries");
+        section("Recent activity");
         historyContainer = new LinearLayout(this);
         historyContainer.setOrientation(LinearLayout.VERTICAL);
         page.addView(historyContainer);
         refreshHistory();
-        section("Recent expenses");
-        expenseHistoryContainer = new LinearLayout(this);
-        expenseHistoryContainer.setOrientation(LinearLayout.VERTICAL);
-        page.addView(expenseHistoryContainer);
-        refreshExpenseHistory();
     }
 
     private void showWorkDialog(WorkDatabase.WorkEntry entry) {
@@ -532,53 +524,108 @@ public final class MainActivity extends Activity {
     private void refreshHistory() {
         if (historyContainer == null) return;
         historyContainer.removeAllViews();
-        List<WorkDatabase.WorkEntry> entries = database.getRecentWorkEntries(8);
-        if (entries.isEmpty()) {
-            historyContainer.addView(emptyState("No shifts yet", "Your saved work shifts will appear here."));
+
+        Map<String, DayHistory> days = new TreeMap<>(java.util.Collections.reverseOrder());
+        List<WorkDatabase.WorkEntry> workEntries = database.getRecentWorkEntries(100);
+        List<WorkDatabase.ExpenseEntry> expenseEntries = database.getRecentExpenseEntries(100);
+
+        for (WorkDatabase.WorkEntry entry : workEntries) {
+            DayHistory day = days.get(entry.date);
+            if (day == null) {
+                day = new DayHistory(entry.date);
+                days.put(entry.date, day);
+            }
+            day.workEntries.add(entry);
+        }
+        for (WorkDatabase.ExpenseEntry entry : expenseEntries) {
+            DayHistory day = days.get(entry.date);
+            if (day == null) {
+                day = new DayHistory(entry.date);
+                days.put(entry.date, day);
+            }
+            day.expenses.add(entry);
+        }
+
+        if (days.isEmpty()) {
+            historyContainer.addView(emptyState("No activity yet", "Saved work shifts and expenses will appear here, grouped by date."));
             return;
         }
-        for (WorkDatabase.WorkEntry entry : entries) {
-            LinearLayout item = cardContainer();
-            item.addView(text(entry.date + "  •  " + entry.timeIn + "–" + entry.timeOut, 14, true));
-            item.addView(text("Work " + duration(entry.netMinutes) + "  •  Break " + duration(entry.breakMinutes)
-                    + "  •  OT " + duration(entry.overtimeMinutes) + "\nRecorded net pay: ₱" + entry.netPay, 13, false));
-            LinearLayout actions = new LinearLayout(this);
-            actions.setOrientation(LinearLayout.HORIZONTAL);
-            Button edit = button("Edit", false);
-            Button delete = button("Delete", false);
-            edit.setOnClickListener(v -> editWorkEntry(entry));
-            delete.setOnClickListener(v -> confirmDeleteWorkEntry(entry));
-            actions.addView(edit, new LinearLayout.LayoutParams(0, dp(48), 1f));
-            actions.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
-            actions.addView(delete, new LinearLayout.LayoutParams(0, dp(48), 1f));
-            item.addView(actions);
-            historyContainer.addView(item);
+
+        int shownDays = 0;
+        for (DayHistory day : days.values()) {
+            if (shownDays++ >= 30) break;
+            LinearLayout dayCard = cardContainer();
+            TextView dateTitle = text(day.date, 16, true);
+            dateTitle.setPadding(0, 0, 0, dp(8));
+            dayCard.addView(dateTitle);
+
+            for (WorkDatabase.WorkEntry entry : day.workEntries) {
+                TextView shiftTime = text(entry.timeIn + " - " + entry.timeOut, 14, true);
+                shiftTime.setPadding(0, dp(3), 0, dp(2));
+                dayCard.addView(shiftTime);
+                dayCard.addView(text("Work " + duration(entry.netMinutes) + "  Break " + duration(entry.breakMinutes),
+                        13, false));
+                if (entry.overtimeMinutes > 0) {
+                    dayCard.addView(text("Overtime: " + duration(entry.overtimeMinutes), 13, false));
+                }
+                dayCard.addView(text("Recorded net pay: " + money(new BigDecimal(entry.netPay)), 14, true));
+
+                LinearLayout actions = new LinearLayout(this);
+                actions.setOrientation(LinearLayout.HORIZONTAL);
+                Button edit = button("Edit shift", false);
+                Button delete = button("Delete shift", false);
+                edit.setOnClickListener(v -> editWorkEntry(entry));
+                delete.setOnClickListener(v -> confirmDeleteWorkEntry(entry));
+                actions.addView(edit, new LinearLayout.LayoutParams(0, dp(44), 1f));
+                actions.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
+                actions.addView(delete, new LinearLayout.LayoutParams(0, dp(44), 1f));
+                LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2);
+                actionParams.topMargin = dp(4);
+                actionParams.bottomMargin = dp(8);
+                dayCard.addView(actions, actionParams);
+            }
+
+            if (!day.expenses.isEmpty()) {
+                TextView expensesTitle = text("Expenses:", 14, true);
+                expensesTitle.setPadding(0, dp(5), 0, dp(3));
+                dayCard.addView(expensesTitle);
+                for (WorkDatabase.ExpenseEntry entry : day.expenses) {
+                    dayCard.addView(text(entry.category + "  " + money(new BigDecimal(entry.amount)), 14, true));
+                    if (!entry.note.isEmpty()) {
+                        TextView note = text(entry.note, 12, false);
+                        note.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+                        dayCard.addView(note);
+                    }
+                    LinearLayout actions = new LinearLayout(this);
+                    actions.setOrientation(LinearLayout.HORIZONTAL);
+                    Button edit = button("Edit expense", false);
+                    Button delete = button("Delete expense", false);
+                    edit.setOnClickListener(v -> editExpense(entry));
+                    delete.setOnClickListener(v -> confirmDeleteExpense(entry));
+                    actions.addView(edit, new LinearLayout.LayoutParams(0, dp(44), 1f));
+                    actions.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
+                    actions.addView(delete, new LinearLayout.LayoutParams(0, dp(44), 1f));
+                    LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(-1, -2);
+                    actionParams.topMargin = dp(2);
+                    actionParams.bottomMargin = dp(6);
+                    dayCard.addView(actions, actionParams);
+                }
+            }
+            historyContainer.addView(dayCard);
         }
     }
 
     private void refreshExpenseHistory() {
-        if (expenseHistoryContainer == null) return;
-        expenseHistoryContainer.removeAllViews();
-        List<WorkDatabase.ExpenseEntry> entries = database.getRecentExpenseEntries(20);
-        if (entries.isEmpty()) {
-            expenseHistoryContainer.addView(emptyState("No expenses yet", "Your saved expenses will appear here."));
-            return;
-        }
-        for (WorkDatabase.ExpenseEntry entry : entries) {
-            LinearLayout item = cardContainer();
-            item.addView(text(entry.date + " • " + entry.category + " • ₱" + entry.amount, 14, true));
-            if (!entry.note.isEmpty()) item.addView(text(entry.note, 13, false));
-            LinearLayout actions = new LinearLayout(this);
-            actions.setOrientation(LinearLayout.HORIZONTAL);
-            Button edit = button("Edit", false);
-            Button delete = button("Delete", false);
-            edit.setOnClickListener(v -> editExpense(entry));
-            delete.setOnClickListener(v -> confirmDeleteExpense(entry));
-            actions.addView(edit, new LinearLayout.LayoutParams(0, dp(48), 1f));
-            actions.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
-            actions.addView(delete, new LinearLayout.LayoutParams(0, dp(48), 1f));
-            item.addView(actions);
-            expenseHistoryContainer.addView(item);
+        refreshHistory();
+    }
+
+    private static final class DayHistory {
+        final String date;
+        final List<WorkDatabase.WorkEntry> workEntries = new ArrayList<>();
+        final List<WorkDatabase.ExpenseEntry> expenses = new ArrayList<>();
+
+        DayHistory(String date) {
+            this.date = date;
         }
     }
 
