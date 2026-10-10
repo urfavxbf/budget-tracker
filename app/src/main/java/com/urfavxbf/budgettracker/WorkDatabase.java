@@ -279,6 +279,21 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         return categories;
     }
 
+    public List<String> getDistinctExpenseCategories() {
+        List<String> categories = new ArrayList<>();
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT DISTINCT TRIM(category) FROM expenses WHERE TRIM(category) != '' ORDER BY TRIM(category) COLLATE NOCASE",
+                null)) {
+            while (cursor.moveToNext()) {
+                String category = cursor.getString(0);
+                if (category != null && !category.trim().isEmpty()) {
+                    categories.add(category.trim());
+                }
+            }
+        }
+        return categories;
+    }
+
     public Map<String, BigDecimal> getExpenseTotalsByCategory(String startDate, String endDate) {
         Map<String, BigDecimal> totals = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         try (Cursor cursor = getReadableDatabase().rawQuery(
