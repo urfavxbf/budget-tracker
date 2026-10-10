@@ -624,8 +624,6 @@ public final class MainActivity extends Activity {
         edit.setMinWidth(0);
         edit.setMinimumWidth(0);
         edit.setMinimumHeight(0);
-        edit.setInsetTop(0);
-        edit.setInsetBottom(0);
         edit.setLayoutParams(new LinearLayout.LayoutParams(revealWidth / 2, dp(44)));
         edit.setOnClickListener(v -> {
             closeSwipeContent();
@@ -639,8 +637,6 @@ public final class MainActivity extends Activity {
         delete.setMinWidth(0);
         delete.setMinimumWidth(0);
         delete.setMinimumHeight(0);
-        delete.setInsetTop(0);
-        delete.setInsetBottom(0);
         delete.setLayoutParams(new LinearLayout.LayoutParams(revealWidth / 2, dp(44)));
         delete.setOnClickListener(v -> {
             closeSwipeContent();
