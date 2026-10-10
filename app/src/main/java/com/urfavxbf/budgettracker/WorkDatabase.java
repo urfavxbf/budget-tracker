@@ -8,8 +8,12 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
@@ -258,6 +262,32 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             }
             return total.setScale(2, java.math.RoundingMode.HALF_UP);
         }
+    }
+
+    public Map<String, BigDecimal> getExpenseTotalsByCategory(String startDate, String endDate) {
+        Map<String, BigDecimal> totals = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT category, amount FROM expenses WHERE expense_date BETWEEN ? AND ?",
+                new String[]{startDate, endDate})) {
+            while (cursor.moveToNext()) {
+                String category = cursor.getString(0).trim();
+                if (category.isEmpty()) category = "Uncategorized";
+                BigDecimal amount = new BigDecimal(cursor.getString(1));
+                BigDecimal current = totals.get(category);
+                totals.put(category, (current == null ? BigDecimal.ZERO : current).add(amount));
+            }
+        }
+
+        List<Map.Entry<String, BigDecimal>> entries = new ArrayList<>(totals.entrySet());
+        Collections.sort(entries, (left, right) -> {
+            int byAmount = right.getValue().compareTo(left.getValue());
+            return byAmount != 0 ? byAmount : left.getKey().compareToIgnoreCase(right.getKey());
+        });
+        Map<String, BigDecimal> sorted = new LinkedHashMap<>();
+        for (Map.Entry<String, BigDecimal> entry : entries) {
+            sorted.put(entry.getKey(), entry.getValue().setScale(2, java.math.RoundingMode.HALF_UP));
+        }
+        return sorted;
     }
 
     public List<String> getRecentExpenses(int limit) {
