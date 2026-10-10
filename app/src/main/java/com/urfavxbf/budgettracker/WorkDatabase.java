@@ -280,15 +280,12 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                     oldReceived = cursor.getString(1);
                 }
             }
-            if (oldDate != null && (!oldDate.equals(paydayDate)
+            boolean paydayDateChanged = oldDate != null && !oldDate.equals(paydayDate);
+            if (oldDate != null && (paydayDateChanged
                     || new BigDecimal(oldReceived).compareTo(receivedAmount) != 0)) {
                 db.execSQL("UPDATE budget_cycle_allocations SET needs_review = 1 " +
                                 "WHERE cutoff_start = ? AND cutoff_end = ?",
                         new Object[]{cutoffStart, cutoffEnd});
-                if (!oldDate.equals(paydayDate)) {
-                    invalidateAllocationsForPaydayChange(db, cutoffStart, cutoffEnd, oldDate);
-                    invalidateAllocationsForPaydayChange(db, cutoffStart, cutoffEnd, paydayDate);
-                }
             }
             ContentValues values = new ContentValues();
             values.put("cutoff_start", cutoffStart);
@@ -299,6 +296,10 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             values.put("created_at", System.currentTimeMillis());
             long saved = db.insertWithOnConflict("payday_payments", null, values, SQLiteDatabase.CONFLICT_REPLACE);
             if (saved == -1) return false;
+            if (paydayDateChanged) {
+                invalidateAllocationsForPaydayChange(db, cutoffStart, cutoffEnd, oldDate);
+                invalidateAllocationsForPaydayChange(db, cutoffStart, cutoffEnd, paydayDate);
+            }
             db.setTransactionSuccessful();
             return true;
         } finally {
