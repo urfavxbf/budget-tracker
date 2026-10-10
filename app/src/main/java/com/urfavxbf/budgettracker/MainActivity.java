@@ -1169,6 +1169,31 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private CutoffPeriod getCutoffAwaitingPayment(LocalDate today) {
+        // Find the oldest unpaid cutoff whose scheduled payday has arrived. This
+        // avoids skipping a missed payday when the app was not opened for a while.
+        LocalDate firstMonth = today.minusMonths(12).withDayOfMonth(1);
+        LocalDate month = firstMonth;
+        CutoffPeriod fallback = null;
+
+        while (!month.isAfter(today)) {
+            CutoffPeriod firstCutoff = CutoffPeriod.forDate(month.withDayOfMonth(1));
+            CutoffPeriod secondCutoff = CutoffPeriod.forDate(month.withDayOfMonth(16));
+
+            CutoffPeriod[] candidates = {firstCutoff, secondCutoff};
+            for (CutoffPeriod candidate : candidates) {
+                if (candidate.startDate.isAfter(today)) continue;
+                LocalDate scheduledPayday = getScheduledPayday(candidate);
+                if (scheduledPayday.isAfter(today)) continue;
+                fallback = candidate;
+                if (database.getPaydayPayment(candidate.startDate.toString(),
+                        candidate.endDate.toString()) == null) {
+                    return candidate;
+                }
+            }
+            month = month.plusMonths(1);
+        }
+
+        if (fallback != null) return fallback;
         LocalDate referenceDate = today.getDayOfMonth() <= 15
                 ? today.minusMonths(1).withDayOfMonth(16)
                 : today.withDayOfMonth(1);
