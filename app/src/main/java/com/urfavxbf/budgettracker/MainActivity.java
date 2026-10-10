@@ -1,9 +1,10 @@
 package com.urfavxbf.budgettracker;
 
-import android.app.Activity;
+import androidx.fragment.app.FragmentActivity;
 import androidx.appcompat.app.AlertDialog;
-import android.app.DatePickerDialog;
-import android.app.TimePickerDialog;
+import com.google.android.material.datepicker.MaterialDatePicker;
+import com.google.android.material.timepicker.MaterialTimePicker;
+import com.google.android.material.timepicker.TimeFormat;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -40,7 +41,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
-public final class MainActivity extends Activity {
+public final class MainActivity extends FragmentActivity {
     private static final String PREFS = "salary_preferences";
     private static final String[] TAB_NAMES = {"Home", "History", "Settings"};
     private final List<BreakInput> breakInputs = new ArrayList<>();
@@ -74,8 +75,8 @@ public final class MainActivity extends Activity {
             return;
         }
         database = new WorkDatabase(this);
-        getWindow().setStatusBarColor(resolveColor(android.R.attr.colorBackground));
-        getWindow().setNavigationBarColor(resolveColor(android.R.attr.colorBackground));
+        getWindow().setStatusBarColor(resolveColor(com.google.android.material.R.attr.colorSurface));
+        getWindow().setNavigationBarColor(resolveColor(com.google.android.material.R.attr.colorSurface));
         buildShell();
         applyImmersiveMode();
         showTab(currentTab);
@@ -134,7 +135,8 @@ public final class MainActivity extends Activity {
         bottomNav.setItemActiveIndicatorEnabled(true);
         bottomNav.setItemActiveIndicatorColor(ColorStateList.valueOf(
                 resolveColor(com.google.android.material.R.attr.colorSecondaryContainer)));
-        bottomNav.setItemRippleColor(ColorStateList.valueOf(0x335267D8));
+        bottomNav.setItemRippleColor(ColorStateList.valueOf(
+                withAlpha(resolveColor(com.google.android.material.R.attr.colorPrimary), 0x33)));
         shell.addView(bottomNav, new LinearLayout.LayoutParams(-1, dp(80)));
         setContentView(shell);
         buildBottomNav();
@@ -642,7 +644,8 @@ public final class MainActivity extends Activity {
         edit.setCornerRadius(dp(12));
         edit.setBackgroundTintList(ColorStateList.valueOf(
                 resolveColor(com.google.android.material.R.attr.colorSecondaryContainer)));
-        edit.setRippleColor(ColorStateList.valueOf(0x335267D8));
+        edit.setRippleColor(ColorStateList.valueOf(
+                withAlpha(resolveColor(com.google.android.material.R.attr.colorPrimary), 0x33)));
         edit.setInsetTop(0);
         edit.setInsetBottom(0);
         LinearLayout.LayoutParams editParams = new LinearLayout.LayoutParams(revealWidth / 2 - dp(8), dp(44));
@@ -663,7 +666,8 @@ public final class MainActivity extends Activity {
         delete.setCornerRadius(dp(12));
         delete.setBackgroundTintList(ColorStateList.valueOf(
                 resolveColor(com.google.android.material.R.attr.colorErrorContainer)));
-        delete.setRippleColor(ColorStateList.valueOf(0x33BA1A1A));
+        delete.setRippleColor(ColorStateList.valueOf(
+                withAlpha(resolveColor(androidx.appcompat.R.attr.colorError), 0x33)));
         delete.setInsetTop(0);
         delete.setInsetBottom(0);
         LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(revealWidth / 2 - dp(8), dp(44));
@@ -924,10 +928,22 @@ public final class MainActivity extends Activity {
         input.setClickable(true);
         input.setOnClickListener(v -> {
             LocalDate current;
-            try { current = LocalDate.parse(value(input)); } catch (Exception ignored) { current = LocalDate.now(); }
-            new DatePickerDialog(this, (picker, year, month, day) ->
-                    input.setText(LocalDate.of(year, month + 1, day).toString()),
-                    current.getYear(), current.getMonthValue() - 1, current.getDayOfMonth()).show();
+            try {
+                current = LocalDate.parse(value(input));
+            } catch (Exception ignored) {
+                current = LocalDate.now();
+            }
+            long initialSelection = current.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli();
+            MaterialDatePicker<Long> picker = MaterialDatePicker.Builder.datePicker()
+                    .setTitleText("Select date")
+                    .setSelection(initialSelection)
+                    .build();
+            picker.addOnPositiveButtonClickListener(selection -> {
+                LocalDate selected = java.time.Instant.ofEpochMilli(selection)
+                        .atZone(java.time.ZoneOffset.UTC).toLocalDate();
+                input.setText(selected.toString());
+            });
+            picker.show(getSupportFragmentManager(), "budget_tracker_date_picker");
         });
     }
 
@@ -936,10 +952,21 @@ public final class MainActivity extends Activity {
         input.setClickable(true);
         input.setOnClickListener(v -> {
             LocalTime current;
-            try { current = LocalTime.parse(value(input)); } catch (Exception ignored) { current = LocalTime.of(8, 0); }
-            new TimePickerDialog(this, (picker, hour, minute) ->
-                    input.setText(String.format(Locale.ROOT, "%02d:%02d", hour, minute)),
-                    current.getHour(), current.getMinute(), true).show();
+            try {
+                current = LocalTime.parse(value(input));
+            } catch (Exception ignored) {
+                current = LocalTime.of(8, 0);
+            }
+            MaterialTimePicker picker = new MaterialTimePicker.Builder()
+                    .setTimeFormat(TimeFormat.CLOCK_24H)
+                    .setHour(current.getHour())
+                    .setMinute(current.getMinute())
+                    .setTitleText("Select time")
+                    .build();
+            picker.addOnPositiveButtonClickListener(view ->
+                    input.setText(String.format(Locale.ROOT, "%02d:%02d",
+                            picker.getHour(), picker.getMinute())));
+            picker.show(getSupportFragmentManager(), "budget_tracker_time_picker");
         });
     }
 
@@ -1010,7 +1037,7 @@ public final class MainActivity extends Activity {
         actionBackground.setCornerRadius(dp(24));
         actionBackground.setStroke(dp(1), resolveColor(com.google.android.material.R.attr.colorOutlineVariant));
         item.setBackground(new RippleDrawable(
-                ColorStateList.valueOf(0x1F5267D8), actionBackground, null));
+                ColorStateList.valueOf(withAlpha(resolveColor(com.google.android.material.R.attr.colorPrimary), 0x1F)), actionBackground, null));
         item.setClickable(true);
         item.setFocusable(true);
         LinearLayout words = new LinearLayout(this);
@@ -1020,7 +1047,9 @@ public final class MainActivity extends Activity {
         desc.setTextColor(resolveColor(android.R.attr.textColorSecondary));
         words.addView(desc);
         item.addView(words, new LinearLayout.LayoutParams(0, -2, 1f));
-        item.addView(text("›", 26, false));
+        TextView arrow = text("›", 26, false);
+        arrow.setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary));
+        item.addView(arrow);
         item.setOnClickListener(v -> action.run());
         page.addView(item);
     }
@@ -1098,7 +1127,8 @@ public final class MainActivity extends Activity {
             button.setBackgroundTintList(ColorStateList.valueOf(
                     resolveColor(com.google.android.material.R.attr.colorSecondaryContainer)));
         }
-        button.setRippleColor(ColorStateList.valueOf(0x335267D8));
+        button.setRippleColor(ColorStateList.valueOf(
+                withAlpha(resolveColor(com.google.android.material.R.attr.colorPrimary), 0x33)));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(52));
         params.topMargin = dp(8);
         button.setLayoutParams(params);
@@ -1111,7 +1141,7 @@ public final class MainActivity extends Activity {
         item.setBackgroundColor(resolveColor(android.R.attr.colorBackground));
         parent.addView(item);
         View divider = new View(this);
-        divider.setBackgroundColor(0x33888888);
+        divider.setBackgroundColor(withAlpha(resolveColor(com.google.android.material.R.attr.colorOutlineVariant), 0x66));
         parent.addView(divider, new LinearLayout.LayoutParams(-1, dp(1)));
     }
 
@@ -1137,6 +1167,10 @@ public final class MainActivity extends Activity {
         view.setTextColor(resolveColor(android.R.attr.textColorPrimary));
         if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         return view;
+    }
+
+    private int withAlpha(int color, int alpha) {
+        return (color & 0x00FFFFFF) | ((alpha & 0xFF) << 24);
     }
 
     private int resolveColor(int attribute) {
