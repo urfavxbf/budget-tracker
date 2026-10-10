@@ -69,6 +69,7 @@ public final class MainActivity extends FragmentActivity {
     private Button saveWorkButton;
     private Button saveExpenseButton;
     private boolean lastSaveSucceeded;
+    private boolean paydayDialogShowing;
     private View openSwipeContent;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -113,6 +114,11 @@ public final class MainActivity extends FragmentActivity {
                             | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
                             | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
         }
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        maybePromptForPaydaySalary();
     }
 
     @Override protected void onDestroy() {
@@ -1180,6 +1186,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void maybePromptForPaydaySalary() {
+        if (paydayDialogShowing || database == null || page == null || isFinishing() || isDestroyed()) return;
         LocalDate today = LocalDate.now();
         CutoffPeriod cutoff = getCutoffAwaitingPayment(today);
         if (database.getPaydayPayment(cutoff.startDate.toString(), cutoff.endDate.toString()) != null) {
@@ -1187,7 +1194,9 @@ public final class MainActivity extends FragmentActivity {
         }
         if (!today.isBefore(getScheduledPayday(cutoff))) {
             page.post(() -> {
-                if (!isFinishing() && !isDestroyed() && currentTab == 0) {
+                if (!isFinishing() && !isDestroyed() && currentTab == 0
+                        && !paydayDialogShowing
+                        && database.getPaydayPayment(cutoff.startDate.toString(), cutoff.endDate.toString()) == null) {
                     showPaydayPaymentDialog(cutoff);
                 }
             });
@@ -1199,6 +1208,8 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showPaydayPaymentDialog(CutoffPeriod paidCutoff) {
+        if (paydayDialogShowing || isFinishing() || isDestroyed()) return;
+        paydayDialogShowing = true;
         LocalDate today = LocalDate.now();
         LocalDate suggestedPayday = getScheduledPayday(paidCutoff);
 
@@ -1229,7 +1240,8 @@ public final class MainActivity extends FragmentActivity {
         new MaterialAlertDialogBuilder(this)
                 .setTitle(existing == null ? "Record salary received" : "Update recorded salary")
                 .setView(form)
-                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                .setNegativeButton("Later", (dialog, which) -> dialog.dismiss())
+                .setOnDismissListener(dialog -> paydayDialogShowing = false)
                 .setPositiveButton("Save salary", (dialog, which) -> {
                     try {
                         BigDecimal received = decimal(receivedInput, "Actual salary received");
