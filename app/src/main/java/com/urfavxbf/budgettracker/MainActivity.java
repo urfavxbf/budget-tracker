@@ -61,6 +61,7 @@ public final class MainActivity extends FragmentActivity {
     private LinearLayout breakContainer, historyContainer, expenseHistoryContainer;
     private TextView resultView, budgetSummaryView;
     private EditText spendingBudgetInput;
+    private EditText openingBalanceInput;
     private ProgressBar budgetProgressBar;
     private WorkDatabase database;
     private long editingWorkEntryId = -1;
@@ -185,6 +186,7 @@ public final class MainActivity extends FragmentActivity {
         breakContainer = historyContainer = expenseHistoryContainer = null;
         resultView = budgetSummaryView = null;
         spendingBudgetInput = null;
+        openingBalanceInput = null;
         budgetProgressBar = null;
         saveWorkButton = null;
         saveExpenseButton = null;
@@ -205,13 +207,13 @@ public final class MainActivity extends FragmentActivity {
         LocalDate payday = getPaydayForCurrentCutoff(today);
         BigDecimal earned = database.getRecordedNetPayTotal(start.toString(), end.toString());
         BigDecimal spent = database.getExpenseTotal(start.toString(), end.toString());
-        BigDecimal remaining = earned.subtract(spent);
+        BigDecimal remaining = getAvailableCashBalance();
 
         LinearLayout totals = new LinearLayout(this);
         totals.setOrientation(LinearLayout.HORIZONTAL);
         totals.setGravity(Gravity.CENTER_VERTICAL);
         totals.setPadding(0, dp(4), 0, dp(12));
-        totals.addView(metricCard("INCOME", money(earned), resolveColor(androidx.appcompat.R.attr.colorPrimary)), new LinearLayout.LayoutParams(0, dp(84), 1f));
+        totals.addView(metricCard("EXPECTED PAY", money(earned), resolveColor(androidx.appcompat.R.attr.colorPrimary)), new LinearLayout.LayoutParams(0, dp(84), 1f));
         View gap = new View(this);
         totals.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
         totals.addView(metricCard("EXPENSES", money(spent), resolveColor(androidx.appcompat.R.attr.colorError)), new LinearLayout.LayoutParams(0, dp(84), 1f));
@@ -229,7 +231,7 @@ public final class MainActivity extends FragmentActivity {
         cutoffLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
         cutoffLabel.setPadding(0, dp(4), 0, dp(14));
         snapshot.addView(cutoffLabel);
-        TextView remainingLabel = text("REMAINING AFTER EXPENSES", 11, true);
+        TextView remainingLabel = text("AVAILABLE CASH BALANCE", 11, true);
         remainingLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
         snapshot.addView(remainingLabel);
         TextView amount = text(money(remaining), 30, true);
@@ -247,9 +249,12 @@ public final class MainActivity extends FragmentActivity {
         budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
         snapshot.addView(budgetSummaryView);
         page.addView(snapshot);
+        MaterialButton recordPayday = button("＋ Record payday salary", true);
+        recordPayday.setOnClickListener(v -> showPaydayPaymentDialog());
+        page.addView(recordPayday);
         refreshBudget();
 
-        TextView disclaimer = text("Based on saved work entries and expenses · estimates only", 11, false);
+        TextView disclaimer = text("Expected pay is an estimate. Available cash uses your opening balance and confirmed salary payments, minus recorded expenses.", 11, false);
         disclaimer.setAlpha(0.75f);
         disclaimer.setPadding(dp(2), dp(8), dp(2), dp(12));
         page.addView(disclaimer);
@@ -599,6 +604,17 @@ public final class MainActivity extends FragmentActivity {
         card("1st cutoff", "1st–15th of each month", "Payday: " + pref("first_cutoff_payday", "22") + "th of the month");
         card("2nd cutoff", "16th–last day of each month", "Payday: " + pref("second_cutoff_payday", "7") + "th of the following month");
 
+        section("Starting cash balance");
+        TextView openingInfo = text("Enter the cash you had when you began tracking. All expenses saved in this app are subtracted from this amount, and confirmed payday payments are added.", 13, false);
+        openingInfo.setPadding(0, 0, 0, dp(8));
+        page.addView(openingInfo);
+        openingBalanceInput = field("0.00", pref("opening_cash_balance", "0.00"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        addField(page, "Opening cash balance (₱)", openingBalanceInput);
+        Button saveOpening = button("Save starting balance", true);
+        saveOpening.setOnClickListener(v -> saveOpeningBalance());
+        page.addView(saveOpening);
+
         section("Spending budget");
         TextView budgetInfo = text("Set a spending cap for each cutoff period. The dashboard tracks recorded expenses against this limit. Enter 0 to disable the limit.", 13, false);
         budgetInfo.setPadding(0, 0, 0, dp(8));
@@ -611,7 +627,7 @@ public final class MainActivity extends FragmentActivity {
         page.addView(saveBudget);
 
         section("About your data");
-        TextView info = text("Your entries are stored locally on this device. Pay amounts are estimates calculated from the hours and rates you enter. Cloud sync and confirmed payroll reconciliation are not enabled yet.", 14, false);
+        TextView info = text("Your entries are stored locally on this device. Expected pay is estimated from saved shifts. Record the amount actually received on payday to update available cash. Opening balance is adjusted against all expenses currently saved in the app.", 14, false);
         info.setPadding(dp(4), dp(4), dp(4), dp(12));
         page.addView(info);
     }
@@ -1031,7 +1047,7 @@ public final class MainActivity extends FragmentActivity {
         long daysUntilPayday = Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(today, payday));
         BigDecimal earned = database.getRecordedNetPayTotal(cutoff.startDate.toString(), cutoff.endDate.toString());
         BigDecimal spent = database.getExpenseTotal(cutoff.startDate.toString(), cutoff.endDate.toString());
-        BigDecimal remaining = earned.subtract(spent);
+        BigDecimal remaining = getAvailableCashBalance();
 
         BigDecimal spendingLimit;
         try {
@@ -1043,7 +1059,8 @@ public final class MainActivity extends FragmentActivity {
 
         StringBuilder summary = new StringBuilder();
         summary.append("Payday in ").append(daysUntilPayday)
-                .append(daysUntilPayday == 1 ? " day" : " days");
+                .append(daysUntilPayday == 1 ? " day" : " days")
+                .append("\\nAvailable cash: ").append(money(remaining));
 
         BigDecimal dailyGuide = BigDecimal.ZERO;
         boolean hasDailyGuide = false;
@@ -1109,6 +1126,100 @@ public final class MainActivity extends FragmentActivity {
                     .append(" · ").append(money(topCategory.getValue()));
         }
         budgetSummaryView.setText(summary.toString());
+    }
+
+    private BigDecimal getAvailableCashBalance() {
+        BigDecimal opening;
+        try {
+            opening = new BigDecimal(pref("opening_cash_balance", "0.00"));
+        } catch (NumberFormatException ignored) {
+            opening = BigDecimal.ZERO;
+        }
+        return opening.add(database.getTotalReceivedPay())
+                .subtract(database.getAllExpensesTotal())
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    private void saveOpeningBalance() {
+        try {
+            BigDecimal opening = decimal(openingBalanceInput, "Starting cash balance");
+            if (opening.signum() < 0) {
+                throw new IllegalArgumentException("Starting cash balance cannot be negative.");
+            }
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putString("opening_cash_balance",
+                            opening.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
+                    .apply();
+            Toast.makeText(this, "Starting cash balance saved", Toast.LENGTH_SHORT).show();
+            showTab(2);
+        } catch (IllegalArgumentException ex) {
+            toast(ex.getMessage());
+        }
+    }
+
+    private void showPaydayPaymentDialog() {
+        LocalDate today = LocalDate.now();
+        LocalDate referenceDate = today.getDayOfMonth() <= 15
+                ? today.minusMonths(1).withDayOfMonth(16)
+                : today.withDayOfMonth(1);
+        CutoffPeriod paidCutoff = CutoffPeriod.forDate(referenceDate);
+        LocalDate suggestedPayday;
+        try {
+            int first = Integer.parseInt(pref("first_cutoff_payday", "22"));
+            int second = Integer.parseInt(pref("second_cutoff_payday", "7"));
+            suggestedPayday = paidCutoff.payday(first, second);
+        } catch (NumberFormatException ignored) {
+            suggestedPayday = paidCutoff.payday(22, 7);
+        }
+
+        String start = paidCutoff.startDate.toString();
+        String end = paidCutoff.endDate.toString();
+        BigDecimal expected = database.getRecordedNetPayTotal(start, end);
+        BigDecimal existing = database.getPaydayPayment(start, end);
+
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(4), dp(4), dp(4), dp(4));
+        TextView cutoffText = text("Cutoff: " + start + " to " + end, 14, true);
+        cutoffText.setPadding(0, 0, 0, dp(4));
+        form.addView(cutoffText);
+        TextView expectedText = text("Expected salary from saved shifts: " + money(expected), 13, false);
+        expectedText.setPadding(0, 0, 0, dp(10));
+        form.addView(expectedText);
+        EditText receivedInput = field("Actual amount received (₱)",
+                existing == null ? expected.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+                        : existing.toPlainString(),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        addField(form, "Actual salary received (₱)", receivedInput);
+        EditText paydayInput = field("Payday date", existing == null ? suggestedPayday.toString() : suggestedPayday.toString(),
+                InputType.TYPE_NULL);
+        configureDatePicker(paydayInput);
+        addField(form, "Date received", paydayInput);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(existing == null ? "Record salary received" : "Update recorded salary")
+                .setView(form)
+                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                .setPositiveButton("Save salary", (dialog, which) -> {
+                    try {
+                        BigDecimal received = decimal(receivedInput, "Actual salary received");
+                        if (received.signum() < 0) {
+                            throw new IllegalArgumentException("Received salary cannot be negative.");
+                        }
+                        LocalDate paidDate = LocalDate.parse(value(paydayInput), DateTimeFormatter.ISO_LOCAL_DATE);
+                        boolean saved = database.savePaydayPayment(start, end, paidDate.toString(), expected, received);
+                        if (!saved) {
+                            toast("Could not save salary payment.");
+                            return;
+                        }
+                        Toast.makeText(this, "Salary payment saved", Toast.LENGTH_SHORT).show();
+                        showTab(0);
+                    } catch (DateTimeParseException ex) {
+                        toast("Select a valid payday date.");
+                    } catch (IllegalArgumentException ex) {
+                        toast(ex.getMessage());
+                    }
+                }).show();
     }
 
     private void saveSpendingBudget() {
