@@ -21,6 +21,7 @@ import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -58,6 +59,8 @@ public final class MainActivity extends FragmentActivity {
     private EditText expenseDateInput, expenseCategoryInput, expenseAmountInput, expenseNoteInput;
     private LinearLayout breakContainer, historyContainer, expenseHistoryContainer;
     private TextView resultView, budgetSummaryView;
+    private EditText spendingBudgetInput;
+    private ProgressBar budgetProgressBar;
     private WorkDatabase database;
     private long editingWorkEntryId = -1;
     private long editingExpenseId = -1;
@@ -178,6 +181,8 @@ public final class MainActivity extends FragmentActivity {
         expenseDateInput = expenseCategoryInput = expenseAmountInput = expenseNoteInput = null;
         breakContainer = historyContainer = expenseHistoryContainer = null;
         resultView = budgetSummaryView = null;
+        spendingBudgetInput = null;
+        budgetProgressBar = null;
         saveWorkButton = null;
         saveExpenseButton = null;
 
@@ -222,6 +227,15 @@ public final class MainActivity extends FragmentActivity {
         page.addView(historyContainer);
         refreshHistory();
         section("Budget snapshot");
+        budgetProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        budgetProgressBar.setMax(100);
+        budgetProgressBar.setProgressTintList(ColorStateList.valueOf(
+                resolveColor(androidx.appcompat.R.attr.colorPrimary)));
+        budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(
+                resolveColor(com.google.android.material.R.attr.colorSurfaceVariant)));
+        LinearLayout.LayoutParams budgetProgressParams = new LinearLayout.LayoutParams(-1, dp(8));
+        budgetProgressParams.bottomMargin = dp(10);
+        page.addView(budgetProgressBar, budgetProgressParams);
         budgetSummaryView = text("", 14, false);
         page.addView(budgetSummaryView);
         refreshBudget();
@@ -408,6 +422,18 @@ public final class MainActivity extends FragmentActivity {
         page.addView(saveSchedule);
         card("1st cutoff", "1st–15th of each month", "Payday: " + pref("first_cutoff_payday", "22") + "th of the month");
         card("2nd cutoff", "16th–last day of each month", "Payday: " + pref("second_cutoff_payday", "7") + "th of the following month");
+
+        section("Spending budget");
+        TextView budgetInfo = text("Set a spending cap for each cutoff period. The dashboard tracks recorded expenses against this limit. Enter 0 to disable the limit.", 13, false);
+        budgetInfo.setPadding(0, 0, 0, dp(8));
+        page.addView(budgetInfo);
+        spendingBudgetInput = field("0.00", pref("spending_budget", "0.00"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        addField(page, "Spending limit per cutoff (₱)", spendingBudgetInput);
+        Button saveBudget = button("Save spending budget", true);
+        saveBudget.setOnClickListener(v -> saveSpendingBudget());
+        page.addView(saveBudget);
+
         section("About your data");
         TextView info = text("Your entries are stored locally on this device. Pay amounts are estimates calculated from the hours and rates you enter. Cloud sync and confirmed payroll reconciliation are not enabled yet.", 14, false);
         info.setPadding(dp(4), dp(4), dp(4), dp(12));
@@ -827,14 +853,78 @@ public final class MainActivity extends FragmentActivity {
         BigDecimal earned = database.getRecordedNetPayTotal(cutoff.startDate.toString(), cutoff.endDate.toString());
         BigDecimal spent = database.getExpenseTotal(cutoff.startDate.toString(), cutoff.endDate.toString());
         BigDecimal remaining = earned.subtract(spent);
-        budgetSummaryView.setText("Cutoff  " + cutoff.startDate + " to " + cutoff.endDate
-                + "\nPayday                 " + payday
-                + "\nTotal recorded pay      " + money(earned)
-                + "\nRecorded expenses      " + money(spent)
-                + "\nRemaining after expenses " + money(remaining)
-                + "\n\nPay total comes from saved work entries.");
-        if (currentTab == 0) {
-            // Dashboard cards are rebuilt on tab selection so their totals always refresh.
+        BigDecimal spendingLimit;
+        try {
+            spendingLimit = new BigDecimal(pref("spending_budget", "0.00"));
+            if (spendingLimit.signum() < 0) spendingLimit = BigDecimal.ZERO;
+        } catch (NumberFormatException ignored) {
+            spendingLimit = BigDecimal.ZERO;
+        }
+
+        StringBuilder summary = new StringBuilder()
+                .append("Cutoff  ").append(cutoff.startDate).append(" to ").append(cutoff.endDate)
+                .append("\nPayday                 ").append(payday)
+                .append("\nTotal recorded pay      ").append(money(earned))
+                .append("\nRecorded expenses      ").append(money(spent))
+                .append("\nRemaining after expenses ").append(money(remaining));
+
+        if (budgetProgressBar != null) {
+            if (spendingLimit.signum() > 0) {
+                budgetProgressBar.setVisibility(View.VISIBLE);
+                int usedPercent = spent.multiply(BigDecimal.valueOf(100))
+                        .divide(spendingLimit, 0, java.math.RoundingMode.HALF_UP)
+                        .min(BigDecimal.valueOf(100)).max(BigDecimal.ZERO).intValue();
+                budgetProgressBar.setProgress(usedPercent);
+                BigDecimal budgetRemaining = spendingLimit.subtract(spent);
+                BigDecimal actualPercent = spent.multiply(BigDecimal.valueOf(100))
+                        .divide(spendingLimit, 1, java.math.RoundingMode.HALF_UP);
+                summary.append("\n\nSpending limit          ").append(money(spendingLimit))
+                        .append("\nBudget used              ").append(actualPercent.toPlainString()).append("%")
+                        .append("\nBudget remaining         ").append(money(budgetRemaining));
+                if (spent.compareTo(spendingLimit) > 0) {
+                    summary.append("\n⚠ OVER BUDGET by ").append(money(spent.subtract(spendingLimit)));
+                } else if (spent.compareTo(spendingLimit.multiply(new BigDecimal("0.80"))) >= 0) {
+                    summary.append("\n⚠ Warning: 80% or more of the budget has been used.");
+                } else {
+                    summary.append("\n✓ Spending is within your budget.");
+                }
+            } else {
+                budgetProgressBar.setVisibility(View.GONE);
+                summary.append("\n\nSpending limit is disabled. Set a limit in Settings to track your budget.");
+            }
+        }
+
+        Map<String, BigDecimal> categoryTotals =
+                database.getExpenseTotalsByCategory(cutoff.startDate.toString(), cutoff.endDate.toString());
+        if (categoryTotals.isEmpty()) {
+            summary.append("\n\nSpending insights\nNo expenses recorded for this cutoff yet.");
+        } else {
+            summary.append("\n\nSpending by category");
+            for (Map.Entry<String, BigDecimal> entry : categoryTotals.entrySet()) {
+                summary.append("\n• ").append(entry.getKey()).append("  ").append(money(entry.getValue()));
+            }
+            Map.Entry<String, BigDecimal> topCategory = categoryTotals.entrySet().iterator().next();
+            summary.append("\n\nHighest spending: ").append(topCategory.getKey())
+                    .append(" (").append(money(topCategory.getValue())).append(")");
+        }
+        summary.append("\n\nPay total comes from saved work entries.");
+        budgetSummaryView.setText(summary.toString());
+    }
+
+    private void saveSpendingBudget() {
+        try {
+            BigDecimal limit = decimal(spendingBudgetInput, "Spending limit");
+            if (limit.signum() < 0) {
+                throw new IllegalArgumentException("Spending limit cannot be negative. Enter 0 to disable it.");
+            }
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putString("spending_budget", limit.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
+                    .apply();
+            Toast.makeText(this, limit.signum() == 0
+                    ? "Spending limit disabled" : "Spending budget saved", Toast.LENGTH_SHORT).show();
+            showTab(2);
+        } catch (IllegalArgumentException ex) {
+            toast(ex.getMessage());
         }
     }
 
