@@ -346,7 +346,7 @@ public final class MainActivity extends Activity {
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(false);
         scroll.addView(form, new ScrollView.LayoutParams(-1, -2));
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
                 .setTitle(entry == null ? "Add an expense" : "Edit expense")
                 .setView(scroll)
                 .setNegativeButton("Cancel", (d, which) -> {
@@ -771,7 +771,7 @@ public final class MainActivity extends Activity {
     }
 
     private void confirmDeleteWorkEntry(WorkDatabase.WorkEntry entry) {
-        new AlertDialog.Builder(this)
+        new MaterialAlertDialogBuilder(this)
                 .setTitle("Delete work shift?")
                 .setMessage(entry.date + " • " + entry.timeIn + "–" + entry.timeOut
                         + "\nRecorded pay: ₱" + entry.netPay + "\nThis cannot be undone.")
@@ -789,7 +789,7 @@ public final class MainActivity extends Activity {
     }
 
     private void confirmDeleteExpense(WorkDatabase.ExpenseEntry entry) {
-        new AlertDialog.Builder(this)
+        new MaterialAlertDialogBuilder(this)
                 .setTitle("Delete expense?")
                 .setMessage(entry.date + " • " + entry.category + " • ₱" + entry.amount
                         + "\nThis cannot be undone.")
