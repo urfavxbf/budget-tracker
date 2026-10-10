@@ -871,7 +871,7 @@ public final class MainActivity extends FragmentActivity {
     private void saveSalaryDefaults() {
         try {
             BigDecimal rate = decimal(hourlyRateInput, "Pay rate");
-            String rateType = payRateTypeInput == null ? pref("pay_rate_type", "Hourly") : String.valueOf(payRateTypeInput.getSelectedItem());
+            String rateType = payRateTypeInput == null ? pref("pay_rate_type", "Hourly") : String.valueOf(payRateTypeInput.getText().toString());
             BigDecimal hours = decimal(regularHoursInput, "Regular hours");
             BigDecimal multiplier = decimal(overtimeMultiplierInput, "OT multiplier");
             BigDecimal allowance = decimal(allowanceInput, "Allowance");
