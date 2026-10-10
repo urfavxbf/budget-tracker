@@ -7,6 +7,7 @@ import android.app.TimePickerDialog;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.Gravity;
@@ -116,13 +117,13 @@ public final class MainActivity extends Activity {
     private void buildShell() {
         LinearLayout shell = new LinearLayout(this);
         shell.setOrientation(LinearLayout.VERTICAL);
-        shell.setBackgroundColor(resolveColor(android.R.attr.colorBackground));
+        shell.setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface));
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(dp(20), dp(18), dp(20), dp(28));
+        page.setPadding(dp(20), dp(20), dp(20), dp(28));
         scroll.addView(page, new ScrollView.LayoutParams(-1, -2));
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
@@ -259,7 +260,7 @@ public final class MainActivity extends Activity {
         times.addView(timeInLayout, new LinearLayout.LayoutParams(0, -2, 1f));
         times.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
         times.addView(timeOutLayout, new LinearLayout.LayoutParams(0, -2, 1f));
-        addField(form, "Time in / time out", times);
+        form.addView(times);
 
         addSection(form, "Break duration");
         breakContainer = new LinearLayout(this);
@@ -1004,6 +1005,14 @@ public final class MainActivity extends Activity {
         LinearLayout item = cardContainer();
         item.setOrientation(LinearLayout.HORIZONTAL);
         item.setGravity(Gravity.CENTER_VERTICAL);
+        GradientDrawable actionBackground = new GradientDrawable();
+        actionBackground.setColor(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant));
+        actionBackground.setCornerRadius(dp(24));
+        actionBackground.setStroke(dp(1), resolveColor(com.google.android.material.R.attr.colorOutlineVariant));
+        item.setBackground(new RippleDrawable(
+                ColorStateList.valueOf(0x1F5267D8), actionBackground, null));
+        item.setClickable(true);
+        item.setFocusable(true);
         LinearLayout words = new LinearLayout(this);
         words.setOrientation(LinearLayout.VERTICAL);
         words.addView(text(title, 16, true));
