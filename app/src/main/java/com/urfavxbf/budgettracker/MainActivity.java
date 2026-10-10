@@ -300,72 +300,88 @@ public final class MainActivity extends FragmentActivity {
     private void refreshDashboardActivity() {
         if (historyContainer == null) return;
         historyContainer.removeAllViews();
-        List<WorkDatabase.WorkEntry> workEntries = database.getRecentWorkEntries(5);
-        List<WorkDatabase.ExpenseEntry> expenseEntries = database.getRecentExpenseEntries(5);
-        class ActivityItem {
-            final String date;
-            final String title;
-            final String subtitle;
-            final String details;
-            final Runnable edit;
-            ActivityItem(String date, String title, String subtitle, String details, Runnable edit) {
-                this.date = date; this.title = title; this.subtitle = subtitle; this.details = details; this.edit = edit;
-            }
-        }
-        List<ActivityItem> items = new ArrayList<>();
+
+        Map<String, DayHistory> days = new TreeMap<>(java.util.Collections.reverseOrder());
+        List<WorkDatabase.WorkEntry> workEntries = database.getRecentWorkEntries(100);
+        List<WorkDatabase.ExpenseEntry> expenseEntries = database.getRecentExpenseEntries(100);
+
         for (WorkDatabase.WorkEntry entry : workEntries) {
-            items.add(new ActivityItem(entry.date, "Work shift", entry.timeIn + "–" + entry.timeOut
-                    + "  ·  " + money(new BigDecimal(entry.netPay)),
-                    "Net work: " + duration(entry.netMinutes) + "\nBreak: " + duration(entry.breakMinutes)
-                            + "\nOvertime: " + duration(entry.overtimeMinutes)
-                            + "\nRecorded net pay: " + money(new BigDecimal(entry.netPay)),
-                    () -> editWorkEntry(entry)));
+            DayHistory day = days.get(entry.date);
+            if (day == null) {
+                day = new DayHistory(entry.date);
+                days.put(entry.date, day);
+            }
+            day.workEntries.add(entry);
         }
         for (WorkDatabase.ExpenseEntry entry : expenseEntries) {
-            String subtitle = entry.category + "  ·  " + money(new BigDecimal(entry.amount));
-            String details = "Date: " + entry.date + "\nCategory: " + entry.category
-                    + "\nAmount: " + money(new BigDecimal(entry.amount))
-                    + (entry.note == null || entry.note.trim().isEmpty() ? "" : "\nNote: " + entry.note);
-            items.add(new ActivityItem(entry.date, "Expense", subtitle, details, () -> editExpense(entry)));
+            DayHistory day = days.get(entry.date);
+            if (day == null) {
+                day = new DayHistory(entry.date);
+                days.put(entry.date, day);
+            }
+            day.expenses.add(entry);
         }
-        items.sort((a, b) -> b.date.compareTo(a.date));
-        if (items.isEmpty()) {
+
+        if (days.isEmpty()) {
             historyContainer.addView(emptyState("No activity yet", "Your saved shifts and expenses will show here."));
             return;
         }
-        int count = Math.min(4, items.size());
-        for (int i = 0; i < count; i++) {
-            ActivityItem item = items.get(i);
-            LinearLayout itemCard = cardContainer();
-            itemCard.setPadding(dp(14), dp(10), dp(14), dp(10));
-            LinearLayout top = new LinearLayout(this);
-            top.setOrientation(LinearLayout.HORIZONTAL);
-            top.setGravity(Gravity.CENTER_VERTICAL);
-            LinearLayout labels = new LinearLayout(this);
-            labels.setOrientation(LinearLayout.VERTICAL);
-            TextView title = text(item.title + "  ·  " + item.date, 13, true);
-            labels.addView(title);
-            TextView subtitle = text(item.subtitle, 12, false);
-            subtitle.setAlpha(0.8f);
-            subtitle.setPadding(0, dp(3), 0, 0);
-            labels.addView(subtitle);
-            top.addView(labels, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        int shownDays = 0;
+        for (DayHistory day : days.values()) {
+            if (shownDays++ >= 4) break;
+
+            LinearLayout dayCard = cardContainer();
+            dayCard.setPadding(dp(14), dp(12), dp(14), dp(8));
+
+            LinearLayout heading = new LinearLayout(this);
+            heading.setOrientation(LinearLayout.HORIZONTAL);
+            heading.setGravity(Gravity.CENTER_VERTICAL);
+
+            int count = day.workEntries.size() + day.expenses.size();
+            TextView dateLabel = text(day.date + "  ·  " + count + (count == 1 ? " item" : " items"), 14, true);
+            heading.addView(dateLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+
             TextView arrow = text("⌄", 22, true);
-            arrow.setAlpha(0.7f);
-            top.addView(arrow);
-            itemCard.addView(top);
-            TextView details = text(item.details, 12, false);
-            details.setVisibility(View.GONE);
-            details.setPadding(0, dp(12), 0, dp(4));
-            itemCard.addView(details);
-            top.setOnClickListener(v -> {
-                boolean expanded = details.getVisibility() == View.VISIBLE;
-                details.setVisibility(expanded ? View.GONE : View.VISIBLE);
+            arrow.setAlpha(0.75f);
+            heading.addView(arrow);
+            dayCard.addView(heading);
+
+            LinearLayout records = new LinearLayout(this);
+            records.setOrientation(LinearLayout.VERTICAL);
+            records.setVisibility(View.GONE);
+
+            for (WorkDatabase.WorkEntry entry : day.workEntries) {
+                LinearLayout recordContent = new LinearLayout(this);
+                recordContent.setOrientation(LinearLayout.VERTICAL);
+                recordContent.addView(text("Work shift  ·  " + entry.timeIn + "–" + entry.timeOut, 13, true));
+                recordContent.addView(text("Net pay: " + money(new BigDecimal(entry.netPay))
+                        + "  ·  Work: " + duration(entry.netMinutes), 12, false));
+                addSwipeReveal(records, recordContent, "Edit", "Delete",
+                        v -> editWorkEntry(entry), v -> confirmDeleteWorkEntry(entry));
+            }
+
+            for (WorkDatabase.ExpenseEntry entry : day.expenses) {
+                LinearLayout recordContent = new LinearLayout(this);
+                recordContent.setOrientation(LinearLayout.VERTICAL);
+                recordContent.addView(text("Expense  ·  " + entry.category, 13, true));
+                recordContent.addView(text(money(new BigDecimal(entry.amount))
+                        + (entry.note == null || entry.note.trim().isEmpty() ? "" : "  ·  " + entry.note), 12, false));
+                addSwipeReveal(records, recordContent, "Edit", "Delete",
+                        v -> editExpense(entry), v -> confirmDeleteExpense(entry));
+            }
+
+            dayCard.addView(records);
+            heading.setOnClickListener(v -> {
+                boolean expanded = records.getVisibility() == View.VISIBLE;
+                records.setVisibility(expanded ? View.GONE : View.VISIBLE);
                 arrow.setText(expanded ? "⌄" : "⌃");
             });
-            itemCard.setOnClickListener(v -> top.performClick());
-            historyContainer.addView(itemCard);
+            dayCard.setOnClickListener(v -> heading.performClick());
+            records.setOnClickListener(v -> { });
+            historyContainer.addView(dayCard);
         }
+
         TextView seeAll = text("See all activity  →", 13, true);
         seeAll.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
         seeAll.setPadding(dp(4), dp(10), 0, dp(4));
