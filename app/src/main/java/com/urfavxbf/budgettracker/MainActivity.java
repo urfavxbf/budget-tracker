@@ -261,7 +261,8 @@ public final class MainActivity extends FragmentActivity {
                 paymentCutoff.endDate.toString()) != null;
         MaterialButton recordPayday = button("＋ Record payday salary", true);
         recordPayday.setOnClickListener(v -> showPaydayPaymentDialog());
-        recordPayday.setVisibility(paymentAlreadyRecorded ? View.GONE : View.VISIBLE);
+        boolean paydayArrived = !getScheduledPayday(paymentCutoff).isAfter(today);
+        recordPayday.setVisibility(paymentAlreadyRecorded || !paydayArrived ? View.GONE : View.VISIBLE);
         page.addView(recordPayday);
         refreshBudget();
 
