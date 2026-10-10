@@ -292,11 +292,23 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             // A deleted salary must not silently erase money already reserved as savings.
             // Convert any carryover from this cycle into savings before removing the payment,
             // so the reserved amount remains accounted for and cannot be spent twice.
-            db.execSQL("UPDATE budget_cycle_allocations " +
-                            "SET savings_amount = CAST(savings_amount AS NUMERIC) + CAST(carryover_amount AS NUMERIC), " +
-                            "carryover_amount = '0.00', needs_review = 0 " +
-                            "WHERE cutoff_start = ? AND cutoff_end = ?",
-                    new Object[]{cutoffStart, cutoffEnd});
+            try (Cursor cursor = db.rawQuery(
+                    "SELECT savings_amount, carryover_amount FROM budget_cycle_allocations " +
+                            "WHERE cutoff_start = ? AND cutoff_end = ? LIMIT 1",
+                    new String[]{cutoffStart, cutoffEnd})) {
+                if (cursor.moveToFirst()) {
+                    BigDecimal preservedSavings = new BigDecimal(cursor.getString(0))
+                            .add(new BigDecimal(cursor.getString(1)))
+                            .setScale(2, java.math.RoundingMode.HALF_UP);
+                    ContentValues allocation = new ContentValues();
+                    allocation.put("savings_amount", preservedSavings.toPlainString());
+                    allocation.put("carryover_amount", "0.00");
+                    allocation.put("needs_review", 0);
+                    db.update("budget_cycle_allocations", allocation,
+                            "cutoff_start = ? AND cutoff_end = ?",
+                            new String[]{cutoffStart, cutoffEnd});
+                }
+            }
             int deleted = db.delete("payday_payments", "cutoff_start = ? AND cutoff_end = ?",
                     new String[]{cutoffStart, cutoffEnd});
             db.setTransactionSuccessful();
