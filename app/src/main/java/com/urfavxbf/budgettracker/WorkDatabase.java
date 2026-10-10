@@ -212,17 +212,39 @@ public final class WorkDatabase extends SQLiteOpenHelper {
 
     public boolean savePaydayPayment(String cutoffStart, String cutoffEnd, String paydayDate,
                                      BigDecimal expectedAmount, BigDecimal receivedAmount) {
-        ContentValues values = new ContentValues();
-        values.put("cutoff_start", cutoffStart);
-        values.put("cutoff_end", cutoffEnd);
-        values.put("payday_date", paydayDate);
-        values.put("expected_amount", expectedAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
-        values.put("received_amount", receivedAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
-        values.put("created_at", System.currentTimeMillis());
-        return getWritableDatabase().insertWithOnConflict("payday_payments", null, values,
-                SQLiteDatabase.CONFLICT_REPLACE) != -1;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            String oldDate = null;
+            String oldReceived = null;
+            try (Cursor cursor = db.rawQuery(
+                    "SELECT payday_date, received_amount FROM payday_payments WHERE cutoff_start = ? AND cutoff_end = ? LIMIT 1",
+                    new String[]{cutoffStart, cutoffEnd})) {
+                if (cursor.moveToFirst()) {
+                    oldDate = cursor.getString(0);
+                    oldReceived = cursor.getString(1);
+                }
+            }
+            if (oldDate != null && (!oldDate.equals(paydayDate)
+                    || new BigDecimal(oldReceived).compareTo(receivedAmount) != 0)) {
+                db.delete("budget_cycle_allocations", "cutoff_start = ? AND cutoff_end = ?",
+                        new String[]{cutoffStart, cutoffEnd});
+            }
+            ContentValues values = new ContentValues();
+            values.put("cutoff_start", cutoffStart);
+            values.put("cutoff_end", cutoffEnd);
+            values.put("payday_date", paydayDate);
+            values.put("expected_amount", expectedAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+            values.put("received_amount", receivedAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+            values.put("created_at", System.currentTimeMillis());
+            long saved = db.insertWithOnConflict("payday_payments", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+            if (saved == -1) return false;
+            db.setTransactionSuccessful();
+            return true;
+        } finally {
+            db.endTransaction();
+        }
     }
-
     public boolean deletePaydayPayment(String cutoffStart, String cutoffEnd) {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
