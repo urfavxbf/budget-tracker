@@ -1415,6 +1415,10 @@ public final class MainActivity extends FragmentActivity {
                             throw new IllegalArgumentException("Received salary cannot be negative.");
                         }
                         LocalDate paidDate = LocalDate.parse(value(paydayInput), DateTimeFormatter.ISO_LOCAL_DATE);
+                        if (database.hasPaydayDateConflict(paidDate.toString(), start, end)) {
+                            throw new IllegalArgumentException(
+                                    "Another salary payment already uses this date. Choose a different payday date so budget cycles and expenses stay unambiguous.");
+                        }
                         boolean saved = database.savePaydayPayment(start, end, paidDate.toString(), expected, received);
                         if (!saved) {
                             toast("Could not save salary payment.");
