@@ -608,7 +608,6 @@ public final class MainActivity extends FragmentActivity {
         tile.setPadding(dp(6), dp(8), dp(6), dp(7));
 
         FrameLayout iconHolder = new FrameLayout(this);
-        iconHolder.setGravity(Gravity.CENTER);
         iconHolder.setBackground(roundedBackground(
                 resolveColor(com.google.android.material.R.attr.colorSurface), dp(12)));
         View icon = actionIcon(symbol, accent);
