@@ -1122,10 +1122,7 @@ public final class MainActivity extends FragmentActivity {
             spendingLimit = BigDecimal.ZERO;
         }
 
-        budgetBase = cycleBudget.signum() > 0 ? cycleBudget : spendingLimit;
-        if (spendingLimit.signum() > 0 && budgetBase.signum() > 0) {
-            budgetBase = budgetBase.min(spendingLimit);
-        }
+        budgetBase = BudgetInsights.resolveBudgetBase(cycleBudget, spendingLimit);
         StringBuilder summary = new StringBuilder();
         summary.append("Budget cycle: ").append(cycleStart)
                 .append("\nPayday in ").append(daysUntilPayday)
@@ -1133,18 +1130,10 @@ public final class MainActivity extends FragmentActivity {
                 .append("\nAvailable to spend: ").append(money(remaining))
                 .append("\nSavings balance: ").append(money(savings));
 
-        BigDecimal dailyGuide = BigDecimal.ZERO;
-        boolean hasDailyGuide = false;
-        if (daysUntilPayday > 0 && budgetBase.signum() > 0) {
-            BigDecimal budgetRemaining = budgetBase.subtract(spent).max(BigDecimal.ZERO);
-            dailyGuide = budgetRemaining.divide(BigDecimal.valueOf(daysUntilPayday),
-                    2, java.math.RoundingMode.DOWN);
-            hasDailyGuide = true;
-        } else if (daysUntilPayday > 0 && remaining.signum() > 0) {
-            dailyGuide = remaining.divide(BigDecimal.valueOf(daysUntilPayday),
-                    2, java.math.RoundingMode.DOWN);
-            hasDailyGuide = true;
-        }
+        BigDecimal dailyGuide = BudgetInsights.dailySpendingGuide(
+                budgetBase, spent, remaining, daysUntilPayday);
+        boolean hasDailyGuide = BudgetInsights.hasDailyGuide(
+                budgetBase, remaining, daysUntilPayday);
 
         summary.append("\n");
         if (hasDailyGuide) {
@@ -1170,11 +1159,12 @@ public final class MainActivity extends FragmentActivity {
                     .append(" · ").append(actualPercent.toPlainString()).append("% used")
                     .append("\n").append(money(budgetRemaining.max(BigDecimal.ZERO))).append(" budget remaining");
 
-            if (spent.compareTo(budgetBase) > 0) {
+            BudgetInsights.Status status = BudgetInsights.classify(spent, budgetBase);
+            if (status == BudgetInsights.Status.OVER_BUDGET) {
                 summary.append("\nOver budget by ").append(money(spent.subtract(budgetBase)))
                         .append(". Review non-essential spending and upcoming needs.");
                 budgetSummaryView.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
-            } else if (spent.compareTo(budgetBase.multiply(new BigDecimal("0.80"))) >= 0) {
+            } else if (status == BudgetInsights.Status.WARNING) {
                 summary.append("\nMost of this cycle’s budget is used. Check upcoming bills.");
                 budgetSummaryView.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
             } else {
