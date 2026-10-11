@@ -298,7 +298,7 @@ public final class MainActivity extends FragmentActivity {
         addField(card, "Opening cash balance (₱)", openingBalanceInput);
         addField(card, "Opening savings balance (₱)", openingSavingsInput);
         addField(card, "Spending limit per salary cycle (₱, 0 to disable)", spendingBudgetInput);
-        TextView balancesNote = text("Optional balances may be 0. Opening cash is separate from savings. The spending limit is a guide, not a bank balance.", 12, false);
+        TextView balancesNote = text("Optional balances may be 0. Opening cash is your total tracked cash before subtracting the amount reserved as savings. Opening savings cannot exceed opening cash. The spending limit is a guide, not a bank balance.", 12, false);
         balancesNote.setPadding(0, 0, 0, dp(8));
         card.addView(balancesNote);
 
@@ -338,6 +338,8 @@ public final class MainActivity extends FragmentActivity {
                 throw new IllegalArgumentException("Payday must be a day from 1 to 31.");
             if (openingCash.signum() < 0 || openingSavings.signum() < 0 || budget.signum() < 0)
                 throw new IllegalArgumentException("Starting balances and spending limit cannot be negative.");
+            if (openingSavings.compareTo(openingCash) > 0)
+                throw new IllegalArgumentException("Opening savings cannot exceed your opening cash balance.");
 
             new MaterialAlertDialogBuilder(this)
                     .setTitle("Confirm your setup")
@@ -1547,6 +1549,10 @@ public final class MainActivity extends FragmentActivity {
             if (opening.signum() < 0) {
                 throw new IllegalArgumentException("Starting cash balance cannot be negative.");
             }
+            BigDecimal openingSavings = new BigDecimal(pref("opening_savings_balance", "0.00"));
+            if (opening.compareTo(openingSavings) < 0) {
+                throw new IllegalArgumentException("Starting cash balance cannot be less than your opening savings balance.");
+            }
             new MaterialAlertDialogBuilder(this)
                     .setTitle("Save starting cash?")
                     .setMessage("Set your opening cash balance to " + money(opening) + "? This value affects Available to Spend.")
@@ -1569,6 +1575,10 @@ public final class MainActivity extends FragmentActivity {
             BigDecimal opening = decimal(openingSavingsInput, "Starting savings balance");
             if (opening.signum() < 0) {
                 throw new IllegalArgumentException("Starting savings balance cannot be negative.");
+            }
+            BigDecimal openingCash = new BigDecimal(pref("opening_cash_balance", "0.00"));
+            if (opening.compareTo(openingCash) > 0) {
+                throw new IllegalArgumentException("Starting savings cannot exceed your opening cash balance.");
             }
             new MaterialAlertDialogBuilder(this)
                     .setTitle("Save starting savings?")
