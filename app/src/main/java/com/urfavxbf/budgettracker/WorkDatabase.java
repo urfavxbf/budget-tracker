@@ -276,11 +276,29 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         }
     }
 
+    public boolean hasPaydayDateConflict(String paydayDate, String excludedCutoffStart,
+                                         String excludedCutoffEnd) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT 1 FROM payday_payments WHERE payday_date = ? " +
+                        "AND NOT (cutoff_start = ? AND cutoff_end = ?) LIMIT 1",
+                new String[]{paydayDate, excludedCutoffStart, excludedCutoffEnd})) {
+            return cursor.moveToFirst();
+        }
+    }
+
     public boolean savePaydayPayment(String cutoffStart, String cutoffEnd, String paydayDate,
                                      BigDecimal expectedAmount, BigDecimal receivedAmount) {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
+            // Expense records are date-only, so two salary cycles cannot be split reliably
+            // when their paydays share the same date. Reject ambiguity before replacing a row.
+            try (Cursor cursor = db.rawQuery(
+                    "SELECT 1 FROM payday_payments WHERE payday_date = ? " +
+                            "AND NOT (cutoff_start = ? AND cutoff_end = ?) LIMIT 1",
+                    new String[]{paydayDate, cutoffStart, cutoffEnd})) {
+                if (cursor.moveToFirst()) return false;
+            }
             String oldDate = null;
             String oldReceived = null;
             try (Cursor cursor = db.rawQuery(
