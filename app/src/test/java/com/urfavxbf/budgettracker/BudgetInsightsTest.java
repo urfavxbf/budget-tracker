@@ -45,6 +45,20 @@ public class BudgetInsightsTest {
     }
 
     @Test
+    public void capsDailyGuideAtAvailableCashAfterSavings() {
+        assertEquals(new BigDecimal("150.00"),
+                BudgetInsights.dailySpendingGuide(new BigDecimal("1000.00"),
+                        new BigDecimal("100.00"), new BigDecimal("300.00"), 2));
+    }
+
+    @Test
+    public void doesNotRecommendSpendingWhenAvailableCashIsNegative() {
+        assertEquals(new BigDecimal("0.00"),
+                BudgetInsights.dailySpendingGuide(new BigDecimal("500.00"),
+                        new BigDecimal("100.00"), new BigDecimal("-50.00"), 5));
+    }
+
+    @Test
     public void fallsBackToAvailableCashWhenNoBudgetIsConfigured() {
         assertEquals(new BigDecimal("140.00"),
                 BudgetInsights.dailySpendingGuide(BigDecimal.ZERO, new BigDecimal("50.00"),
