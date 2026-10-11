@@ -491,7 +491,7 @@ public final class MainActivity extends FragmentActivity {
         actions1.setOrientation(LinearLayout.HORIZONTAL);
         actions1.setGravity(Gravity.CENTER_VERTICAL);
         actions1.addView(actionTile("＋", "Add Income", 0xFFE1F5EE, 0xFF16866E,
-                () -> showWorkDialog(null)), new LinearLayout.LayoutParams(0, dp(94), 1f));
+                () -> showWorkDialog(null)), new LinearLayout.LayoutParams(0, dp(88), 1f));
         actions1.addView(space(dp(10)), new LinearLayout.LayoutParams(dp(10), 1));
         actions1.addView(actionTile("−", "Add Expense", 0xFFFFE9EC, 0xFFE05D72,
                 () -> showExpenseDialog(null)), new LinearLayout.LayoutParams(0, dp(94), 1f));
@@ -603,21 +603,106 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout tile = new LinearLayout(this);
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER);
-        tile.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant), dp(20)));
-        TextView icon = text(symbol, 25, true);
-        icon.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
-        icon.setGravity(Gravity.CENTER);
-        icon.setPadding(dp(10), 0, dp(10), 0);
-        tile.setPadding(dp(10), dp(8), dp(10), dp(8));
-        tile.addView(icon);
-        TextView title = text(label, 12, true);
+        tile.setBackground(roundedBackground(
+                resolveColor(com.google.android.material.R.attr.colorSurfaceVariant), dp(18)));
+        tile.setPadding(dp(6), dp(8), dp(6), dp(7));
+
+        FrameLayout iconHolder = new FrameLayout(this);
+        iconHolder.setGravity(Gravity.CENTER);
+        iconHolder.setBackground(roundedBackground(
+                resolveColor(com.google.android.material.R.attr.colorSurface), dp(12)));
+        View icon = actionIcon(symbol, accent);
+        iconHolder.addView(icon, new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
+        LinearLayout.LayoutParams iconParams =
+                new LinearLayout.LayoutParams(dp(38), dp(38));
+        iconParams.bottomMargin = dp(7);
+        tile.addView(iconHolder, iconParams);
+
+        TextView title = text(label, 11, true);
         title.setGravity(Gravity.CENTER);
         title.setTextColor(resolveColor(android.R.attr.textColorPrimary));
+        title.setMaxLines(1);
+        title.setIncludeFontPadding(false);
         tile.addView(title);
         tile.setClickable(true);
         tile.setFocusable(true);
+        android.util.TypedValue outValue = new android.util.TypedValue();
+        if (getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)) {
+            tile.setForeground(getDrawable(outValue.resourceId));
+        }
         tile.setOnClickListener(v -> action.run());
         return tile;
+    }
+
+    private View actionIcon(String symbol, int accent) {
+        return new View(this) {
+            private final android.graphics.Paint paint = new android.graphics.Paint(
+                    android.graphics.Paint.ANTI_ALIAS_FLAG);
+            private final android.graphics.Path path = new android.graphics.Path();
+
+            @Override
+            protected void onDraw(android.graphics.Canvas canvas) {
+                super.onDraw(canvas);
+                float unit = Math.min(getWidth(), getHeight()) / 24f;
+                canvas.save();
+                canvas.translate((getWidth() - 24f * unit) / 2f, (getHeight() - 24f * unit) / 2f);
+                canvas.scale(unit, unit);
+                paint.setColor(accent);
+                paint.setStyle(android.graphics.Paint.Style.STROKE);
+                paint.setStrokeWidth(1.9f);
+                paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+                paint.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+
+                if ("＋".equals(symbol)) {
+                    // Wallet outline with a plus mark.
+                    path.reset();
+                    path.moveTo(4, 8); path.lineTo(4, 6.5f);
+                    path.quadTo(4, 5, 6, 5); path.lineTo(18, 5);
+                    path.quadTo(20, 5, 20, 7); path.lineTo(20, 18);
+                    path.quadTo(20, 20, 18, 20); path.lineTo(5, 20);
+                    path.quadTo(3, 20, 3, 18); path.lineTo(3, 9);
+                    path.quadTo(3, 8, 4, 8);
+                    canvas.drawPath(path, paint);
+                    canvas.drawRoundRect(14, 10, 22, 16, 2, 2, paint);
+                    canvas.drawLine(18, 11.8f, 18, 14.2f, paint);
+                    canvas.drawLine(16.8f, 13, 19.2f, 13, paint);
+                } else if ("−".equals(symbol)) {
+                    // Wallet outline with a minus mark.
+                    path.reset();
+                    path.moveTo(4, 8); path.lineTo(4, 6.5f);
+                    path.quadTo(4, 5, 6, 5); path.lineTo(18, 5);
+                    path.quadTo(20, 5, 20, 7); path.lineTo(20, 18);
+                    path.quadTo(20, 20, 18, 20); path.lineTo(5, 20);
+                    path.quadTo(3, 20, 3, 18); path.lineTo(3, 9);
+                    path.quadTo(3, 8, 4, 8);
+                    canvas.drawPath(path, paint);
+                    canvas.drawRoundRect(14, 10, 22, 16, 2, 2, paint);
+                    canvas.drawLine(16.8f, 13, 19.2f, 13, paint);
+                } else if ("▦".equals(symbol)) {
+                    // Calendar with binding rings and date cells.
+                    canvas.drawRoundRect(3, 5, 21, 21, 2, 2, paint);
+                    canvas.drawLine(3, 9, 21, 9, paint);
+                    canvas.drawLine(8, 3, 8, 7, paint);
+                    canvas.drawLine(16, 3, 16, 7, paint);
+                    canvas.drawLine(8, 12, 8, 12.1f, paint);
+                    canvas.drawLine(12, 12, 12, 12.1f, paint);
+                    canvas.drawLine(16, 12, 16, 12.1f, paint);
+                    canvas.drawLine(8, 16, 8, 16.1f, paint);
+                    canvas.drawLine(12, 16, 12, 16.1f, paint);
+                    canvas.drawLine(16, 16, 16, 16.1f, paint);
+                } else {
+                    // Report page with a compact bar chart.
+                    canvas.drawRoundRect(4, 3, 20, 21, 2, 2, paint);
+                    canvas.drawLine(8, 7, 14, 7, paint);
+                    canvas.drawLine(8, 10, 12, 10, paint);
+                    canvas.drawLine(8, 17, 8, 14, paint);
+                    canvas.drawLine(12, 17, 12, 12, paint);
+                    canvas.drawLine(16, 17, 16, 9, paint);
+                    canvas.drawLine(7, 18.5f, 18, 18.5f, paint);
+                }
+                canvas.restore();
+            }
+        };
     }
 
     private View metricCard(String label, String amount, int accent) {
