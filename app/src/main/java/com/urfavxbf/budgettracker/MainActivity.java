@@ -732,6 +732,63 @@ public final class MainActivity extends FragmentActivity {
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> attemptExpenseSave(dialog));
     }
 
+    private void attemptExpenseSave(AlertDialog expenseDialog) {
+        try {
+            LocalDate.parse(value(expenseDateInput), DateTimeFormatter.ISO_LOCAL_DATE);
+            String category = value(expenseCategoryInput);
+            if (category.isEmpty()) throw new IllegalArgumentException("Expense category is required.");
+            BigDecimal amount = decimal(expenseAmountInput, "Expense amount");
+            if (amount.signum() <= 0) throw new IllegalArgumentException("Amount must be greater than zero.");
+
+            boolean updatingExpense = editingExpenseId >= 0;
+            BigDecimal availableBefore = getAvailableCashBalance();
+            BigDecimal savingsBefore = database.getTotalSavingsBalance();
+            if (updatingExpense) {
+                BigDecimal oldAmount = database.getExpenseAmount(editingExpenseId);
+                BigDecimal oldDraw = database.getExpenseSavingsDraw(editingExpenseId);
+                availableBefore = availableBefore.add(oldAmount).subtract(oldDraw);
+                savingsBefore = savingsBefore.add(oldDraw);
+            }
+            BigDecimal savingsDraw = BudgetInsights.savingsDrawForExpense(availableBefore, savingsBefore, amount);
+            BigDecimal availableAfter = availableBefore.subtract(amount).add(savingsDraw);
+            if (savingsDraw.signum() > 0 || availableAfter.signum() <= 0) {
+                String message;
+                if (savingsDraw.signum() > 0) {
+                    message = "This expense will use " + money(savingsDraw) + " from your savings."
+                            + "\nSavings remaining after this expense: " + money(savingsBefore.subtract(savingsDraw))
+                            + "\nAvailable to Spend after this expense: " + money(availableAfter)
+                            + "\n\nContinue saving this expense?";
+                } else {
+                    message = "This expense will exhaust or exceed your Available to Spend."
+                            + "\nAvailable to Spend after this expense: " + money(availableAfter.max(BigDecimal.ZERO))
+                            + "\nThere is not enough savings to cover the extra amount."
+                            + "\n\nContinue anyway?";
+                }
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle("Budget warning")
+                        .setMessage(message)
+                        .setNegativeButton("Review expense", (dialog, which) -> dialog.dismiss())
+                        .setPositiveButton("Continue", (dialog, which) -> {
+                            addExpense();
+                            if (lastSaveSucceeded) {
+                                expenseDialog.dismiss();
+                                showTab(currentTab);
+                            }
+                        }).show();
+                return;
+            }
+            addExpense();
+            if (lastSaveSucceeded) {
+                expenseDialog.dismiss();
+                showTab(currentTab);
+            }
+        } catch (DateTimeParseException ex) {
+            toast("Use YYYY-MM-DD for the expense date.");
+        } catch (IllegalArgumentException ex) {
+            toast(ex.getMessage());
+        }
+    }
+
     private List<String> getExpenseCategorySuggestions() {
         List<String> categories = new ArrayList<>();
         String[] commonCategories = {
