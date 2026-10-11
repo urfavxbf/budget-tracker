@@ -523,6 +523,10 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void buildCalendarScreen() {
+        page.removeAllViews();
+        Button back = button("←  Back to dashboard", false);
+        back.setOnClickListener(v -> showTab(0));
+        page.addView(back);
         header("Calendar", "Browse your work shifts and expenses by date.");
         CalendarView calendar = new CalendarView(this);
         calendar.setFirstDayOfWeek(java.util.Calendar.MONDAY);
@@ -608,7 +612,7 @@ public final class MainActivity extends FragmentActivity {
         tile.addView(icon);
         TextView title = text(label, 12, true);
         title.setGravity(Gravity.CENTER);
-        title.setTextColor(0xFF294653);
+        title.setTextColor(resolveColor(android.R.attr.textColorPrimary));
         tile.addView(title);
         tile.setClickable(true);
         tile.setFocusable(true);
