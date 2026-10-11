@@ -7,13 +7,13 @@ Native Android salary tracker and payday budget planner. Package: `com.urfavxbf.
 - Java 17 / Android Gradle project, min SDK 26, target SDK 35.
 - Adaptive system light/dark theme.
 - Daily time-in/time-out entry; earlier time-out is interpreted as an overnight shift.
-- Multiple break intervals with validation that rejects breaks outside the shift and overlapping breaks.
+- Multiple break-duration entries that are summed for salary calculation. The current UI does not capture each break's start/end time, so it cannot validate whether breaks fall within the shift or overlap.
 - Configurable hourly rate, regular workday hours, ordinary overtime multiplier, daily allowance, and daily deduction.
 - Salary calculations use `BigDecimal` and store a snapshot of the rate and result for each saved work entry.
 - Local SQLite persistence and recent work-entry history.
 - Local expense entry with date, category, amount, and optional note.
 - Current cutoff summary for the 1st–15th or 16th–month-end, based on saved estimated earnings and recorded expenses.
-- Unit tests for regular overtime math, overnight shifts, and overlapping breaks.
+- Unit tests for regular overtime math, overnight shifts, break interval validation in the calculator, payday reminder scheduling policy, and daily spending-guide limits.
 - GitHub Actions workflow for unit tests and debug APK build.
 
 ## Open in Android Studio
