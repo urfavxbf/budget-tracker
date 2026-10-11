@@ -446,8 +446,8 @@ public final class MainActivity extends FragmentActivity {
         snapshotHeader.addView(target);
         LinearLayout snapshotTitles = new LinearLayout(this);
         snapshotTitles.setOrientation(LinearLayout.VERTICAL);
-        snapshotTitles.addView(text("Budget Snapshot", 19, true));
-        TextView cutoffCaption = text("Expense limit for this cutoff", 12, false);
+        snapshotTitles.addView(text("Budget Snapshot", 17, true));
+        TextView cutoffCaption = text("Expense limit for this cutoff", 11, false);
         cutoffCaption.setTextColor(resolveColor(android.R.attr.textColorSecondary));
         snapshotTitles.addView(cutoffCaption);
         snapshotHeader.addView(snapshotTitles, new LinearLayout.LayoutParams(0, -2, 1f));
@@ -459,7 +459,7 @@ public final class MainActivity extends FragmentActivity {
         } catch (NumberFormatException ignored) {
             limit = BigDecimal.ZERO;
         }
-        TextView limitText = text("Spending limit: " + (limit.signum() > 0 ? money(limit) : "Not set"), 14, true);
+        TextView limitText = text("Spending limit: " + (limit.signum() > 0 ? money(limit) : "Not set"), 13, true);
         limitText.setPadding(0, dp(14), 0, dp(6));
         snapshot.addView(limitText);
 
@@ -471,7 +471,7 @@ public final class MainActivity extends FragmentActivity {
         progressParams.bottomMargin = dp(10);
         snapshot.addView(budgetProgressBar, progressParams);
 
-        budgetSummaryView = text("", 13, false);
+        budgetSummaryView = text("", 12, false);
         budgetSummaryView.setTextColor(resolveColor(android.R.attr.textColorSecondary));
         snapshot.addView(budgetSummaryView);
         page.addView(snapshot);
@@ -487,24 +487,21 @@ public final class MainActivity extends FragmentActivity {
         page.addView(recordPayday);
 
         section("Quick Actions");
-        LinearLayout actions1 = new LinearLayout(this);
-        actions1.setOrientation(LinearLayout.HORIZONTAL);
-        actions1.setGravity(Gravity.CENTER_VERTICAL);
-        actions1.addView(actionTile("＋", "Add Income", 0xFFE1F5EE, 0xFF16866E,
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        actions.addView(actionTile("＋", "Add Income", 0xFFE1F5EE, 0xFF16866E,
                 () -> showWorkDialog(null)), new LinearLayout.LayoutParams(0, dp(88), 1f));
-        actions1.addView(space(dp(10)), new LinearLayout.LayoutParams(dp(10), 1));
-        actions1.addView(actionTile("−", "Add Expense", 0xFFFFE9EC, 0xFFE05D72,
-                () -> showExpenseDialog(null)), new LinearLayout.LayoutParams(0, dp(94), 1f));
-        page.addView(actions1);
-        LinearLayout actions2 = new LinearLayout(this);
-        actions2.setOrientation(LinearLayout.HORIZONTAL);
-        actions2.setGravity(Gravity.CENTER_VERTICAL);
-        actions2.addView(actionTile("▦", "View Calendar", 0xFFEDE7FF, 0xFF7B61C9,
-                () -> buildCalendarScreen()), new LinearLayout.LayoutParams(0, dp(94), 1f));
-        actions2.addView(space(dp(10)), new LinearLayout.LayoutParams(dp(10), 1));
-        actions2.addView(actionTile("▥", "View Reports", 0xFFE5EFFD, 0xFF3975BD,
-                () -> showTab(1)), new LinearLayout.LayoutParams(0, dp(94), 1f));
-        page.addView(actions2);
+        actions.addView(space(dp(6)), new LinearLayout.LayoutParams(dp(6), 1));
+        actions.addView(actionTile("−", "Add Expense", 0xFFFFE9EC, 0xFFE05D72,
+                () -> showExpenseDialog(null)), new LinearLayout.LayoutParams(0, dp(88), 1f));
+        actions.addView(space(dp(6)), new LinearLayout.LayoutParams(dp(6), 1));
+        actions.addView(actionTile("▦", "View Calendar", 0xFFEDE7FF, 0xFF7B61C9,
+                () -> buildCalendarScreen()), new LinearLayout.LayoutParams(0, dp(88), 1f));
+        actions.addView(space(dp(6)), new LinearLayout.LayoutParams(dp(6), 1));
+        actions.addView(actionTile("▥", "View Reports", 0xFFE5EFFD, 0xFF3975BD,
+                () -> showTab(1)), new LinearLayout.LayoutParams(0, dp(88), 1f));
+        page.addView(actions);
 
         section("Recent Activity");
         TextView recentFilter = text("This cutoff  ⌄", 12, false);
@@ -605,22 +602,22 @@ public final class MainActivity extends FragmentActivity {
         tile.setGravity(Gravity.CENTER);
         tile.setBackground(roundedBackground(
                 resolveColor(com.google.android.material.R.attr.colorSurfaceVariant), dp(18)));
-        tile.setPadding(dp(6), dp(8), dp(6), dp(7));
+        tile.setPadding(dp(3), dp(6), dp(3), dp(5));
 
         FrameLayout iconHolder = new FrameLayout(this);
         iconHolder.setBackground(roundedBackground(
                 resolveColor(com.google.android.material.R.attr.colorSurface), dp(12)));
         View icon = actionIcon(symbol, accent);
-        iconHolder.addView(icon, new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
+        iconHolder.addView(icon, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
         LinearLayout.LayoutParams iconParams =
-                new LinearLayout.LayoutParams(dp(38), dp(38));
-        iconParams.bottomMargin = dp(7);
+                new LinearLayout.LayoutParams(dp(32), dp(32));
+        iconParams.bottomMargin = dp(5);
         tile.addView(iconHolder, iconParams);
 
-        TextView title = text(label, 11, true);
+        TextView title = text(label, 9, true);
         title.setGravity(Gravity.CENTER);
         title.setTextColor(resolveColor(android.R.attr.textColorPrimary));
-        title.setMaxLines(1);
+        title.setMaxLines(2);
         title.setIncludeFontPadding(false);
         tile.addView(title);
         tile.setClickable(true);
