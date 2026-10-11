@@ -21,6 +21,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.widget.FrameLayout;
 import android.widget.Button;
+import android.widget.CheckBox;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
@@ -66,6 +67,7 @@ public final class MainActivity extends FragmentActivity {
     private TextView resultView, budgetSummaryView;
     private EditText spendingBudgetInput;
     private EditText openingBalanceInput;
+    private EditText openingSavingsInput;
     private ProgressBar budgetProgressBar;
     private WorkDatabase database;
     private long editingWorkEntryId = -1;
@@ -89,13 +91,14 @@ public final class MainActivity extends FragmentActivity {
         getWindow().setNavigationBarColor(resolveColor(com.google.android.material.R.attr.colorSurface));
         buildShell();
         applyImmersiveMode();
-        showTab(currentTab);
-        PaydayReminderScheduler.schedule(this);
-        if (android.os.Build.VERSION.SDK_INT >= 33
-                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 7127);
+        if (isFirstTimeSetupRequired()) {
+            bottomNav.setVisibility(View.GONE);
+            showFirstTimeSetup();
+        } else {
+            showTab(currentTab);
+            requestNotificationPermissionIfNeeded();
         }
+        PaydayReminderScheduler.schedule(this);
     }
 
     @Override public void onWindowFocusChanged(boolean hasFocus) {
@@ -209,6 +212,7 @@ public final class MainActivity extends FragmentActivity {
         resultView = budgetSummaryView = null;
         spendingBudgetInput = null;
         openingBalanceInput = null;
+        openingSavingsInput = null;
         budgetProgressBar = null;
         saveWorkButton = null;
         saveExpenseButton = null;
@@ -218,6 +222,155 @@ public final class MainActivity extends FragmentActivity {
             case 1: buildHistoryScreen(); break;
             case 2: buildSettingsScreen(); break;
             default: buildDashboard();
+        }
+    }
+
+    private boolean isFirstTimeSetupRequired() {
+        android.content.SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        if (prefs.getBoolean("onboarding_complete", false)) return false;
+
+        // Do not show onboarding to existing users upgrading the app.
+        boolean hasSavedPreferences = prefs.contains("pay_rate")
+                || prefs.contains("opening_cash_balance")
+                || prefs.contains("spending_budget")
+                || prefs.contains("first_cutoff_payday");
+        boolean hasSavedActivity = !database.getRecentWorkEntries(1).isEmpty()
+                || !database.getRecentExpenseEntries(1).isEmpty()
+                || !database.getPaydayPayments(1).isEmpty();
+        if (hasSavedPreferences || hasSavedActivity) {
+            prefs.edit().putBoolean("onboarding_complete", true).apply();
+            return false;
+        }
+        return true;
+    }
+
+    private void requestNotificationPermissionIfNeeded() {
+        android.content.SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        if (!prefs.getBoolean("notifications_enabled", false)) return;
+        if (android.os.Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 7127);
+        }
+    }
+
+    private void showFirstTimeSetup() {
+        page.removeAllViews();
+        header("Welcome to Budget Tracker 👋", "Let's set up your pay, payday, cash, and savings. You can change these later in Settings.");
+        TextView note = text("Currency: Philippine peso (₱). Enter your actual details. The app's estimated salary is based on your saved work shifts; it is not a confirmed payment.", 14, false);
+        note.setPadding(0, 0, 0, dp(12));
+        page.addView(note);
+
+        LinearLayout card = cardContainer();
+        page.addView(card);
+        addSection(card, "Salary defaults");
+        payRateTypeInput = createRateTypeSpinner();
+        hourlyRateInput = field("Rate amount (₱)", pref("pay_rate", ""),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        regularHoursInput = field("Regular hours per day", pref("regular_hours", "8"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        overtimeMultiplierInput = field("Overtime multiplier", pref("ot_multiplier", "1.25"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        allowanceInput = field("Daily allowance", pref("allowance", "0.00"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        deductionInput = field("Daily deduction", pref("deduction", "0.00"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        addField(card, "Pay rate type", payRateTypeInput);
+        addField(card, "Rate amount (₱)", hourlyRateInput);
+        addField(card, "Regular hours per day", regularHoursInput);
+        addField(card, "Overtime multiplier", overtimeMultiplierInput);
+        addField(card, "Daily allowance (₱, optional)", allowanceInput);
+        addField(card, "Daily deduction (₱, optional)", deductionInput);
+
+        addSection(card, "Payday schedule");
+        firstPaydayInput = field("Day 1–31", pref("first_cutoff_payday", "22"), InputType.TYPE_CLASS_NUMBER);
+        secondPaydayInput = field("Day 1–31", pref("second_cutoff_payday", "7"), InputType.TYPE_CLASS_NUMBER);
+        addField(card, "Payday for 1st–15th cutoff (same month)", firstPaydayInput);
+        addField(card, "Payday for 16th–month-end cutoff (following month)", secondPaydayInput);
+
+        addSection(card, "Starting balances and budget");
+        openingBalanceInput = field("0.00", pref("opening_cash_balance", "0.00"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        openingSavingsInput = field("0.00", pref("opening_savings_balance", "0.00"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        spendingBudgetInput = field("0.00", pref("spending_budget", "0.00"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        addField(card, "Opening cash balance (₱)", openingBalanceInput);
+        addField(card, "Opening savings balance (₱)", openingSavingsInput);
+        addField(card, "Spending limit per salary cycle (₱, 0 to disable)", spendingBudgetInput);
+        TextView balancesNote = text("Optional balances may be 0. Opening cash is separate from savings. The spending limit is a guide, not a bank balance.", 12, false);
+        balancesNote.setPadding(0, 0, 0, dp(8));
+        card.addView(balancesNote);
+
+        CheckBox notifications = new CheckBox(this);
+        notifications.setText("Enable payday reminder notifications");
+        notifications.setChecked(getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("notifications_enabled", true));
+        card.addView(notifications);
+
+        Button finish = button("Save setup and continue", true);
+        finish.setOnClickListener(v -> completeFirstTimeSetup(notifications));
+        card.addView(finish);
+    }
+
+    private void completeFirstTimeSetup(CheckBox notifications) {
+        try {
+            BigDecimal rate = decimal(hourlyRateInput, "Pay rate");
+            String rateType = payRateTypeInput == null ? "Hourly" : payRateTypeInput.getText().toString();
+            if (!"Hourly".equals(rateType) && !"Daily".equals(rateType)) {
+                throw new IllegalArgumentException("Choose Hourly or Daily for pay rate type.");
+            }
+            BigDecimal hours = decimal(regularHoursInput, "Regular hours");
+            BigDecimal multiplier = decimal(overtimeMultiplierInput, "OT multiplier");
+            BigDecimal allowance = decimal(allowanceInput, "Allowance");
+            BigDecimal deduction = decimal(deductionInput, "Deduction");
+            BigDecimal openingCash = decimal(openingBalanceInput, "Starting cash balance");
+            BigDecimal openingSavings = decimal(openingSavingsInput, "Starting savings balance");
+            BigDecimal budget = decimal(spendingBudgetInput, "Spending limit");
+            int firstPayday = Integer.parseInt(value(firstPaydayInput));
+            int secondPayday = Integer.parseInt(value(secondPaydayInput));
+
+            if (rate.signum() <= 0) throw new IllegalArgumentException("Pay rate must be greater than zero.");
+            if (hours.signum() <= 0 || hours.multiply(BigDecimal.valueOf(60)).stripTrailingZeros().scale() > 0)
+                throw new IllegalArgumentException("Regular hours must be positive and convert to whole minutes.");
+            if (multiplier.signum() <= 0 || allowance.signum() < 0 || deduction.signum() < 0)
+                throw new IllegalArgumentException("OT multiplier must be positive; allowance and deduction cannot be negative.");
+            if (firstPayday < 1 || firstPayday > 31 || secondPayday < 1 || secondPayday > 31)
+                throw new IllegalArgumentException("Payday must be a day from 1 to 31.");
+            if (openingCash.signum() < 0 || openingSavings.signum() < 0 || budget.signum() < 0)
+                throw new IllegalArgumentException("Starting balances and spending limit cannot be negative.");
+
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("Confirm your setup")
+                    .setMessage("Pay rate: " + money(rate) + " (" + rateType + ")"
+                            + "\nPaydays: " + firstPayday + " and " + secondPayday
+                            + "\nOpening cash: " + money(openingCash)
+                            + "\nOpening savings: " + money(openingSavings)
+                            + "\nSpending limit: " + (budget.signum() == 0 ? "Disabled" : money(budget))
+                            + "\n\nYou can edit these details later in Settings.")
+                    .setNegativeButton("Go back", (dialog, which) -> dialog.dismiss())
+                    .setPositiveButton("Confirm and finish", (dialog, which) -> {
+                        saveSalaryPreferences(rate, rateType, hours, multiplier, allowance, deduction);
+                        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                                .putString("first_cutoff_payday", Integer.toString(firstPayday))
+                                .putString("second_cutoff_payday", Integer.toString(secondPayday))
+                                .putString("opening_cash_balance", openingCash.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
+                                .putString("opening_savings_balance", openingSavings.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
+                                .putString("spending_budget", budget.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
+                                .putBoolean("notifications_enabled", notifications.isChecked())
+                                .putBoolean("onboarding_complete", true)
+                                .apply();
+                        bottomNav.setVisibility(View.VISIBLE);
+                        currentTab = 0;
+                        showTab(0);
+                        bottomNav.setSelectedItemId(NAV_HOME_ID);
+                        PaydayReminderScheduler.schedule(this);
+                        requestNotificationPermissionIfNeeded();
+                        Toast.makeText(this, "Setup complete. Welcome!", Toast.LENGTH_LONG).show();
+                    }).show();
+        } catch (NumberFormatException ex) {
+            toast("Enter valid payday days from 1 to 31.");
+        } catch (IllegalArgumentException ex) {
+            toast(ex.getMessage());
         }
     }
 
@@ -576,14 +729,7 @@ public final class MainActivity extends FragmentActivity {
         if (dialog.getWindow() != null) {
             dialog.getWindow().setLayout((int) (getResources().getDisplayMetrics().widthPixels * 0.92f), -2);
         }
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            lastSaveSucceeded = false;
-            addExpense();
-            if (lastSaveSucceeded) {
-                dialog.dismiss();
-                showTab(currentTab);
-            }
-        });
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> attemptExpenseSave(dialog));
     }
 
     private List<String> getExpenseCategorySuggestions() {
@@ -688,6 +834,17 @@ public final class MainActivity extends FragmentActivity {
         Button saveOpening = button("Save starting balance", true);
         saveOpening.setOnClickListener(v -> saveOpeningBalance());
         page.addView(saveOpening);
+
+        section("Starting savings balance");
+        TextView savingsInfo = text("Enter savings you already have before tracking with this app. This is separate from your available cash and can be used to cover overspending when needed.", 13, false);
+        savingsInfo.setPadding(0, 0, 0, dp(8));
+        page.addView(savingsInfo);
+        openingSavingsInput = field("0.00", pref("opening_savings_balance", "0.00"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        addField(page, "Opening savings balance (₱)", openingSavingsInput);
+        Button saveSavings = button("Save starting savings", true);
+        saveSavings.setOnClickListener(v -> saveOpeningSavingsBalance());
+        page.addView(saveSavings);
 
         section("Spending budget");
         TextView budgetInfo = text("Set a spending cap for each salary cycle. The dashboard tracks expenses since the most recently recorded payday against this limit. Enter 0 to disable the cap.", 13, false);
@@ -1333,12 +1490,41 @@ public final class MainActivity extends FragmentActivity {
             if (opening.signum() < 0) {
                 throw new IllegalArgumentException("Starting cash balance cannot be negative.");
             }
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                    .putString("opening_cash_balance",
-                            opening.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
-                    .apply();
-            Toast.makeText(this, "Starting cash balance saved", Toast.LENGTH_SHORT).show();
-            showTab(2);
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("Save starting cash?")
+                    .setMessage("Set your opening cash balance to " + money(opening) + "? This value affects Available to Spend.")
+                    .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                    .setPositiveButton("Confirm", (dialog, which) -> {
+                        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                                .putString("opening_cash_balance",
+                                        opening.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
+                                .apply();
+                        Toast.makeText(this, "Starting cash balance saved", Toast.LENGTH_SHORT).show();
+                        showTab(2);
+                    }).show();
+        } catch (IllegalArgumentException ex) {
+            toast(ex.getMessage());
+        }
+    }
+
+    private void saveOpeningSavingsBalance() {
+        try {
+            BigDecimal opening = decimal(openingSavingsInput, "Starting savings balance");
+            if (opening.signum() < 0) {
+                throw new IllegalArgumentException("Starting savings balance cannot be negative.");
+            }
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("Save starting savings?")
+                    .setMessage("Set your opening savings balance to " + money(opening) + "? This amount will be included in Savings Balance.")
+                    .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                    .setPositiveButton("Confirm", (dialog, which) -> {
+                        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                                .putString("opening_savings_balance",
+                                        opening.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
+                                .apply();
+                        Toast.makeText(this, "Starting savings balance saved", Toast.LENGTH_SHORT).show();
+                        showTab(2);
+                    }).show();
         } catch (IllegalArgumentException ex) {
             toast(ex.getMessage());
         }
