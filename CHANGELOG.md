@@ -15,7 +15,8 @@
 - Validate setup values and prevent negative starting balances or spending limits.
 
 ### Verification
-- Automated CI and manual device regression checks are pending for this version.
+- GitHub Actions unit tests and debug APK build passed for this PR.
+- Manual device regression checks are still required before release.
 
 ### Notes
 - Salary amounts are estimates based on user-entered settings and work records.
