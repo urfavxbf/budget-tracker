@@ -1,6 +1,10 @@
 package com.urfavxbf.budgettracker;
 
 import androidx.fragment.app.FragmentActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.appcompat.app.AlertDialog;
 import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.android.material.timepicker.MaterialTimePicker;
@@ -131,6 +135,17 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout shell = new LinearLayout(this);
         shell.setOrientation(LinearLayout.VERTICAL);
         shell.setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface));
+
+        // Android 15 enforces edge-to-edge for apps targeting SDK 35. Keep the app shell
+        // inside the visible system-bar insets so the header and bottom navigation aren't obscured.
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+            ViewCompat.setOnApplyWindowInsetsListener(shell, (view, windowInsets) -> {
+                Insets systemBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+                view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+                return windowInsets;
+            });
+        }
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
