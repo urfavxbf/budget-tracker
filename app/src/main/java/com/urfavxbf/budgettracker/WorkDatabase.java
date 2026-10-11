@@ -18,9 +18,11 @@ import java.util.TreeMap;
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
     private static final int DATABASE_VERSION = 8;
+    private final Context context;
 
     public WorkDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        this.context = context.getApplicationContext();
     }
 
     @Override
@@ -184,9 +186,16 @@ public final class WorkDatabase extends SQLiteOpenHelper {
     }
 
     public BigDecimal getTotalSavingsBalance() {
+        String openingSavings = context.getSharedPreferences("salary_preferences", Context.MODE_PRIVATE)
+                .getString("opening_savings_balance", "0.00");
+        BigDecimal total;
+        try {
+            total = new BigDecimal(openingSavings);
+        } catch (NumberFormatException ignored) {
+            total = BigDecimal.ZERO;
+        }
         try (Cursor cursor = getReadableDatabase().rawQuery(
                 "SELECT savings_amount FROM budget_cycle_allocations", null)) {
-            BigDecimal total = BigDecimal.ZERO;
             while (cursor.moveToNext()) total = total.add(new BigDecimal(cursor.getString(0)));
             try (Cursor draws = getReadableDatabase().rawQuery("SELECT amount FROM expense_savings_draws", null)) {
                 while (draws.moveToNext()) total = total.subtract(new BigDecimal(draws.getString(0)));
