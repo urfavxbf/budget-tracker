@@ -410,7 +410,7 @@ public final class MainActivity extends FragmentActivity {
         TextView cutoffBadge = text("PAYDAY\n" + payday.format(DateTimeFormatter.ofPattern("MMM d")), 12, true);
         cutoffBadge.setGravity(Gravity.CENTER);
         cutoffBadge.setPadding(dp(10), dp(8), dp(10), dp(8));
-        cutoffBadge.setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary));
+        cutoffBadge.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
         cutoffBadge.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSecondaryContainer), dp(16)));
         top.addView(cutoffBadge);
         page.addView(top);
@@ -441,7 +441,7 @@ public final class MainActivity extends FragmentActivity {
         snapshotHeader.setGravity(Gravity.CENTER_VERTICAL);
         snapshotHeader.setOrientation(LinearLayout.HORIZONTAL);
         TextView target = text("◎", 27, true);
-        target.setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary));
+        target.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
         target.setPadding(0, 0, dp(10), 0);
         snapshotHeader.addView(target);
         LinearLayout snapshotTitles = new LinearLayout(this);
@@ -465,7 +465,7 @@ public final class MainActivity extends FragmentActivity {
 
         budgetProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         budgetProgressBar.setMax(100);
-        budgetProgressBar.setProgressTintList(ColorStateList.valueOf(resolveColor(com.google.android.material.R.attr.colorPrimary)));
+        budgetProgressBar.setProgressTintList(ColorStateList.valueOf(resolveColor(androidx.appcompat.R.attr.colorPrimary)));
         budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(resolveColor(com.google.android.material.R.attr.colorSurface)));
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(10));
         progressParams.bottomMargin = dp(10);
@@ -590,7 +590,7 @@ public final class MainActivity extends FragmentActivity {
         metric.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant), dp(20)));
         metric.addView(text(label, 12, false));
         TextView value = text(amount, 17, true);
-        value.setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary));
+        value.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
         value.setPadding(0, dp(5), 0, dp(3));
         metric.addView(value);
         TextView caption = text(detail, 10, false);
@@ -605,7 +605,7 @@ public final class MainActivity extends FragmentActivity {
         tile.setGravity(Gravity.CENTER);
         tile.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant), dp(20)));
         TextView icon = text(symbol, 25, true);
-        icon.setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary));
+        icon.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
         icon.setGravity(Gravity.CENTER);
         icon.setPadding(dp(10), 0, dp(10), 0);
         tile.setPadding(dp(10), dp(8), dp(10), dp(8));
