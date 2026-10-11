@@ -446,8 +446,8 @@ public final class MainActivity extends FragmentActivity {
         snapshotHeader.addView(target);
         LinearLayout snapshotTitles = new LinearLayout(this);
         snapshotTitles.setOrientation(LinearLayout.VERTICAL);
-        snapshotTitles.addView(text("Budget Snapshot", 17, true));
-        TextView cutoffCaption = text("Expense limit for this cutoff", 11, false);
+        snapshotTitles.addView(text("Budget Snapshot", 18, true));
+        TextView cutoffCaption = text("Your budget at a glance", 12, false);
         cutoffCaption.setTextColor(resolveColor(android.R.attr.textColorSecondary));
         snapshotTitles.addView(cutoffCaption);
         snapshotHeader.addView(snapshotTitles, new LinearLayout.LayoutParams(0, -2, 1f));
@@ -459,20 +459,22 @@ public final class MainActivity extends FragmentActivity {
         } catch (NumberFormatException ignored) {
             limit = BigDecimal.ZERO;
         }
-        TextView limitText = text("Spending limit: " + (limit.signum() > 0 ? money(limit) : "Not set"), 13, true);
-        limitText.setPadding(0, dp(14), 0, dp(6));
+        TextView limitText = text("Spending limit  ·  " + (limit.signum() > 0 ? money(limit) : "Not set in Settings"), 15, true);
+        limitText.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
+        limitText.setPadding(0, dp(16), 0, dp(8));
         snapshot.addView(limitText);
 
         budgetProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         budgetProgressBar.setMax(100);
         budgetProgressBar.setProgressTintList(ColorStateList.valueOf(resolveColor(androidx.appcompat.R.attr.colorPrimary)));
         budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(resolveColor(com.google.android.material.R.attr.colorSurface)));
-        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(10));
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(8));
         progressParams.bottomMargin = dp(10);
         snapshot.addView(budgetProgressBar, progressParams);
 
-        budgetSummaryView = text("", 12, false);
-        budgetSummaryView.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        budgetSummaryView = text("", 13, false);
+        budgetSummaryView.setTextColor(resolveColor(android.R.attr.textColorPrimary));
+        budgetSummaryView.setLineSpacing(dp(3), 1.0f);
         snapshot.addView(budgetSummaryView);
         page.addView(snapshot);
         refreshBudget();
@@ -491,16 +493,13 @@ public final class MainActivity extends FragmentActivity {
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER_VERTICAL);
         actions.addView(actionTile("＋", "Add Income", 0xFFE1F5EE, 0xFF16866E,
-                () -> showWorkDialog(null)), new LinearLayout.LayoutParams(0, dp(88), 1f));
-        actions.addView(space(dp(6)), new LinearLayout.LayoutParams(dp(6), 1));
+                () -> showWorkDialog(null)), new LinearLayout.LayoutParams(0, dp(76), 1f));
         actions.addView(actionTile("−", "Add Expense", 0xFFFFE9EC, 0xFFE05D72,
-                () -> showExpenseDialog(null)), new LinearLayout.LayoutParams(0, dp(88), 1f));
-        actions.addView(space(dp(6)), new LinearLayout.LayoutParams(dp(6), 1));
+                () -> showExpenseDialog(null)), new LinearLayout.LayoutParams(0, dp(76), 1f));
         actions.addView(actionTile("▦", "View Calendar", 0xFFEDE7FF, 0xFF7B61C9,
-                () -> buildCalendarScreen()), new LinearLayout.LayoutParams(0, dp(88), 1f));
-        actions.addView(space(dp(6)), new LinearLayout.LayoutParams(dp(6), 1));
+                () -> buildCalendarScreen()), new LinearLayout.LayoutParams(0, dp(76), 1f));
         actions.addView(actionTile("▥", "View Reports", 0xFFE5EFFD, 0xFF3975BD,
-                () -> showTab(1)), new LinearLayout.LayoutParams(0, dp(88), 1f));
+                () -> showTab(1)), new LinearLayout.LayoutParams(0, dp(76), 1f));
         page.addView(actions);
 
         section("Recent Activity");
@@ -600,21 +599,14 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout tile = new LinearLayout(this);
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER);
-        tile.setBackground(roundedBackground(
-                resolveColor(com.google.android.material.R.attr.colorSurfaceVariant), dp(18)));
-        tile.setPadding(dp(3), dp(6), dp(3), dp(5));
+        tile.setPadding(dp(2), dp(5), dp(2), dp(5));
 
-        FrameLayout iconHolder = new FrameLayout(this);
-        iconHolder.setBackground(roundedBackground(
-                resolveColor(com.google.android.material.R.attr.colorSurface), dp(12)));
         View icon = actionIcon(symbol, accent);
-        iconHolder.addView(icon, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
-        LinearLayout.LayoutParams iconParams =
-                new LinearLayout.LayoutParams(dp(32), dp(32));
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(27), dp(27));
         iconParams.bottomMargin = dp(5);
-        tile.addView(iconHolder, iconParams);
+        tile.addView(icon, iconParams);
 
-        TextView title = text(label, 9, true);
+        TextView title = text(label, 10, true);
         title.setGravity(Gravity.CENTER);
         title.setTextColor(resolveColor(android.R.attr.textColorPrimary));
         title.setMaxLines(2);
@@ -650,30 +642,25 @@ public final class MainActivity extends FragmentActivity {
                 paint.setStrokeJoin(android.graphics.Paint.Join.ROUND);
 
                 if ("＋".equals(symbol)) {
-                    // Wallet outline with a plus mark.
-                    path.reset();
-                    path.moveTo(4, 8); path.lineTo(4, 6.5f);
-                    path.quadTo(4, 5, 6, 5); path.lineTo(18, 5);
-                    path.quadTo(20, 5, 20, 7); path.lineTo(20, 18);
-                    path.quadTo(20, 20, 18, 20); path.lineTo(5, 20);
-                    path.quadTo(3, 20, 3, 18); path.lineTo(3, 9);
-                    path.quadTo(3, 8, 4, 8);
-                    canvas.drawPath(path, paint);
-                    canvas.drawRoundRect(14, 10, 22, 16, 2, 2, paint);
-                    canvas.drawLine(18, 11.8f, 18, 14.2f, paint);
-                    canvas.drawLine(16.8f, 13, 19.2f, 13, paint);
+                    // Work briefcase with an upward income arrow.
+                    canvas.drawRoundRect(3, 8, 21, 20, 2, 2, paint);
+                    canvas.drawRoundRect(8, 4, 16, 9, 1.5f, 1.5f, paint);
+                    canvas.drawLine(3, 12, 21, 12, paint);
+                    canvas.drawLine(12, 10, 12, 14, paint);
+                    canvas.drawLine(9.5f, 12, 12, 9.5f, paint);
+                    canvas.drawLine(14.5f, 12, 12, 9.5f, paint);
                 } else if ("−".equals(symbol)) {
-                    // Wallet outline with a minus mark.
+                    // Receipt with a downward expense arrow, distinct from income.
                     path.reset();
-                    path.moveTo(4, 8); path.lineTo(4, 6.5f);
-                    path.quadTo(4, 5, 6, 5); path.lineTo(18, 5);
-                    path.quadTo(20, 5, 20, 7); path.lineTo(20, 18);
-                    path.quadTo(20, 20, 18, 20); path.lineTo(5, 20);
-                    path.quadTo(3, 20, 3, 18); path.lineTo(3, 9);
-                    path.quadTo(3, 8, 4, 8);
+                    path.moveTo(6, 3); path.lineTo(18, 3); path.lineTo(18, 21);
+                    path.lineTo(15, 19); path.lineTo(12, 21); path.lineTo(9, 19);
+                    path.lineTo(6, 21); path.close();
                     canvas.drawPath(path, paint);
-                    canvas.drawRoundRect(14, 10, 22, 16, 2, 2, paint);
-                    canvas.drawLine(16.8f, 13, 19.2f, 13, paint);
+                    canvas.drawLine(9, 7, 15, 7, paint);
+                    canvas.drawLine(9, 10, 13, 10, paint);
+                    canvas.drawLine(12, 12, 12, 17, paint);
+                    canvas.drawLine(9.5f, 14.5f, 12, 17, paint);
+                    canvas.drawLine(14.5f, 14.5f, 12, 17, paint);
                 } else if ("▦".equals(symbol)) {
                     // Calendar with binding rings and date cells.
                     canvas.drawRoundRect(3, 5, 21, 21, 2, 2, paint);
@@ -1591,7 +1578,7 @@ public final class MainActivity extends FragmentActivity {
 
         budgetBase = BudgetInsights.resolveBudgetBase(cycleBudget, spendingLimit);
         StringBuilder summary = new StringBuilder();
-        summary.append("Budget cycle: ").append(cycleStart)
+        summary.append("Cycle started: ").append(cycleStart.format(DateTimeFormatter.ofPattern("MMM d, yyyy")))
                 .append("\nPayday in ").append(daysUntilPayday)
                 .append(daysUntilPayday == 1 ? " day" : " days")
                 .append("\nAvailable to spend: ").append(money(remaining))
@@ -1626,9 +1613,10 @@ public final class MainActivity extends FragmentActivity {
             BigDecimal budgetRemaining = budgetBase.subtract(spent);
             BigDecimal actualPercent = spent.multiply(BigDecimal.valueOf(100))
                     .divide(budgetBase, 1, java.math.RoundingMode.HALF_UP);
-            summary.append("\n").append(money(spent)).append(" spent of ").append(money(budgetBase))
-                    .append(" · ").append(actualPercent.toPlainString()).append("% used")
-                    .append("\n").append(money(budgetRemaining.max(BigDecimal.ZERO))).append(" budget remaining");
+            summary.append("\nSpent this cycle: ").append(money(spent))
+                    .append(" of ").append(money(budgetBase))
+                    .append(" (").append(actualPercent.toPlainString()).append("% used)")
+                    .append("\nBudget left: ").append(money(budgetRemaining.max(BigDecimal.ZERO)));
 
             BudgetInsights.Status status = BudgetInsights.classify(spent, budgetBase);
             if (status == BudgetInsights.Status.OVER_BUDGET) {
