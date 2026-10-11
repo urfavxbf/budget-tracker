@@ -59,6 +59,24 @@ public class BudgetInsightsTest {
     }
 
     @Test
+    public void drawsOnlyTheAmountBeyondAvailableCash() {
+        assertEquals(new BigDecimal("130.00"), BudgetInsights.savingsDrawForExpense(
+                new BigDecimal("70.00"), new BigDecimal("500.00"), new BigDecimal("200.00")));
+    }
+
+    @Test
+    public void capsSavingsDrawAtRemainingSavings() {
+        assertEquals(new BigDecimal("40.00"), BudgetInsights.savingsDrawForExpense(
+                new BigDecimal("50.00"), new BigDecimal("40.00"), new BigDecimal("200.00")));
+    }
+
+    @Test
+    public void doesNotDrawSavingsWhenExpenseFitsAvailableCash() {
+        assertEquals(new BigDecimal("0.00"), BudgetInsights.savingsDrawForExpense(
+                new BigDecimal("200.00"), new BigDecimal("500.00"), new BigDecimal("120.00")));
+    }
+
+    @Test
     public void fallsBackToAvailableCashWhenNoBudgetIsConfigured() {
         assertEquals(new BigDecimal("140.00"),
                 BudgetInsights.dailySpendingGuide(BigDecimal.ZERO, new BigDecimal("50.00"),
