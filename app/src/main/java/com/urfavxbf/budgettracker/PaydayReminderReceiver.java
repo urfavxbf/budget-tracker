@@ -11,13 +11,12 @@ import android.os.Build;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
-import java.time.LocalDate;
-
 public final class PaydayReminderReceiver extends BroadcastReceiver {
     private static final String CHANNEL_ID = "payday_reminders";
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (intent == null) return;
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())
                 || Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())) {
             PaydayReminderScheduler.schedule(context);
@@ -32,6 +31,8 @@ public final class PaydayReminderReceiver extends BroadcastReceiver {
             return;
         }
 
+        // Mark this cutoff as handled before rescheduling, preventing a repeated 5-second alarm loop.
+        PaydayReminderScheduler.markDelivered(context, start, end, payday);
         WorkDatabase database = new WorkDatabase(context);
         try {
             if (database.getPaydayPayment(start, end) == null) {

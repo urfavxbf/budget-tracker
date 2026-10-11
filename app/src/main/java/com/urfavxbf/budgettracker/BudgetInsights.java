@@ -45,7 +45,9 @@ public final class BudgetInsights {
         BigDecimal totalSpent = normalize(spent);
         BigDecimal available = normalize(availableCash);
         if (base.signum() > 0) {
-            return base.subtract(totalSpent).max(BigDecimal.ZERO)
+            BigDecimal remainingBudget = base.subtract(totalSpent).max(BigDecimal.ZERO);
+            BigDecimal spendable = available.max(BigDecimal.ZERO);
+            return remainingBudget.min(spendable)
                     .divide(BigDecimal.valueOf(daysUntilPayday), 2, RoundingMode.DOWN);
         }
         if (available.signum() > 0) {

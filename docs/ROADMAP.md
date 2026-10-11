@@ -4,8 +4,8 @@
 - Java 17 native Android project, min SDK 26, target SDK 35.
 - Adaptive system light/dark theme resources.
 - Daily time-in/time-out entry; an earlier time-out is interpreted as an overnight shift and identical times are rejected.
-- Add/remove multiple break periods.
-- Break validation: every interval must fit entirely inside the shift; overlapping breaks are rejected.
+- Add/remove multiple break-duration entries; the UI sums their durations before salary calculation.
+- The calculator has a separate interval-based validation API, but the current UI does not collect break start/end times, so it cannot validate whether individual breaks fit inside the shift or overlap.
 - Configurable hourly rate, regular hours, ordinary OT multiplier, daily allowance, and daily deduction.
 - Currency calculations use `BigDecimal` with two-decimal rounding.
 - Local SQLite storage for work entries, salary snapshots, and expenses.
@@ -24,7 +24,8 @@
 6. Firebase Authentication and Firestore sync with account-scoped security rules, once Firebase configuration is supplied.
 7. Offline sync status, conflict strategy, export/restore, notifications, and accessibility.
 8. Holiday, rest-day, and night-differential payroll rules.
-9. More unit tests for invalid durations, edge cases, deductions, cutoff boundaries, and budget calculations.
+9. Replace break-duration-only inputs with start/end times for each break, wire the interval-based calculator into the UI, and test overnight-shift breaks and overlapping/out-of-shift intervals.
+10. Add more unit tests for invalid durations, edge cases, deductions, cutoff boundaries, and budget calculations.
 
 ## Payroll correctness notes
 - Current calculator is an ordinary-day estimate, not a statutory payroll engine.
