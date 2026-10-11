@@ -21,6 +21,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.widget.FrameLayout;
 import android.widget.Button;
+import android.widget.CalendarView;
 import android.widget.CheckBox;
 import com.google.android.material.textfield.MaterialAutoCompleteTextView;
 import android.widget.ArrayAdapter;
@@ -400,7 +401,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout brand = new LinearLayout(this);
         brand.setOrientation(LinearLayout.VERTICAL);
         TextView appTitle = text("◈  Budget Tracker", 25, true);
-        appTitle.setTextColor(android.graphics.Color.rgb(25, 75, 69));
+        appTitle.setTextColor(resolveColor(android.R.attr.textColorPrimary));
         brand.addView(appTitle);
         TextView subtitle = text("Track your earnings. Manage your expenses.", 13, false);
         subtitle.setTextColor(resolveColor(android.R.attr.textColorSecondary));
@@ -409,8 +410,8 @@ public final class MainActivity extends FragmentActivity {
         TextView cutoffBadge = text("PAYDAY\n" + payday.format(DateTimeFormatter.ofPattern("MMM d")), 12, true);
         cutoffBadge.setGravity(Gravity.CENTER);
         cutoffBadge.setPadding(dp(10), dp(8), dp(10), dp(8));
-        cutoffBadge.setTextColor(android.graphics.Color.rgb(25, 117, 103));
-        cutoffBadge.setBackground(roundedBackground(android.graphics.Color.rgb(222, 246, 240), dp(16)));
+        cutoffBadge.setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary));
+        cutoffBadge.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSecondaryContainer), dp(16)));
         top.addView(cutoffBadge);
         page.addView(top);
 
@@ -435,19 +436,19 @@ public final class MainActivity extends FragmentActivity {
 
         LinearLayout snapshot = cardContainer();
         snapshot.setPadding(dp(18), dp(18), dp(18), dp(18));
-        snapshot.setBackground(roundedBackground(0xFFF0FAF7, dp(24)));
+        snapshot.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant), dp(24)));
         LinearLayout snapshotHeader = new LinearLayout(this);
         snapshotHeader.setGravity(Gravity.CENTER_VERTICAL);
         snapshotHeader.setOrientation(LinearLayout.HORIZONTAL);
         TextView target = text("◎", 27, true);
-        target.setTextColor(0xFF16866E);
+        target.setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary));
         target.setPadding(0, 0, dp(10), 0);
         snapshotHeader.addView(target);
         LinearLayout snapshotTitles = new LinearLayout(this);
         snapshotTitles.setOrientation(LinearLayout.VERTICAL);
         snapshotTitles.addView(text("Budget Snapshot", 19, true));
         TextView cutoffCaption = text("Expense limit for this cutoff", 12, false);
-        cutoffCaption.setTextColor(0xFF63817A);
+        cutoffCaption.setTextColor(resolveColor(android.R.attr.textColorSecondary));
         snapshotTitles.addView(cutoffCaption);
         snapshotHeader.addView(snapshotTitles, new LinearLayout.LayoutParams(0, -2, 1f));
         snapshot.addView(snapshotHeader);
@@ -464,14 +465,14 @@ public final class MainActivity extends FragmentActivity {
 
         budgetProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         budgetProgressBar.setMax(100);
-        budgetProgressBar.setProgressTintList(ColorStateList.valueOf(0xFF2DAE96));
-        budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(0xFFDCECE7));
+        budgetProgressBar.setProgressTintList(ColorStateList.valueOf(resolveColor(com.google.android.material.R.attr.colorPrimary)));
+        budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(resolveColor(com.google.android.material.R.attr.colorSurface)));
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(10));
         progressParams.bottomMargin = dp(10);
         snapshot.addView(budgetProgressBar, progressParams);
 
         budgetSummaryView = text("", 13, false);
-        budgetSummaryView.setTextColor(0xFF356B60);
+        budgetSummaryView.setTextColor(resolveColor(android.R.attr.textColorSecondary));
         snapshot.addView(budgetSummaryView);
         page.addView(snapshot);
         refreshBudget();
@@ -499,7 +500,7 @@ public final class MainActivity extends FragmentActivity {
         actions2.setOrientation(LinearLayout.HORIZONTAL);
         actions2.setGravity(Gravity.CENTER_VERTICAL);
         actions2.addView(actionTile("▦", "View Calendar", 0xFFEDE7FF, 0xFF7B61C9,
-                () -> showTab(1)), new LinearLayout.LayoutParams(0, dp(94), 1f));
+                () -> buildCalendarScreen()), new LinearLayout.LayoutParams(0, dp(94), 1f));
         actions2.addView(space(dp(10)), new LinearLayout.LayoutParams(dp(10), 1));
         actions2.addView(actionTile("▥", "View Reports", 0xFFE5EFFD, 0xFF3975BD,
                 () -> showTab(1)), new LinearLayout.LayoutParams(0, dp(94), 1f));
@@ -521,6 +522,52 @@ public final class MainActivity extends FragmentActivity {
         page.addView(disclaimer);
     }
 
+    private void buildCalendarScreen() {
+        header("Calendar", "Browse your work shifts and expenses by date.");
+        CalendarView calendar = new CalendarView(this);
+        calendar.setFirstDayOfWeek(java.util.Calendar.MONDAY);
+        LinearLayout calendarCard = cardContainer();
+        calendarCard.addView(calendar, new LinearLayout.LayoutParams(-1, -2));
+        page.addView(calendarCard);
+
+        TextView selectedDateTitle = text("", 18, true);
+        selectedDateTitle.setPadding(0, dp(12), 0, dp(8));
+        page.addView(selectedDateTitle);
+        LinearLayout selectedDateEntries = new LinearLayout(this);
+        selectedDateEntries.setOrientation(LinearLayout.VERTICAL);
+        page.addView(selectedDateEntries);
+
+        Runnable[] refreshSelectedDate = new Runnable[1];
+        refreshSelectedDate[0] = () -> {
+            LocalDate selected = java.time.Instant.ofEpochMilli(calendar.getDate())
+                    .atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+            String date = selected.toString();
+            selectedDateTitle.setText(selected.format(DateTimeFormatter.ofPattern("EEEE, MMM d, yyyy")));
+            selectedDateEntries.removeAllViews();
+            boolean found = false;
+            for (WorkDatabase.WorkEntry entry : database.getRecentWorkEntries(1000)) {
+                if (!date.equals(entry.date)) continue;
+                found = true;
+                BigDecimal pay;
+                try { pay = new BigDecimal(entry.netPay); } catch (NumberFormatException ex) { pay = BigDecimal.ZERO; }
+                selectedDateEntries.addView(emptyState("Work shift · " + entry.timeIn + "–" + entry.timeOut,
+                        "Estimated net pay: " + money(pay) + "  •  " + duration(entry.netMinutes)));
+            }
+            for (WorkDatabase.ExpenseEntry entry : database.getRecentExpenseEntries(1000)) {
+                if (!date.equals(entry.date)) continue;
+                found = true;
+                BigDecimal amount;
+                try { amount = new BigDecimal(entry.amount); } catch (NumberFormatException ex) { amount = BigDecimal.ZERO; }
+                selectedDateEntries.addView(emptyState("Expense · " + entry.category,
+                        (entry.note == null || entry.note.trim().isEmpty() ? "Recorded expense" : entry.note)
+                                + "  •  " + money(amount)));
+            }
+            if (!found) selectedDateEntries.addView(emptyState("Nothing recorded", "No work shifts or expenses on this date."));
+        };
+        calendar.setOnDateChangeListener((view, year, month, dayOfMonth) -> refreshSelectedDate[0].run());
+        refreshSelectedDate[0].run();
+    }
+
     private LinearLayout metricRow() {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
@@ -535,15 +582,15 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout metric = new LinearLayout(this);
         metric.setOrientation(LinearLayout.VERTICAL);
         metric.setGravity(Gravity.CENTER_VERTICAL);
-        metric.setPadding(dp(13), dp(12), dp(8), dp(12));
-        metric.setBackground(roundedBackground(background, dp(20)));
+        metric.setPadding(dp(14), dp(12), dp(14), dp(12));
+        metric.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant), dp(20)));
         metric.addView(text(label, 12, false));
         TextView value = text(amount, 17, true);
-        value.setTextColor(accent);
+        value.setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary));
         value.setPadding(0, dp(5), 0, dp(3));
         metric.addView(value);
         TextView caption = text(detail, 10, false);
-        caption.setTextColor(0xFF687D80);
+        caption.setTextColor(resolveColor(android.R.attr.textColorSecondary));
         metric.addView(caption);
         return metric;
     }
@@ -552,9 +599,12 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout tile = new LinearLayout(this);
         tile.setOrientation(LinearLayout.VERTICAL);
         tile.setGravity(Gravity.CENTER);
-        tile.setBackground(roundedBackground(background, dp(20)));
+        tile.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant), dp(20)));
         TextView icon = text(symbol, 25, true);
-        icon.setTextColor(accent);
+        icon.setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary));
+        icon.setGravity(Gravity.CENTER);
+        icon.setPadding(dp(10), 0, dp(10), 0);
+        tile.setPadding(dp(10), dp(8), dp(10), dp(8));
         tile.addView(icon);
         TextView title = text(label, 12, true);
         title.setGravity(Gravity.CENTER);
