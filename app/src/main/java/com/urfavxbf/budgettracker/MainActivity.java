@@ -377,108 +377,193 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void buildDashboard() {
-        header("Good day 👋", "Your money, at a glance.");
         LocalDate today = LocalDate.now();
-        LocalDate start = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
-        LocalDate end = today.getDayOfMonth() <= 15 ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
+        LocalDate cutoffStart = today.getDayOfMonth() <= 15
+                ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
+        LocalDate cutoffEnd = today.getDayOfMonth() <= 15
+                ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
         LocalDate payday = getPaydayForCurrentCutoff(today);
         WorkDatabase.PaydayPayment activePayment = database.getLatestPaydayPaymentOnOrBefore(today.toString());
         BigDecimal earned = activePayment == null
-                ? database.getRecordedNetPayTotal(start.toString(), end.toString())
+                ? database.getRecordedNetPayTotal(cutoffStart.toString(), cutoffEnd.toString())
                 : new BigDecimal(activePayment.receivedAmount);
         BigDecimal spent = activePayment == null
-                ? database.getExpenseTotal(start.toString(), end.toString())
+                ? database.getExpenseTotal(cutoffStart.toString(), cutoffEnd.toString())
                 : database.getExpenseTotal(activePayment.paydayDate, today.toString());
-        String payMetricLabel = activePayment == null ? "EXPECTED PAY" : "CYCLE SALARY";
-        String expenseMetricLabel = activePayment == null ? "CUTOFF EXPENSES" : "CYCLE EXPENSES";
-        BigDecimal totalCash = getTotalCashBalance();
-        BigDecimal savings = database.getTotalSavingsBalance();
-        BigDecimal remaining = totalCash.subtract(savings).setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal net = earned.subtract(spent).setScale(2, java.math.RoundingMode.HALF_UP);
+        long daysLeft = Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(today, payday));
 
-        LinearLayout totals = new LinearLayout(this);
-        totals.setOrientation(LinearLayout.HORIZONTAL);
-        totals.setGravity(Gravity.CENTER_VERTICAL);
-        totals.setPadding(0, dp(4), 0, dp(12));
-        totals.addView(metricCard(payMetricLabel, money(earned), resolveColor(androidx.appcompat.R.attr.colorPrimary)), new LinearLayout.LayoutParams(0, dp(84), 1f));
-        View gap = new View(this);
-        totals.addView(gap, new LinearLayout.LayoutParams(dp(10), 1));
-        totals.addView(metricCard(expenseMetricLabel, money(spent), resolveColor(androidx.appcompat.R.attr.colorError)), new LinearLayout.LayoutParams(0, dp(84), 1f));
-        LinearLayout.LayoutParams totalsParams = new LinearLayout.LayoutParams(-1, -2);
-        totalsParams.bottomMargin = dp(2);
-        page.addView(totals, totalsParams);
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.setPadding(0, 0, 0, dp(18));
+        LinearLayout brand = new LinearLayout(this);
+        brand.setOrientation(LinearLayout.VERTICAL);
+        TextView appTitle = text("◈  Budget Tracker", 25, true);
+        appTitle.setTextColor(android.graphics.Color.rgb(25, 75, 69));
+        brand.addView(appTitle);
+        TextView subtitle = text("Track your earnings. Manage your expenses.", 13, false);
+        subtitle.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        brand.addView(subtitle);
+        top.addView(brand, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView cutoffBadge = text("PAYDAY\n" + payday.format(DateTimeFormatter.ofPattern("MMM d")), 12, true);
+        cutoffBadge.setGravity(Gravity.CENTER);
+        cutoffBadge.setPadding(dp(10), dp(8), dp(10), dp(8));
+        cutoffBadge.setTextColor(android.graphics.Color.rgb(25, 117, 103));
+        cutoffBadge.setBackground(roundedBackground(android.graphics.Color.rgb(222, 246, 240), dp(16)));
+        top.addView(cutoffBadge);
+        page.addView(top);
+
+        LinearLayout firstRow = metricRow();
+        firstRow.addView(colorMetric("Total Earnings", money(earned), "↗  This cutoff", 0xFFE1F5EE, 0xFF16866E),
+                new LinearLayout.LayoutParams(0, -1, 1f));
+        View rowGap1 = space(dp(10));
+        firstRow.addView(rowGap1, new LinearLayout.LayoutParams(dp(10), 1));
+        firstRow.addView(colorMetric("Total Expenses", money(spent), "↘  Recorded spending", 0xFFFFE9EC, 0xFFE05D72),
+                new LinearLayout.LayoutParams(0, -1, 1f));
+        page.addView(firstRow);
+
+        LinearLayout secondRow = metricRow();
+        secondRow.addView(colorMetric("Net Income", money(net), "Earnings less expenses", 0xFFEDE7FF, 0xFF7B61C9),
+                new LinearLayout.LayoutParams(0, -1, 1f));
+        secondRow.addView(space(dp(10)), new LinearLayout.LayoutParams(dp(10), 1));
+        secondRow.addView(colorMetric("This Cutoff", cutoffStart.format(DateTimeFormatter.ofPattern("MMM d"))
+                + " – " + cutoffEnd.format(DateTimeFormatter.ofPattern("MMM d")),
+                daysLeft + (daysLeft == 1 ? " day until payday" : " days until payday"),
+                0xFFE5EFFD, 0xFF3975BD), new LinearLayout.LayoutParams(0, -1, 1f));
+        page.addView(secondRow);
 
         LinearLayout snapshot = cardContainer();
         snapshot.setPadding(dp(18), dp(18), dp(18), dp(18));
-        snapshot.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSecondaryContainer), dp(22)));
-        TextView snapshotTitle = text("Budget snapshot", 18, true);
-        snapshot.addView(snapshotTitle);
-        TextView cutoffLabel = text(activePayment == null
-                ? (today.getDayOfMonth() <= 15 ? "1st–15th cutoff" : "16th–month-end cutoff")
-                        + "  ·  Scheduled payday " + payday.format(DateTimeFormatter.ofPattern("MMM d"))
-                : "Salary cycle started " + activePayment.paydayDate
-                        + "  ·  Next scheduled payday " + payday.format(DateTimeFormatter.ofPattern("MMM d")), 12, false);
-        cutoffLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
-        cutoffLabel.setPadding(0, dp(4), 0, dp(14));
-        snapshot.addView(cutoffLabel);
-        TextView remainingLabel = text("TOTAL CASH BALANCE", 11, true);
-        remainingLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
-        snapshot.addView(remainingLabel);
-        TextView amount = text(money(totalCash), 30, true);
-        amount.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
-        amount.setPadding(0, dp(3), 0, dp(4));
-        snapshot.addView(amount);
-        TextView savingsLabel = text("Savings: " + money(savings) + "   ·   Available to spend: " + money(remaining), 12, true);
-        savingsLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
-        savingsLabel.setPadding(0, 0, 0, dp(12));
-        snapshot.addView(savingsLabel);
+        snapshot.setBackground(roundedBackground(0xFFF0FAF7, dp(24)));
+        LinearLayout snapshotHeader = new LinearLayout(this);
+        snapshotHeader.setGravity(Gravity.CENTER_VERTICAL);
+        snapshotHeader.setOrientation(LinearLayout.HORIZONTAL);
+        TextView target = text("◎", 27, true);
+        target.setTextColor(0xFF16866E);
+        target.setPadding(0, 0, dp(10), 0);
+        snapshotHeader.addView(target);
+        LinearLayout snapshotTitles = new LinearLayout(this);
+        snapshotTitles.setOrientation(LinearLayout.VERTICAL);
+        snapshotTitles.addView(text("Budget Snapshot", 19, true));
+        TextView cutoffCaption = text("Expense limit for this cutoff", 12, false);
+        cutoffCaption.setTextColor(0xFF63817A);
+        snapshotTitles.addView(cutoffCaption);
+        snapshotHeader.addView(snapshotTitles, new LinearLayout.LayoutParams(0, -2, 1f));
+        snapshot.addView(snapshotHeader);
+
+        BigDecimal limit;
+        try {
+            limit = new BigDecimal(pref("spending_budget", "0.00"));
+        } catch (NumberFormatException ignored) {
+            limit = BigDecimal.ZERO;
+        }
+        TextView limitText = text("Spending limit: " + (limit.signum() > 0 ? money(limit) : "Not set"), 14, true);
+        limitText.setPadding(0, dp(14), 0, dp(6));
+        snapshot.addView(limitText);
+
         budgetProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         budgetProgressBar.setMax(100);
-        budgetProgressBar.setProgressTintList(ColorStateList.valueOf(resolveColor(androidx.appcompat.R.attr.colorPrimary)));
-        budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(withAlpha(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer), 0x30)));
-        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(7));
+        budgetProgressBar.setProgressTintList(ColorStateList.valueOf(0xFF2DAE96));
+        budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(0xFFDCECE7));
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(10));
         progressParams.bottomMargin = dp(10);
         snapshot.addView(budgetProgressBar, progressParams);
+
         budgetSummaryView = text("", 13, false);
-        budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
+        budgetSummaryView.setTextColor(0xFF356B60);
         snapshot.addView(budgetSummaryView);
         page.addView(snapshot);
+        refreshBudget();
+
         CutoffPeriod paymentCutoff = getCutoffAwaitingPayment(today);
         boolean paymentAlreadyRecorded = database.getPaydayPayment(paymentCutoff.startDate.toString(),
                 paymentCutoff.endDate.toString()) != null;
-        MaterialButton recordPayday = button("＋ Record payday salary", true);
+        MaterialButton recordPayday = button("＋  Record payday salary", true);
         recordPayday.setOnClickListener(v -> showPaydayPaymentDialog());
         boolean paydayArrived = !getScheduledPayday(paymentCutoff).isAfter(today);
         recordPayday.setVisibility(paymentAlreadyRecorded || !paydayArrived ? View.GONE : View.VISIBLE);
         page.addView(recordPayday);
-        refreshBudget();
 
-        TextView disclaimer = text("Total cash is opening balance plus confirmed salary payments minus recorded expenses. Savings are reserved separately and excluded from available-to-spend cash.", 11, false);
-        disclaimer.setAlpha(0.75f);
-        disclaimer.setPadding(dp(2), dp(8), dp(2), dp(12));
-        page.addView(disclaimer);
+        section("Quick Actions");
+        LinearLayout actions1 = new LinearLayout(this);
+        actions1.setOrientation(LinearLayout.HORIZONTAL);
+        actions1.setGravity(Gravity.CENTER_VERTICAL);
+        actions1.addView(actionTile("＋", "Add Income", 0xFFE1F5EE, 0xFF16866E,
+                () -> showWorkDialog(null)), new LinearLayout.LayoutParams(0, dp(94), 1f));
+        actions1.addView(space(dp(10)), new LinearLayout.LayoutParams(dp(10), 1));
+        actions1.addView(actionTile("−", "Add Expense", 0xFFFFE9EC, 0xFFE05D72,
+                () -> showExpenseDialog(null)), new LinearLayout.LayoutParams(0, dp(94), 1f));
+        page.addView(actions1);
+        LinearLayout actions2 = new LinearLayout(this);
+        actions2.setOrientation(LinearLayout.HORIZONTAL);
+        actions2.setGravity(Gravity.CENTER_VERTICAL);
+        actions2.addView(actionTile("▦", "View Calendar", 0xFFEDE7FF, 0xFF7B61C9,
+                () -> showTab(1)), new LinearLayout.LayoutParams(0, dp(94), 1f));
+        actions2.addView(space(dp(10)), new LinearLayout.LayoutParams(dp(10), 1));
+        actions2.addView(actionTile("▥", "View Reports", 0xFFE5EFFD, 0xFF3975BD,
+                () -> showTab(1)), new LinearLayout.LayoutParams(0, dp(94), 1f));
+        page.addView(actions2);
 
-        section("Recent activity");
+        section("Recent Activity");
+        TextView recentFilter = text("This cutoff  ⌄", 12, false);
+        recentFilter.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        page.addView(recentFilter);
         historyContainer = new LinearLayout(this);
         historyContainer.setOrientation(LinearLayout.VERTICAL);
         page.addView(historyContainer);
         refreshDashboardActivity();
         maybePromptForSavingsAllocation();
 
-        section("Quick actions");
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.CENTER_VERTICAL);
-        MaterialButton addShift = button("＋ Work shift", false);
-        addShift.setOnClickListener(v -> showWorkDialog(null));
-        MaterialButton addExpense = button("＋ Expense", false);
-        addExpense.setOnClickListener(v -> showExpenseDialog(null));
-        LinearLayout.LayoutParams actionLp = new LinearLayout.LayoutParams(0, dp(50), 1f);
-        actionLp.setMargins(0, 0, dp(6), 0);
-        actions.addView(addShift, actionLp);
-        LinearLayout.LayoutParams expenseLp = new LinearLayout.LayoutParams(0, dp(50), 1f);
-        expenseLp.setMargins(dp(6), 0, 0, 0);
-        actions.addView(addExpense, expenseLp);
-        page.addView(actions);
+        TextView disclaimer = text("Salary amounts are estimates until you record a confirmed payday payment. Available-to-spend cash excludes reserved savings.", 11, false);
+        disclaimer.setAlpha(0.75f);
+        disclaimer.setPadding(dp(2), dp(8), dp(2), dp(12));
+        page.addView(disclaimer);
+    }
+
+    private LinearLayout metricRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(100));
+        params.bottomMargin = dp(10);
+        row.setLayoutParams(params);
+        return row;
+    }
+
+    private View colorMetric(String label, String amount, String detail, int background, int accent) {
+        LinearLayout metric = new LinearLayout(this);
+        metric.setOrientation(LinearLayout.VERTICAL);
+        metric.setGravity(Gravity.CENTER_VERTICAL);
+        metric.setPadding(dp(13), dp(12), dp(8), dp(12));
+        metric.setBackground(roundedBackground(background, dp(20)));
+        metric.addView(text(label, 12, false));
+        TextView value = text(amount, 17, true);
+        value.setTextColor(accent);
+        value.setPadding(0, dp(5), 0, dp(3));
+        metric.addView(value);
+        TextView caption = text(detail, 10, false);
+        caption.setTextColor(0xFF687D80);
+        metric.addView(caption);
+        return metric;
+    }
+
+    private View actionTile(String symbol, String label, int background, int accent, Runnable action) {
+        LinearLayout tile = new LinearLayout(this);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setGravity(Gravity.CENTER);
+        tile.setBackground(roundedBackground(background, dp(20)));
+        TextView icon = text(symbol, 25, true);
+        icon.setTextColor(accent);
+        tile.addView(icon);
+        TextView title = text(label, 12, true);
+        title.setGravity(Gravity.CENTER);
+        title.setTextColor(0xFF294653);
+        tile.addView(title);
+        tile.setClickable(true);
+        tile.setFocusable(true);
+        tile.setOnClickListener(v -> action.run());
+        return tile;
     }
 
     private View metricCard(String label, String amount, int accent) {
