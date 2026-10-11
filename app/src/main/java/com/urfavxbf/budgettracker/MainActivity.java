@@ -807,14 +807,23 @@ public final class MainActivity extends FragmentActivity {
             BigDecimal amount = decimal(expenseAmountInput, "Expense amount");
             if (amount.signum() <= 0) throw new IllegalArgumentException("Amount must be greater than zero.");
             boolean updatingExpense = editingExpenseId >= 0;
+            BigDecimal availableBefore = getAvailableCashBalance();
+            BigDecimal savingsBefore = database.getTotalSavingsBalance();
             if (updatingExpense) {
-                if (!database.updateExpense(editingExpenseId, date.toString(), category, value(expenseNoteInput), amount)) {
+                BigDecimal oldAmount = database.getExpenseAmount(editingExpenseId);
+                BigDecimal oldDraw = database.getExpenseSavingsDraw(editingExpenseId);
+                availableBefore = availableBefore.add(oldAmount).subtract(oldDraw);
+                savingsBefore = savingsBefore.add(oldDraw);
+            }
+            BigDecimal savingsDraw = BudgetInsights.savingsDrawForExpense(availableBefore, savingsBefore, amount);
+            if (updatingExpense) {
+                if (!database.updateExpense(editingExpenseId, date.toString(), category, value(expenseNoteInput), amount, savingsDraw)) {
                     throw new IllegalArgumentException("This saved expense no longer exists.");
                 }
                 editingExpenseId = -1;
                 if (saveExpenseButton != null) saveExpenseButton.setText("Save expense");
             } else {
-                database.insertExpense(date.toString(), category, value(expenseNoteInput), amount);
+                database.insertExpense(date.toString(), category, value(expenseNoteInput), amount, savingsDraw);
             }
             if (!updatingExpense) {
                 expenseAmountInput.setText("");
@@ -822,7 +831,14 @@ public final class MainActivity extends FragmentActivity {
             }
             refreshBudget();
             refreshExpenseHistory();
-            Toast.makeText(this, updatingExpense ? "Expense updated" : "Expense saved", Toast.LENGTH_SHORT).show();
+            BigDecimal availableAfter = availableBefore.subtract(amount).add(savingsDraw);
+            String saveMessage = updatingExpense ? "Expense updated" : "Expense saved";
+            if (availableAfter.signum() <= 0) {
+                saveMessage = savingsDraw.signum() > 0
+                        ? "Warning: savings used " + money(savingsDraw) + " to cover overspending."
+                        : "Warning: available to spend is exhausted; spending exceeds available cash.";
+            }
+            Toast.makeText(this, saveMessage, Toast.LENGTH_LONG).show();
             lastSaveSucceeded = true;
         } catch (DateTimeParseException ex) {
             toast("Use YYYY-MM-DD for the expense date.");
@@ -1144,6 +1160,10 @@ public final class MainActivity extends FragmentActivity {
                 .append(daysUntilPayday == 1 ? " day" : " days")
                 .append("\nAvailable to spend: ").append(money(remaining))
                 .append("\nSavings balance: ").append(money(savings));
+        if (remaining.signum() <= 0) {
+            summary.append("\nWARNING: Available to spend is exhausted.");
+            if (savings.signum() <= 0) summary.append(" No savings remain to cover extra expenses.");
+        }
 
         BigDecimal dailyGuide = BudgetInsights.dailySpendingGuide(
                 budgetBase, spent, remaining, daysUntilPayday);

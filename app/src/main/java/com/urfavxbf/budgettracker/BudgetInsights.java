@@ -56,6 +56,14 @@ public final class BudgetInsights {
         return ZERO;
     }
 
+    /** Returns the savings needed for the portion of an expense beyond available cash. */
+    public static BigDecimal savingsDrawForExpense(BigDecimal availableCash, BigDecimal savings, BigDecimal expenseAmount) {
+        BigDecimal available = normalize(availableCash).max(BigDecimal.ZERO);
+        BigDecimal saved = normalize(savings).max(BigDecimal.ZERO);
+        BigDecimal expense = normalize(expenseAmount).max(BigDecimal.ZERO);
+        return expense.subtract(available).max(BigDecimal.ZERO).min(saved).setScale(2, RoundingMode.HALF_UP);
+    }
+
     private static BigDecimal normalize(BigDecimal value) {
         return value == null ? ZERO : value.setScale(2, RoundingMode.HALF_UP);
     }

@@ -17,7 +17,7 @@ import java.util.TreeMap;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
-    private static final int DATABASE_VERSION = 7;
+    private static final int DATABASE_VERSION = 8;
 
     public WorkDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -50,6 +50,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         createExpensesTable(db);
         createPaydayPaymentsTable(db);
         createBudgetCycleAllocationsTable(db);
+        createExpenseSavingsDrawsTable(db);
     }
 
     private static void createExpensesTable(SQLiteDatabase db) {
@@ -86,6 +87,14 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         if (oldVersion == 6) {
             db.execSQL("ALTER TABLE budget_cycle_allocations ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0");
         }
+        if (oldVersion < 8) createExpenseSavingsDrawsTable(db);
+    }
+
+    private static void createExpenseSavingsDrawsTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS expense_savings_draws (" +
+                "expense_id INTEGER PRIMARY KEY," +
+                "amount TEXT NOT NULL," +
+                "FOREIGN KEY(expense_id) REFERENCES expenses(id) ON DELETE CASCADE)");
     }
 
     private static void createPaydayPaymentsTable(SQLiteDatabase db) {
@@ -179,7 +188,10 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 "SELECT savings_amount FROM budget_cycle_allocations", null)) {
             BigDecimal total = BigDecimal.ZERO;
             while (cursor.moveToNext()) total = total.add(new BigDecimal(cursor.getString(0)));
-            return total.setScale(2, java.math.RoundingMode.HALF_UP);
+            try (Cursor draws = getReadableDatabase().rawQuery("SELECT amount FROM expense_savings_draws", null)) {
+                while (draws.moveToNext()) total = total.subtract(new BigDecimal(draws.getString(0)));
+            }
+            return total.max(BigDecimal.ZERO).setScale(2, java.math.RoundingMode.HALF_UP);
         }
     }
 
@@ -472,6 +484,10 @@ public final class WorkDatabase extends SQLiteOpenHelper {
     }
 
     public long insertExpense(String date, String category, String note, BigDecimal amount) {
+        return insertExpense(date, category, note, amount, BigDecimal.ZERO);
+    }
+
+    public long insertExpense(String date, String category, String note, BigDecimal amount, BigDecimal savingsDraw) {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
@@ -482,11 +498,41 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             values.put("amount", amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
             values.put("created_at", System.currentTimeMillis());
             long id = db.insertOrThrow("expenses", null, values);
+            saveExpenseSavingsDraw(db, id, savingsDraw);
             invalidateAllocationForExpenseDate(db, date);
             db.setTransactionSuccessful();
             return id;
         } finally {
             db.endTransaction();
+        }
+    }
+
+    private static void saveExpenseSavingsDraw(SQLiteDatabase db, long expenseId, BigDecimal amount) {
+        BigDecimal normalized = (amount == null ? BigDecimal.ZERO : amount).max(BigDecimal.ZERO)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+        if (normalized.signum() == 0) {
+            db.delete("expense_savings_draws", "expense_id = ?", new String[]{Long.toString(expenseId)});
+            return;
+        }
+        ContentValues values = new ContentValues();
+        values.put("expense_id", expenseId);
+        values.put("amount", normalized.toPlainString());
+        db.insertWithOnConflict("expense_savings_draws", null, values, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public BigDecimal getExpenseSavingsDraw(long expenseId) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT amount FROM expense_savings_draws WHERE expense_id = ? LIMIT 1",
+                new String[]{Long.toString(expenseId)})) {
+            return cursor.moveToFirst() ? new BigDecimal(cursor.getString(0)) : BigDecimal.ZERO.setScale(2);
+        }
+    }
+
+    public BigDecimal getExpenseAmount(long expenseId) {
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT amount FROM expenses WHERE id = ? LIMIT 1",
+                new String[]{Long.toString(expenseId)})) {
+            return cursor.moveToFirst() ? new BigDecimal(cursor.getString(0)) : BigDecimal.ZERO.setScale(2);
         }
     }
 
@@ -530,6 +576,10 @@ public final class WorkDatabase extends SQLiteOpenHelper {
     }
 
     public boolean updateExpense(long id, String date, String category, String note, BigDecimal amount) {
+        return updateExpense(id, date, category, note, amount, getExpenseSavingsDraw(id));
+    }
+
+    public boolean updateExpense(long id, String date, String category, String note, BigDecimal amount, BigDecimal savingsDraw) {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
@@ -546,6 +596,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             values.put("amount", amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
             int updated = db.update("expenses", values, "id = ?", new String[]{Long.toString(id)});
             if (updated == 1) {
+                saveExpenseSavingsDraw(db, id, savingsDraw);
                 invalidateAllocationForExpenseDate(db, oldDate);
                 if (!date.equals(oldDate)) invalidateAllocationForExpenseDate(db, date);
             }
@@ -567,7 +618,10 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 if (cursor.moveToFirst()) oldDate = cursor.getString(0);
             }
             int deleted = db.delete("expenses", "id = ?", new String[]{Long.toString(id)});
-            if (deleted == 1) invalidateAllocationForExpenseDate(db, oldDate);
+            if (deleted == 1) {
+                db.delete("expense_savings_draws", "expense_id = ?", new String[]{Long.toString(id)});
+                invalidateAllocationForExpenseDate(db, oldDate);
+            }
             db.setTransactionSuccessful();
             return deleted == 1;
         } finally {
