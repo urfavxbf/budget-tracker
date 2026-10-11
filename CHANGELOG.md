@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0
+
+### Added
+- Add first-launch setup for pay rate, regular hours, overtime, payday schedule, opening cash, opening savings, and spending limit.
+- Ask users to opt in to payday reminder notifications during setup.
+- Add a setup confirmation summary before saving initial settings.
+- Add opening savings balance to the tracked Savings Balance and expose it in Settings.
+- Warn and ask for confirmation before saving an expense that uses savings or exhausts Available to Spend.
+- Confirm changes to opening cash and savings balances before applying them.
+
+### Improved
+- Preserve existing user data by skipping first-time setup for users with saved settings or activity.
+- Validate setup values and prevent negative starting balances or spending limits.
+
+### Verification
+- Automated CI and manual device regression checks are pending for this version.
+
+### Notes
+- Salary amounts are estimates based on user-entered settings and work records.
+- Existing expense, payday, and budget-cycle records are intended to remain intact during upgrade.
+
 ## 0.2.0
 
 ### Added
