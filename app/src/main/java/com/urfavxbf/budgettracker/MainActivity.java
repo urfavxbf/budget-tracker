@@ -304,7 +304,7 @@ public final class MainActivity extends FragmentActivity {
 
         CheckBox notifications = new CheckBox(this);
         notifications.setText("Enable payday reminder notifications");
-        notifications.setChecked(getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("notifications_enabled", true));
+        notifications.setChecked(getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("notifications_enabled", false));
         card.addView(notifications);
 
         Button finish = button("Save setup and continue", true);
@@ -895,7 +895,7 @@ public final class MainActivity extends FragmentActivity {
         page.addView(saveOpening);
 
         section("Starting savings balance");
-        TextView savingsInfo = text("Enter savings you already have before tracking with this app. This is separate from your available cash and can be used to cover overspending when needed.", 13, false);
+        TextView savingsInfo = text("Enter savings already included in your opening cash balance. This amount is excluded from Available to Spend and can cover overspending when needed.", 13, false);
         savingsInfo.setPadding(0, 0, 0, dp(8));
         page.addView(savingsInfo);
         openingSavingsInput = field("0.00", pref("opening_savings_balance", "0.00"),
