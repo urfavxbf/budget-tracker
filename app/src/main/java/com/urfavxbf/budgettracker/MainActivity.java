@@ -1398,7 +1398,7 @@ public final class MainActivity extends FragmentActivity {
         overview.addView(overviewValues);
         historyContainer.addView(overview);
 
-        TextView recentHeading = text("Activity by date", 18, true);
+        TextView recentHeading = text("ACTIVITY BY DATE", 18, true);
         recentHeading.setPadding(0, dp(8), 0, dp(10));
         historyContainer.addView(recentHeading);
 
@@ -1530,13 +1530,16 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER);
-        actions.setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface));
+        actions.setBackgroundColor(android.graphics.Color.TRANSPARENT);
+        actions.setBackgroundTintList(ColorStateList.valueOf(android.graphics.Color.TRANSPARENT));
         FrameLayout.LayoutParams actionParams = new FrameLayout.LayoutParams(
                 revealWidth, -1, Gravity.END | Gravity.CENTER_VERTICAL);
         row.addView(actions, actionParams);
 
         MaterialButton edit = button("Edit", false);
         edit.setTextSize(12);
+        edit.setAllCaps(true);
+        edit.setTypeface(edit.getTypeface(), android.graphics.Typeface.BOLD);
         edit.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
         edit.setPadding(0, 0, 0, 0);
         edit.setMinWidth(0);
@@ -1544,6 +1547,7 @@ public final class MainActivity extends FragmentActivity {
         edit.setMinimumHeight(0);
         edit.setCornerRadius(dp(12));
         edit.setBackgroundTintList(ColorStateList.valueOf(android.graphics.Color.TRANSPARENT));
+        edit.setBackgroundColor(android.graphics.Color.TRANSPARENT);
         edit.setRippleColor(ColorStateList.valueOf(
                 withAlpha(resolveColor(androidx.appcompat.R.attr.colorPrimary), 0x33)));
         edit.setInsetTop(0);
@@ -1558,6 +1562,8 @@ public final class MainActivity extends FragmentActivity {
 
         MaterialButton delete = button("Delete", false);
         delete.setTextSize(12);
+        delete.setAllCaps(true);
+        delete.setTypeface(delete.getTypeface(), android.graphics.Typeface.BOLD);
         delete.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnErrorContainer));
         delete.setPadding(0, 0, 0, 0);
         delete.setMinWidth(0);
@@ -1565,6 +1571,7 @@ public final class MainActivity extends FragmentActivity {
         delete.setMinimumHeight(0);
         delete.setCornerRadius(dp(12));
         delete.setBackgroundTintList(ColorStateList.valueOf(android.graphics.Color.TRANSPARENT));
+        delete.setBackgroundColor(android.graphics.Color.TRANSPARENT);
         delete.setRippleColor(ColorStateList.valueOf(
                 withAlpha(resolveColor(android.R.attr.colorError), 0x33)));
         delete.setInsetTop(0);
