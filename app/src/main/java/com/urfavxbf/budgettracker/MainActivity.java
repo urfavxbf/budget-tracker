@@ -1387,7 +1387,7 @@ public final class MainActivity extends FragmentActivity {
         expenseMetric.setOrientation(LinearLayout.VERTICAL);
         expenseMetric.setPadding(dp(16), 0, 0, 0);
         TextView expenseValue = text(money(expenseTotal), 22, true);
-        expenseValue.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
+        expenseValue.setTextColor(resolveColor(android.R.attr.colorError));
         expenseMetric.addView(expenseValue);
         TextView expenseCaption = text(expenseEntries.size() + " expenses recorded", 12, false);
         expenseCaption.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
@@ -1462,7 +1462,7 @@ public final class MainActivity extends FragmentActivity {
                 LinearLayout recordContent = new LinearLayout(this);
                 recordContent.setOrientation(LinearLayout.VERTICAL);
                 TextView type = text("EXPENSE", 10, true);
-                type.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
+                type.setTextColor(resolveColor(android.R.attr.colorError));
                 recordContent.addView(type);
                 TextView expenseLine = text(entry.category + "  ·  " + money(new BigDecimal(entry.amount)), 14, true);
                 expenseLine.setPadding(0, dp(2), 0, dp(2));
@@ -1527,9 +1527,9 @@ public final class MainActivity extends FragmentActivity {
         delete.setMinimumHeight(0);
         delete.setCornerRadius(dp(12));
         delete.setBackgroundTintList(ColorStateList.valueOf(
-                resolveColor(androidx.appcompat.R.attr.colorErrorContainer)));
+                resolveColor(android.R.attr.colorError)));
         delete.setRippleColor(ColorStateList.valueOf(
-                withAlpha(resolveColor(androidx.appcompat.R.attr.colorError), 0x33)));
+                withAlpha(resolveColor(android.R.attr.colorError), 0x33)));
         delete.setInsetTop(0);
         delete.setInsetBottom(0);
         LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(revealWidth / 2 - dp(8), dp(44));
@@ -1753,10 +1753,10 @@ public final class MainActivity extends FragmentActivity {
             if (status == BudgetInsights.Status.OVER_BUDGET) {
                 summary.append("\nOver budget by ").append(money(spent.subtract(budgetBase)))
                         .append(". Review non-essential spending and upcoming needs.");
-                budgetSummaryView.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
+                budgetSummaryView.setTextColor(resolveColor(android.R.attr.colorError));
             } else if (status == BudgetInsights.Status.WARNING) {
                 summary.append("\nMost of this cycle’s budget is used. Check upcoming bills.");
-                budgetSummaryView.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
+                budgetSummaryView.setTextColor(resolveColor(android.R.attr.colorError));
             } else {
                 summary.append("\nYour spending is within the cycle budget so far.");
                 budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
