@@ -396,8 +396,8 @@ public final class MainActivity extends FragmentActivity {
 
         final int ink = resolveColor(com.google.android.material.R.attr.colorOnSurface);
         final int muted = resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant);
-        final int accent = resolveColor(com.google.android.material.R.attr.colorPrimary);
-        final int green = resolveColor(com.google.android.material.R.attr.colorPrimary);
+        final int accent = resolveColor(androidx.appcompat.R.attr.colorPrimary);
+        final int green = resolveColor(androidx.appcompat.R.attr.colorPrimary);
         final int navy = 0xFF1A2647;
         page.setPadding(dp(20), dp(24), dp(20), dp(24));
 
@@ -475,7 +475,7 @@ public final class MainActivity extends FragmentActivity {
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER);
         int actionBackground = resolveColor(com.google.android.material.R.attr.colorSurfaceVariant);
-        int actionAccent = resolveColor(com.google.android.material.R.attr.colorPrimary);
+        int actionAccent = resolveColor(androidx.appcompat.R.attr.colorPrimary);
         actions.addView(actionTile("＋", "Income", actionBackground, actionAccent,
                 () -> showWorkDialog(null)), new LinearLayout.LayoutParams(0, dp(76), 1f));
         actions.addView(actionTile("−", "Expense", actionBackground, actionAccent,
