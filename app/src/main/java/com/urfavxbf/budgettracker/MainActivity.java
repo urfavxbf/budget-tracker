@@ -1436,24 +1436,43 @@ public final class MainActivity extends FragmentActivity {
             for (WorkDatabase.WorkEntry entry : day.workEntries) {
                 LinearLayout recordContent = new LinearLayout(this);
                 recordContent.setOrientation(LinearLayout.VERTICAL);
+                LinearLayout summary = new LinearLayout(this);
+                summary.setOrientation(LinearLayout.HORIZONTAL);
+                summary.setGravity(Gravity.CENTER_VERTICAL);
+                LinearLayout summaryText = new LinearLayout(this);
+                summaryText.setOrientation(LinearLayout.VERTICAL);
                 TextView type = text("WORK SHIFT", 10, true);
                 type.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
-                recordContent.addView(type);
+                summaryText.addView(type);
                 TextView shiftTime = text(entry.timeIn + " – " + entry.timeOut, 15, true);
-                shiftTime.setPadding(0, dp(2), 0, dp(2));
-                recordContent.addView(shiftTime);
-                TextView durationLine = text(duration(entry.netMinutes) + " worked  ·  "
-                        + duration(entry.breakMinutes) + " break", 12, false);
+                shiftTime.setPadding(0, dp(2), 0, 0);
+                summaryText.addView(shiftTime);
+                summary.addView(summaryText, new LinearLayout.LayoutParams(0, -2, 1f));
+                TextView pay = text(money(new BigDecimal(entry.netPay)), 14, true);
+                pay.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
+                summary.addView(pay);
+                TextView expand = text("⌄", 20, true);
+                expand.setPadding(dp(8), 0, 0, 0);
+                summary.addView(expand);
+                recordContent.addView(summary);
+
+                LinearLayout details = new LinearLayout(this);
+                details.setOrientation(LinearLayout.VERTICAL);
+                details.setVisibility(View.GONE);
+                details.setPadding(0, dp(8), 0, 0);
+                TextView durationLine = text("Worked: " + duration(entry.netMinutes)
+                        + "  ·  Break: " + duration(entry.breakMinutes), 12, false);
                 durationLine.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
-                recordContent.addView(durationLine);
+                details.addView(durationLine);
                 if (entry.overtimeMinutes > 0) {
                     TextView overtime = text("Overtime: " + duration(entry.overtimeMinutes), 12, true);
                     overtime.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
-                    recordContent.addView(overtime);
+                    details.addView(overtime);
                 }
-                TextView pay = text("Net pay  " + money(new BigDecimal(entry.netPay)), 14, true);
-                pay.setPadding(0, dp(3), 0, 0);
-                recordContent.addView(pay);
+                details.addView(text("Estimated net pay: " + money(new BigDecimal(entry.netPay)), 13, true));
+                recordContent.addView(details);
+                recordContent.setTag(details);
+                recordContent.setContentDescription("Work shift " + entry.timeIn + " to " + entry.timeOut + ". Tap for full details.");
                 addSwipeReveal(dayCard, recordContent, "Edit shift", "Delete shift",
                         v -> editWorkEntry(entry), v -> confirmDeleteWorkEntry(entry));
             }
@@ -1461,17 +1480,37 @@ public final class MainActivity extends FragmentActivity {
             for (WorkDatabase.ExpenseEntry entry : day.expenses) {
                 LinearLayout recordContent = new LinearLayout(this);
                 recordContent.setOrientation(LinearLayout.VERTICAL);
+                LinearLayout summary = new LinearLayout(this);
+                summary.setOrientation(LinearLayout.HORIZONTAL);
+                summary.setGravity(Gravity.CENTER_VERTICAL);
+                LinearLayout summaryText = new LinearLayout(this);
+                summaryText.setOrientation(LinearLayout.VERTICAL);
                 TextView type = text("EXPENSE", 10, true);
                 type.setTextColor(resolveColor(android.R.attr.colorError));
-                recordContent.addView(type);
+                summaryText.addView(type);
                 TextView expenseLine = text(entry.category + "  ·  " + money(new BigDecimal(entry.amount)), 14, true);
-                expenseLine.setPadding(0, dp(2), 0, dp(2));
-                recordContent.addView(expenseLine);
+                expenseLine.setPadding(0, dp(2), 0, 0);
+                summaryText.addView(expenseLine);
+                summary.addView(summaryText, new LinearLayout.LayoutParams(0, -2, 1f));
+                TextView expand = text("⌄", 20, true);
+                summary.addView(expand);
+                recordContent.addView(summary);
+
+                LinearLayout details = new LinearLayout(this);
+                details.setOrientation(LinearLayout.VERTICAL);
+                details.setVisibility(View.GONE);
+                details.setPadding(0, dp(8), 0, 0);
+                TextView dateDetail = text("Date: " + entry.date, 12, false);
+                dateDetail.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+                details.addView(dateDetail);
                 if (!entry.note.isEmpty()) {
-                    TextView note = text(entry.note, 12, false);
+                    TextView note = text("Note: " + entry.note, 12, false);
                     note.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
-                    recordContent.addView(note);
+                    details.addView(note);
                 }
+                recordContent.addView(details);
+                recordContent.setTag(details);
+                recordContent.setContentDescription("Expense " + entry.category + ". Tap for full details.");
                 addSwipeReveal(dayCard, recordContent, "Edit expense", "Delete expense",
                         v -> editExpense(entry), v -> confirmDeleteExpense(entry));
             }
@@ -1504,8 +1543,7 @@ public final class MainActivity extends FragmentActivity {
         edit.setMinimumWidth(0);
         edit.setMinimumHeight(0);
         edit.setCornerRadius(dp(12));
-        edit.setBackgroundTintList(ColorStateList.valueOf(
-                resolveColor(com.google.android.material.R.attr.colorSecondaryContainer)));
+        edit.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
         edit.setRippleColor(ColorStateList.valueOf(
                 withAlpha(resolveColor(androidx.appcompat.R.attr.colorPrimary), 0x33)));
         edit.setInsetTop(0);
@@ -1526,8 +1564,7 @@ public final class MainActivity extends FragmentActivity {
         delete.setMinimumWidth(0);
         delete.setMinimumHeight(0);
         delete.setCornerRadius(dp(12));
-        delete.setBackgroundTintList(ColorStateList.valueOf(
-                resolveColor(android.R.attr.colorError)));
+        delete.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
         delete.setRippleColor(ColorStateList.valueOf(
                 withAlpha(resolveColor(android.R.attr.colorError), 0x33)));
         delete.setInsetTop(0);
@@ -1601,6 +1638,19 @@ public final class MainActivity extends FragmentActivity {
                             }
                         } else if (!moved && recordContent.getTranslationX() < 0f) {
                             closeSwipeContent();
+                        } else if (!moved) {
+                            View details = recordContent.getTag() instanceof View
+                                    ? (View) recordContent.getTag() : null;
+                            if (details != null) {
+                                boolean expanding = details.getVisibility() != View.VISIBLE;
+                                details.setVisibility(expanding ? View.VISIBLE : View.GONE);
+                                if (recordContent.getChildAt(0) instanceof LinearLayout) {
+                                    LinearLayout summary = (LinearLayout) recordContent.getChildAt(0);
+                                    View last = summary.getChildAt(summary.getChildCount() - 1);
+                                    if (last instanceof TextView) ((TextView) last).setText(expanding ? "⌃" : "⌄");
+                                }
+                                recordContent.requestLayout();
+                            }
                         }
                         return true;
                     default:
