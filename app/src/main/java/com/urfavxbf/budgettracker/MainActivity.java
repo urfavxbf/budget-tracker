@@ -480,7 +480,7 @@ public final class MainActivity extends FragmentActivity {
                 () -> showWorkDialog(null)), new LinearLayout.LayoutParams(0, dp(76), 1f));
         actions.addView(actionTile("−", "Expense", actionBackground, actionAccent,
                 () -> showExpenseDialog(null)), new LinearLayout.LayoutParams(0, dp(76), 1f));
-        actions.addView(actionTile("▦", "Budgets", actionBackground, actionAccent,
+        actions.addView(actionTile("◉", "Budgets", actionBackground, actionAccent,
                 () -> showTab(2)), new LinearLayout.LayoutParams(0, dp(76), 1f));
         actions.addView(actionTile("▦", "Calendar", actionBackground, actionAccent,
                 this::buildCalendarScreen), new LinearLayout.LayoutParams(0, dp(76), 1f));
@@ -712,6 +712,12 @@ public final class MainActivity extends FragmentActivity {
                     canvas.drawLine(12, 12, 12, 17, paint);
                     canvas.drawLine(9.5f, 14.5f, 12, 17, paint);
                     canvas.drawLine(14.5f, 14.5f, 12, 17, paint);
+                } else if ("◉".equals(symbol)) {
+                    // Budget wallet with a coin and reserved balance line.
+                    canvas.drawRoundRect(3, 6, 21, 20, 2, 2, paint);
+                    canvas.drawLine(3, 9, 21, 9, paint);
+                    canvas.drawCircle(15.5f, 14.5f, 2.2f, paint);
+                    canvas.drawLine(6, 14, 10, 14, paint);
                 } else if ("▦".equals(symbol)) {
                     // Calendar with binding rings and date cells.
                     canvas.drawRoundRect(3, 5, 21, 21, 2, 2, paint);
