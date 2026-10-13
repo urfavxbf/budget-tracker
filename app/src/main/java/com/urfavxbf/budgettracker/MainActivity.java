@@ -829,6 +829,13 @@ public final class MainActivity extends FragmentActivity {
                         v -> editWorkEntry(entry), v -> confirmDeleteWorkEntry(entry));
             }
 
+            if (!day.expenses.isEmpty()) {
+                TextView expensesHeading = text("EXPENSES  ·  " + day.expenses.size() + " entries", 11, true);
+                expensesHeading.setTextColor(resolveColor(android.R.attr.colorError));
+                expensesHeading.setPadding(dp(4), dp(12), 0, dp(4));
+                dayActivityList.addView(expensesHeading);
+            }
+
             for (WorkDatabase.ExpenseEntry entry : day.expenses) {
                 LinearLayout recordContent = new LinearLayout(this);
                 recordContent.setOrientation(LinearLayout.VERTICAL);
@@ -1467,7 +1474,7 @@ public final class MainActivity extends FragmentActivity {
 
                 LinearLayout details = new LinearLayout(this);
                 details.setOrientation(LinearLayout.VERTICAL);
-                details.setVisibility(View.GONE);
+                details.setVisibility(View.VISIBLE);
                 details.setPadding(0, dp(8), 0, 0);
                 TextView durationLine = text("Worked: " + duration(entry.netMinutes)
                         + "  ·  Break: " + duration(entry.breakMinutes), 12, false);
@@ -1493,9 +1500,6 @@ public final class MainActivity extends FragmentActivity {
                 summary.setGravity(Gravity.CENTER_VERTICAL);
                 LinearLayout summaryText = new LinearLayout(this);
                 summaryText.setOrientation(LinearLayout.VERTICAL);
-                TextView type = text("EXPENSE", 10, true);
-                type.setTextColor(resolveColor(android.R.attr.colorError));
-                summaryText.addView(type);
                 TextView expenseLine = text(entry.category + "  ·  " + money(new BigDecimal(entry.amount)), 14, true);
                 expenseLine.setPadding(0, dp(2), 0, 0);
                 summaryText.addView(expenseLine);
