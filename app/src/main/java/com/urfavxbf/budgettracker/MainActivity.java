@@ -859,7 +859,7 @@ public final class MainActivity extends FragmentActivity {
 
     private void buildHistoryScreen() {
         header("History", "Review, edit, or delete your saved shifts and expenses.");
-        section("Recent activity");
+        
         historyContainer = new LinearLayout(this);
         historyContainer.setOrientation(LinearLayout.VERTICAL);
         page.addView(historyContainer);
@@ -1389,7 +1389,7 @@ public final class MainActivity extends FragmentActivity {
         TextView expenseValue = text(money(expenseTotal), 22, true);
         expenseValue.setTextColor(resolveColor(android.R.attr.colorError));
         expenseMetric.addView(expenseValue);
-        TextView expenseCaption = text(expenseEntries.size() + " expenses recorded", 12, false);
+        TextView expenseCaption = text("Total from " + expenseEntries.size() + " expenses", 12, false);
         expenseCaption.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
         expenseMetric.addView(expenseCaption);
         overviewValues.addView(expenseMetric, new LinearLayout.LayoutParams(0, -2, 1f));
@@ -1398,7 +1398,7 @@ public final class MainActivity extends FragmentActivity {
         overview.addView(overviewValues);
         historyContainer.addView(overview);
 
-        TextView recentHeading = text("Recent activity", 18, true);
+        TextView recentHeading = text("Activity by date", 18, true);
         recentHeading.setPadding(0, dp(8), 0, dp(10));
         historyContainer.addView(recentHeading);
 
@@ -1406,7 +1406,7 @@ public final class MainActivity extends FragmentActivity {
         for (DayHistory day : days.values()) {
             if (shownDays++ >= 30) break;
             LinearLayout dayCard = cardContainer();
-            dayCard.setPadding(dp(15), dp(14), dp(15), dp(12));
+            dayCard.setPadding(dp(14), dp(12), dp(14), dp(12));
 
             String prettyDate;
             try {
@@ -1542,9 +1542,12 @@ public final class MainActivity extends FragmentActivity {
         actions.addView(edit);
         actions.addView(delete);
 
-        recordContent.setPadding(dp(8), dp(8), dp(8), dp(8));
-        recordContent.setMinimumHeight(dp(64));
-        recordContent.setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface));
+        recordContent.setPadding(dp(10), dp(8), dp(10), dp(8));
+        recordContent.setMinimumHeight(dp(56));
+        GradientDrawable recordBackground = new GradientDrawable();
+        recordBackground.setColor(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant));
+        recordBackground.setCornerRadius(dp(10));
+        recordContent.setBackground(recordBackground);
         recordContent.setClickable(true);
         recordContent.setElevation(dp(2));
         FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(-1, -2, Gravity.START | Gravity.TOP);
