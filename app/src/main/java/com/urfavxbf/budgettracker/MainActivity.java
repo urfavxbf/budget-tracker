@@ -829,13 +829,6 @@ public final class MainActivity extends FragmentActivity {
                         v -> editWorkEntry(entry), v -> confirmDeleteWorkEntry(entry));
             }
 
-            if (!day.expenses.isEmpty()) {
-                TextView expensesHeading = text("EXPENSES  ·  " + day.expenses.size() + " entries", 11, true);
-                expensesHeading.setTextColor(resolveColor(android.R.attr.colorError));
-                expensesHeading.setPadding(dp(4), dp(12), 0, dp(4));
-                dayActivityList.addView(expensesHeading);
-            }
-
             for (WorkDatabase.ExpenseEntry entry : day.expenses) {
                 LinearLayout recordContent = new LinearLayout(this);
                 recordContent.setOrientation(LinearLayout.VERTICAL);
@@ -1490,6 +1483,13 @@ public final class MainActivity extends FragmentActivity {
                 recordContent.setContentDescription("Work shift " + entry.timeIn + " to " + entry.timeOut + ".");
                 addSwipeReveal(dayActivityList, recordContent, "Edit shift", "Delete shift",
                         v -> editWorkEntry(entry), v -> confirmDeleteWorkEntry(entry));
+            }
+
+            if (!day.expenses.isEmpty()) {
+                TextView expensesHeading = text("EXPENSES  ·  " + day.expenses.size() + " entries", 11, true);
+                expensesHeading.setTextColor(resolveColor(android.R.attr.colorError));
+                expensesHeading.setPadding(dp(4), dp(12), 0, dp(4));
+                dayActivityList.addView(expensesHeading);
             }
 
             for (WorkDatabase.ExpenseEntry entry : day.expenses) {
