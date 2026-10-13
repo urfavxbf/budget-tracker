@@ -1425,6 +1425,18 @@ public final class MainActivity extends FragmentActivity {
             itemCount.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
             dateHeader.addView(itemCount);
             dayCard.addView(dateHeader);
+            LinearLayout dayActivityList = new LinearLayout(this);
+            dayActivityList.setOrientation(LinearLayout.VERTICAL);
+            dayActivityList.setVisibility(View.GONE);
+            dayActivityList.setTag(false);
+            dayCard.addView(dayActivityList);
+            dateHeader.setOnClickListener(v -> {
+                boolean expanded = Boolean.TRUE.equals(dayActivityList.getTag());
+                dayActivityList.setTag(!expanded);
+                dayActivityList.setVisibility(expanded ? View.GONE : View.VISIBLE);
+                itemCount.setText((day.workEntries.size() + day.expenses.size()) + " ITEMS  " + (expanded ? "⌄" : "⌃"));
+            });
+            itemCount.setText((day.workEntries.size() + day.expenses.size()) + " ITEMS  ⌄");
 
             View dateDivider = new View(this);
             dateDivider.setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorOutlineVariant));
@@ -1451,9 +1463,6 @@ public final class MainActivity extends FragmentActivity {
                 TextView pay = text(money(new BigDecimal(entry.netPay)), 14, true);
                 pay.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
                 summary.addView(pay);
-                TextView expand = text("⌄", 20, true);
-                expand.setPadding(dp(8), 0, 0, 0);
-                summary.addView(expand);
                 recordContent.addView(summary);
 
                 LinearLayout details = new LinearLayout(this);
@@ -1471,9 +1480,8 @@ public final class MainActivity extends FragmentActivity {
                 }
                 details.addView(text("Estimated net pay: " + money(new BigDecimal(entry.netPay)), 13, true));
                 recordContent.addView(details);
-                recordContent.setTag(details);
-                recordContent.setContentDescription("Work shift " + entry.timeIn + " to " + entry.timeOut + ". Tap for full details.");
-                addSwipeReveal(dayCard, recordContent, "Edit shift", "Delete shift",
+                recordContent.setContentDescription("Work shift " + entry.timeIn + " to " + entry.timeOut + ".");
+                addSwipeReveal(dayActivityList, recordContent, "Edit shift", "Delete shift",
                         v -> editWorkEntry(entry), v -> confirmDeleteWorkEntry(entry));
             }
 
@@ -1492,8 +1500,6 @@ public final class MainActivity extends FragmentActivity {
                 expenseLine.setPadding(0, dp(2), 0, 0);
                 summaryText.addView(expenseLine);
                 summary.addView(summaryText, new LinearLayout.LayoutParams(0, -2, 1f));
-                TextView expand = text("⌄", 20, true);
-                summary.addView(expand);
                 recordContent.addView(summary);
 
                 LinearLayout details = new LinearLayout(this);
@@ -1509,9 +1515,8 @@ public final class MainActivity extends FragmentActivity {
                     details.addView(note);
                 }
                 recordContent.addView(details);
-                recordContent.setTag(details);
-                recordContent.setContentDescription("Expense " + entry.category + ". Tap for full details.");
-                addSwipeReveal(dayCard, recordContent, "Edit expense", "Delete expense",
+                recordContent.setContentDescription("Expense " + entry.category + ".");
+                addSwipeReveal(dayActivityList, recordContent, "Edit expense", "Delete expense",
                         v -> editExpense(entry), v -> confirmDeleteExpense(entry));
             }
             historyContainer.addView(dayCard);
