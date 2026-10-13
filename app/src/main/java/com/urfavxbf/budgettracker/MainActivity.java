@@ -1338,6 +1338,7 @@ public final class MainActivity extends FragmentActivity {
         List<WorkDatabase.WorkEntry> workEntries = database.getRecentWorkEntries(100);
         List<WorkDatabase.ExpenseEntry> expenseEntries = database.getRecentExpenseEntries(100);
 
+        BigDecimal expenseTotal = BigDecimal.ZERO;
         for (WorkDatabase.WorkEntry entry : workEntries) {
             DayHistory day = days.get(entry.date);
             if (day == null) {
@@ -1353,53 +1354,125 @@ public final class MainActivity extends FragmentActivity {
                 days.put(entry.date, day);
             }
             day.expenses.add(entry);
+            expenseTotal = expenseTotal.add(new BigDecimal(entry.amount));
         }
 
         if (days.isEmpty()) {
-            historyContainer.addView(emptyState("No activity yet", "Saved work shifts and expenses will appear here, grouped by date."));
+            historyContainer.addView(emptyState("No activity yet",
+                    "Your shifts and expenses will appear here once you start recording them."));
             return;
         }
+
+        LinearLayout overview = cardContainer();
+        overview.setPadding(dp(16), dp(14), dp(16), dp(14));
+        TextView overviewTitle = text("ACTIVITY OVERVIEW", 11, true);
+        overviewTitle.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+        overview.addView(overviewTitle);
+        LinearLayout overviewValues = new LinearLayout(this);
+        overviewValues.setOrientation(LinearLayout.HORIZONTAL);
+        overviewValues.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout shiftMetric = new LinearLayout(this);
+        shiftMetric.setOrientation(LinearLayout.VERTICAL);
+        TextView shiftCount = text(String.valueOf(workEntries.size()), 22, true);
+        shiftCount.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
+        shiftMetric.addView(shiftCount);
+        TextView shiftCaption = text("Work shifts", 12, false);
+        shiftCaption.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+        shiftMetric.addView(shiftCaption);
+        overviewValues.addView(shiftMetric, new LinearLayout.LayoutParams(0, -2, 1f));
+        View overviewDivider = new View(this);
+        overviewDivider.setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorOutlineVariant));
+        overviewValues.addView(overviewDivider, new LinearLayout.LayoutParams(dp(1), dp(34)));
+        LinearLayout expenseMetric = new LinearLayout(this);
+        expenseMetric.setOrientation(LinearLayout.VERTICAL);
+        expenseMetric.setPadding(dp(16), 0, 0, 0);
+        TextView expenseValue = text(money(expenseTotal), 22, true);
+        expenseValue.setTextColor(resolveColor(com.google.android.material.R.attr.colorError));
+        expenseMetric.addView(expenseValue);
+        TextView expenseCaption = text(expenseEntries.size() + " expenses recorded", 12, false);
+        expenseCaption.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+        expenseMetric.addView(expenseCaption);
+        overviewValues.addView(expenseMetric, new LinearLayout.LayoutParams(0, -2, 1f));
+        overview.addView(space(dp(10)));
+        overview.addView(overviewValues);
+        historyContainer.addView(overview);
+
+        TextView recentHeading = text("Recent activity", 18, true);
+        recentHeading.setPadding(0, dp(8), 0, dp(10));
+        historyContainer.addView(recentHeading);
 
         int shownDays = 0;
         for (DayHistory day : days.values()) {
             if (shownDays++ >= 30) break;
             LinearLayout dayCard = cardContainer();
-            TextView dateTitle = text(day.date, 16, true);
-            dateTitle.setPadding(0, 0, 0, dp(8));
-            dayCard.addView(dateTitle);
+            dayCard.setPadding(dp(15), dp(14), dp(15), dp(12));
+
+            String prettyDate;
+            try {
+                prettyDate = LocalDate.parse(day.date).format(
+                        DateTimeFormatter.ofPattern("EEE, MMM d, yyyy", java.util.Locale.getDefault()));
+            } catch (Exception ignored) {
+                prettyDate = day.date;
+            }
+            LinearLayout dateHeader = new LinearLayout(this);
+            dateHeader.setOrientation(LinearLayout.HORIZONTAL);
+            dateHeader.setGravity(Gravity.CENTER_VERTICAL);
+            TextView dateTitle = text(prettyDate, 14, true);
+            dateTitle.setTextColor(resolveColor(android.R.attr.textColorPrimary));
+            dateHeader.addView(dateTitle, new LinearLayout.LayoutParams(0, -2, 1f));
+            TextView itemCount = text((day.workEntries.size() + day.expenses.size()) + " items", 11, true);
+            itemCount.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+            dateHeader.addView(itemCount);
+            dayCard.addView(dateHeader);
+
+            View dateDivider = new View(this);
+            dateDivider.setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorOutlineVariant));
+            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(-1, dp(1));
+            dividerParams.topMargin = dp(10);
+            dividerParams.bottomMargin = dp(5);
+            dayCard.addView(dateDivider, dividerParams);
 
             for (WorkDatabase.WorkEntry entry : day.workEntries) {
                 LinearLayout recordContent = new LinearLayout(this);
                 recordContent.setOrientation(LinearLayout.VERTICAL);
-                TextView shiftTime = text(entry.timeIn + " - " + entry.timeOut, 14, true);
-                shiftTime.setPadding(0, dp(3), 0, dp(2));
+                TextView type = text("WORK SHIFT", 10, true);
+                type.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
+                recordContent.addView(type);
+                TextView shiftTime = text(entry.timeIn + " – " + entry.timeOut, 15, true);
+                shiftTime.setPadding(0, dp(2), 0, dp(2));
                 recordContent.addView(shiftTime);
-                recordContent.addView(text("Work " + duration(entry.netMinutes) + "  Break " + duration(entry.breakMinutes),
-                        13, false));
+                TextView durationLine = text(duration(entry.netMinutes) + " worked  ·  "
+                        + duration(entry.breakMinutes) + " break", 12, false);
+                durationLine.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+                recordContent.addView(durationLine);
                 if (entry.overtimeMinutes > 0) {
-                    recordContent.addView(text("Overtime: " + duration(entry.overtimeMinutes), 13, false));
+                    TextView overtime = text("Overtime: " + duration(entry.overtimeMinutes), 12, true);
+                    overtime.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
+                    recordContent.addView(overtime);
                 }
-                recordContent.addView(text("Recorded net pay: " + money(new BigDecimal(entry.netPay)), 14, true));
+                TextView pay = text("Net pay  " + money(new BigDecimal(entry.netPay)), 14, true);
+                pay.setPadding(0, dp(3), 0, 0);
+                recordContent.addView(pay);
                 addSwipeReveal(dayCard, recordContent, "Edit shift", "Delete shift",
                         v -> editWorkEntry(entry), v -> confirmDeleteWorkEntry(entry));
             }
 
-            if (!day.expenses.isEmpty()) {
-                TextView expensesTitle = text("Expenses:", 14, true);
-                expensesTitle.setPadding(0, dp(5), 0, dp(3));
-                dayCard.addView(expensesTitle);
-                for (WorkDatabase.ExpenseEntry entry : day.expenses) {
-                    LinearLayout recordContent = new LinearLayout(this);
-                    recordContent.setOrientation(LinearLayout.VERTICAL);
-                    recordContent.addView(text(entry.category + "  " + money(new BigDecimal(entry.amount)), 14, true));
-                    if (!entry.note.isEmpty()) {
-                        TextView note = text(entry.note, 12, false);
-                        note.setTextColor(resolveColor(android.R.attr.textColorSecondary));
-                        recordContent.addView(note);
-                    }
-                    addSwipeReveal(dayCard, recordContent, "Edit expense", "Delete expense",
-                            v -> editExpense(entry), v -> confirmDeleteExpense(entry));
+            for (WorkDatabase.ExpenseEntry entry : day.expenses) {
+                LinearLayout recordContent = new LinearLayout(this);
+                recordContent.setOrientation(LinearLayout.VERTICAL);
+                TextView type = text("EXPENSE", 10, true);
+                type.setTextColor(resolveColor(com.google.android.material.R.attr.colorError));
+                recordContent.addView(type);
+                TextView expenseLine = text(entry.category + "  ·  " + money(new BigDecimal(entry.amount)), 14, true);
+                expenseLine.setPadding(0, dp(2), 0, dp(2));
+                recordContent.addView(expenseLine);
+                if (!entry.note.isEmpty()) {
+                    TextView note = text(entry.note, 12, false);
+                    note.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+                    recordContent.addView(note);
                 }
+                addSwipeReveal(dayCard, recordContent, "Edit expense", "Delete expense",
+                        v -> editExpense(entry), v -> confirmDeleteExpense(entry));
             }
             historyContainer.addView(dayCard);
         }
