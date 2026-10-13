@@ -1387,7 +1387,7 @@ public final class MainActivity extends FragmentActivity {
         expenseMetric.setOrientation(LinearLayout.VERTICAL);
         expenseMetric.setPadding(dp(16), 0, 0, 0);
         TextView expenseValue = text(money(expenseTotal), 22, true);
-        expenseValue.setTextColor(resolveColor(com.google.android.material.R.attr.colorError));
+        expenseValue.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
         expenseMetric.addView(expenseValue);
         TextView expenseCaption = text(expenseEntries.size() + " expenses recorded", 12, false);
         expenseCaption.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
@@ -1462,7 +1462,7 @@ public final class MainActivity extends FragmentActivity {
                 LinearLayout recordContent = new LinearLayout(this);
                 recordContent.setOrientation(LinearLayout.VERTICAL);
                 TextView type = text("EXPENSE", 10, true);
-                type.setTextColor(resolveColor(com.google.android.material.R.attr.colorError));
+                type.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
                 recordContent.addView(type);
                 TextView expenseLine = text(entry.category + "  ·  " + money(new BigDecimal(entry.amount)), 14, true);
                 expenseLine.setPadding(0, dp(2), 0, dp(2));
@@ -1527,7 +1527,7 @@ public final class MainActivity extends FragmentActivity {
         delete.setMinimumHeight(0);
         delete.setCornerRadius(dp(12));
         delete.setBackgroundTintList(ColorStateList.valueOf(
-                resolveColor(com.google.android.material.R.attr.colorErrorContainer)));
+                resolveColor(androidx.appcompat.R.attr.colorErrorContainer)));
         delete.setRippleColor(ColorStateList.valueOf(
                 withAlpha(resolveColor(androidx.appcompat.R.attr.colorError), 0x33)));
         delete.setInsetTop(0);
