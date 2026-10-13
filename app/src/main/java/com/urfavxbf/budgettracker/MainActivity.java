@@ -1393,7 +1393,8 @@ public final class MainActivity extends FragmentActivity {
         expenseCaption.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
         expenseMetric.addView(expenseCaption);
         overviewValues.addView(expenseMetric, new LinearLayout.LayoutParams(0, -2, 1f));
-        overview.addView(space(dp(10)));
+        View overviewSpacer = new View(this);
+        overview.addView(overviewSpacer, new LinearLayout.LayoutParams(1, dp(10)));
         overview.addView(overviewValues);
         historyContainer.addView(overview);
 
