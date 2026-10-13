@@ -1543,7 +1543,7 @@ public final class MainActivity extends FragmentActivity {
         edit.setMinimumWidth(0);
         edit.setMinimumHeight(0);
         edit.setCornerRadius(dp(12));
-        edit.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+        edit.setBackgroundTintList(ColorStateList.valueOf(android.graphics.Color.TRANSPARENT));
         edit.setRippleColor(ColorStateList.valueOf(
                 withAlpha(resolveColor(androidx.appcompat.R.attr.colorPrimary), 0x33)));
         edit.setInsetTop(0);
@@ -1564,7 +1564,7 @@ public final class MainActivity extends FragmentActivity {
         delete.setMinimumWidth(0);
         delete.setMinimumHeight(0);
         delete.setCornerRadius(dp(12));
-        delete.setBackgroundTintList(ColorStateList.valueOf(Color.TRANSPARENT));
+        delete.setBackgroundTintList(ColorStateList.valueOf(android.graphics.Color.TRANSPARENT));
         delete.setRippleColor(ColorStateList.valueOf(
                 withAlpha(resolveColor(android.R.attr.colorError), 0x33)));
         delete.setInsetTop(0);
