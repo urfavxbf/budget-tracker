@@ -394,10 +394,10 @@ public final class MainActivity extends FragmentActivity {
         BigDecimal net = earned.subtract(spent).setScale(2, java.math.RoundingMode.HALF_UP);
         long daysLeft = Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(today, payday));
 
-        final int ink = 0xFF172138;
-        final int muted = 0xFF6E7A91;
-        final int accent = 0xFF4D6EF5;
-        final int green = 0xFF38B885;
+        final int ink = resolveColor(com.google.android.material.R.attr.colorOnSurface);
+        final int muted = resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant);
+        final int accent = resolveColor(com.google.android.material.R.attr.colorPrimary);
+        final int green = resolveColor(com.google.android.material.R.attr.colorPrimary);
         final int navy = 0xFF1A2647;
         page.setPadding(dp(20), dp(24), dp(20), dp(24));
 
@@ -417,7 +417,7 @@ public final class MainActivity extends FragmentActivity {
         TextView avatar = text("₱", 19, true);
         avatar.setGravity(Gravity.CENTER);
         avatar.setTextColor(accent);
-        avatar.setBackground(roundedBackground(0xFFE8EDFF, dp(21)));
+        avatar.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant), dp(21)));
         top.addView(avatar, new LinearLayout.LayoutParams(dp(42), dp(42)));
         page.addView(top);
 
@@ -474,19 +474,21 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.CENTER);
-        actions.addView(actionTile("＋", "Income", 0xFFE1F5EE, 0xFF16866E,
+        int actionBackground = resolveColor(com.google.android.material.R.attr.colorSurfaceVariant);
+        int actionAccent = resolveColor(com.google.android.material.R.attr.colorPrimary);
+        actions.addView(actionTile("＋", "Income", actionBackground, actionAccent,
                 () -> showWorkDialog(null)), new LinearLayout.LayoutParams(0, dp(76), 1f));
-        actions.addView(actionTile("−", "Expense", 0xFFFFE9EC, 0xFFE05D72,
+        actions.addView(actionTile("−", "Expense", actionBackground, actionAccent,
                 () -> showExpenseDialog(null)), new LinearLayout.LayoutParams(0, dp(76), 1f));
-        actions.addView(actionTile("▦", "Budgets", 0xFFEDE7FF, 0xFF7B61C9,
+        actions.addView(actionTile("▦", "Budgets", actionBackground, actionAccent,
                 () -> showTab(2)), new LinearLayout.LayoutParams(0, dp(76), 1f));
-        actions.addView(actionTile("▥", "Reports", 0xFFE5EFFD, 0xFF3975BD,
-                () -> showTab(1)), new LinearLayout.LayoutParams(0, dp(76), 1f));
+        actions.addView(actionTile("▦", "Calendar", actionBackground, actionAccent,
+                this::buildCalendarScreen), new LinearLayout.LayoutParams(0, dp(76), 1f));
         page.addView(actions);
 
         LinearLayout snapshot = cardContainer();
         snapshot.setPadding(dp(16), dp(16), dp(16), dp(16));
-        snapshot.setBackground(roundedBackground(0xFFFFFFFF, dp(18)));
+        snapshot.setBackground(roundedBackground(resolveColor(com.google.android.material.R.attr.colorSurface), dp(18)));
         LinearLayout snapshotHeader = new LinearLayout(this);
         snapshotHeader.setGravity(Gravity.CENTER_VERTICAL);
         snapshotHeader.setOrientation(LinearLayout.HORIZONTAL);
@@ -518,7 +520,7 @@ public final class MainActivity extends FragmentActivity {
         budgetProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         budgetProgressBar.setMax(100);
         budgetProgressBar.setProgressTintList(ColorStateList.valueOf(green));
-        budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(0xFFE8EDF5));
+        budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(resolveColor(com.google.android.material.R.attr.colorOutlineVariant)));
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(8));
         progressParams.bottomMargin = dp(9);
         snapshot.addView(budgetProgressBar, progressParams);
