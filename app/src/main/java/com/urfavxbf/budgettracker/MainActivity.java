@@ -1505,13 +1505,50 @@ public final class MainActivity extends FragmentActivity {
     private void showSavingsContributionDialog(WorkDatabase.SavingsGoal goal) {
         EditText amountInput = field("Amount to add (₱)", "",
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        BigDecimal available = getAvailableCashBalance();
+        BigDecimal available = getAvailableCashBalance().max(BigDecimal.ZERO);
+        BigDecimal remaining = goal.targetAmount.subtract(goal.savedAmount).max(BigDecimal.ZERO);
+
+        LinearLayout contributionForm = new LinearLayout(this);
+        contributionForm.setOrientation(LinearLayout.VERTICAL);
+        contributionForm.setPadding(dp(20), dp(8), dp(20), 0);
+        addField(contributionForm, "Contribution amount (₱)", amountInput);
+
+        TextView presetHint = text(
+                remaining.signum() > 0
+                        ? "Quick amounts are based on the remaining goal and capped by your available cash. You can edit the amount before transferring."
+                        : "This goal has reached its target. You can still record an extra contribution if you choose.",
+                12, false);
+        presetHint.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        presetHint.setPadding(0, dp(2), 0, dp(8));
+        contributionForm.addView(presetHint);
+
+        if (remaining.signum() > 0 && available.signum() > 0) {
+            LinearLayout presets = new LinearLayout(this);
+            presets.setOrientation(LinearLayout.HORIZONTAL);
+            BigDecimal[] portions = {
+                    new BigDecimal("0.25"), new BigDecimal("0.50"), BigDecimal.ONE
+            };
+            String[] labels = {"25%", "50%", "Finish goal"};
+            for (int i = 0; i < portions.length; i++) {
+                BigDecimal suggested = remaining.multiply(portions[i])
+                        .setScale(2, java.math.RoundingMode.CEILING)
+                        .min(available);
+                MaterialButton preset = compactButton(labels[i], false);
+                preset.setOnClickListener(v -> amountInput.setText(suggested.toPlainString()));
+                LinearLayout.LayoutParams presetParams = new LinearLayout.LayoutParams(0, -2, 1f);
+                presetParams.setMargins(0, 0, dp(4), dp(4));
+                presets.addView(preset, presetParams);
+            }
+            contributionForm.addView(presets);
+        }
+
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Transfer to " + goal.name)
                 .setMessage("Current goal progress: " + money(goal.savedAmount) + " of " + money(goal.targetAmount)
+                        + "\nStill needed: " + money(remaining)
                         + "\nAvailable to Spend: " + money(available)
-                        + "\n\nThe contribution will be added to your real savings balance and deducted from Available to Spend.")
-                .setView(amountInput)
+                        + "\n\nThe contribution will be added to your savings balance and deducted from Available to Spend.")
+                .setView(contributionForm)
                 .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                 .setPositiveButton("Transfer savings", (dialog, which) -> {
                     try {
