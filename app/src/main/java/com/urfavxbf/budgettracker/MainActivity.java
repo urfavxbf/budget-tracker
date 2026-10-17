@@ -1145,6 +1145,9 @@ public final class MainActivity extends FragmentActivity {
         for (String category : database.getDistinctExpenseCategories()) {
             addCategorySuggestion(categories, category);
         }
+        for (String category : database.getCategoryBudgetLimits().keySet()) {
+            addCategorySuggestion(categories, category);
+        }
         return categories;
     }
 
