@@ -1302,10 +1302,19 @@ public final class MainActivity extends FragmentActivity {
         addSavingsGoal.setOnClickListener(v -> showSavingsGoalDialog(null));
         page.addView(addSavingsGoal);
         List<WorkDatabase.SavingsGoal> savingsGoals = database.getSavingsGoals();
+        savingsGoals.sort((left, right) -> Boolean.compare(left.isCompleted(), right.isCompleted()));
         if (savingsGoals.isEmpty()) {
             page.addView(emptyState("No savings goals yet", "Try an emergency fund, a gadget, travel, or another personal target."));
         } else {
+            boolean hasRenderedGoal = false;
+            boolean lastWasCompleted = false;
             for (WorkDatabase.SavingsGoal goal : savingsGoals) {
+                boolean completed = goal.isCompleted();
+                if (!hasRenderedGoal || completed != lastWasCompleted) {
+                    section(completed ? "Completed goals" : "Active goals");
+                    hasRenderedGoal = true;
+                    lastWasCompleted = completed;
+                }
                 LinearLayout goalCard = cardContainer();
                 goalCard.addView(text(goal.name, 16, true));
                 goalCard.addView(text(money(goal.savedAmount) + " saved of " + money(goal.targetAmount), 14, true));
@@ -1322,9 +1331,11 @@ public final class MainActivity extends FragmentActivity {
                 String detail = goal.targetDate.isEmpty() ? "No target date"
                         : "Target date: " + goal.targetDate;
                 BigDecimal remainingForGoal = goal.targetAmount.subtract(goal.savedAmount).max(BigDecimal.ZERO);
-                if (goal.savedAmount.compareTo(goal.targetAmount) >= 0) {
+                if (completed) {
                     detail += " · Goal reached!";
+                    if (!goal.completionDate.isEmpty()) detail += " · Completed on " + goal.completionDate;
                 } else {
+                    if (!goal.completionDate.isEmpty()) detail += " · Previously reached on " + goal.completionDate;
                     detail += " · " + money(remainingForGoal) + " to go";
                     if (!goal.targetDate.isEmpty()) {
                         try {
@@ -1374,8 +1385,11 @@ public final class MainActivity extends FragmentActivity {
             }
         }
 
-        section("Savings activity");
-        List<String> savingsActivity = database.getRecentSavingsActivity(20);
+        section("Savings history");
+        TextView savingsHistoryInfo = text("Contributions and withdrawals are shown newest first. Completed goals stay listed separately from active goals.", 12, false);
+        savingsHistoryInfo.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        page.addView(savingsHistoryInfo);
+        List<String> savingsActivity = database.getRecentSavingsActivity(100);
         if (savingsActivity.isEmpty()) {
             page.addView(emptyState("No savings transfers yet", "Contributions and withdrawals will appear here."));
         } else {
