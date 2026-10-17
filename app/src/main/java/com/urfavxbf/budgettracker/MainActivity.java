@@ -1251,6 +1251,11 @@ public final class MainActivity extends FragmentActivity {
             else { breakInputs.remove(input); breakContainer.removeView(row); }
         });
         breakInputs.add(input);
+        breakHours.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { previewWorkEstimate(); }
+            @Override public void afterTextChanged(android.text.Editable s) {}
+        });
         breakContainer.addView(row);
     }
 
@@ -1317,6 +1322,18 @@ public final class MainActivity extends FragmentActivity {
                 int minutes = breakHours.multiply(BigDecimal.valueOf(60)).intValueExact();
                 totalBreakMinutes = Math.addExact(totalBreakMinutes, minutes);
                 if (minutes > 0) serializedBreaks.add(breakHours.stripTrailingZeros().toPlainString() + "h");
+            }
+            if (hoursOnlyMode != null && hoursOnlyMode.isChecked()) {
+                BigDecimal totalHours = decimal(totalHoursInput, "Total worked hours");
+                if (totalHours.signum() <= 0 || totalHours.multiply(BigDecimal.valueOf(60)).stripTrailingZeros().scale() > 0) {
+                    throw new IllegalArgumentException("Total worked hours must be positive and convert to whole minutes.");
+                }
+                int netMinutes = totalHours.multiply(BigDecimal.valueOf(60)).intValueExact();
+                if (netMinutes + totalBreakMinutes > 24 * 60) {
+                    throw new IllegalArgumentException("Worked hours plus breaks cannot exceed 24 hours.");
+                }
+                timeOut = timeIn.plusMinutes((long) netMinutes + totalBreakMinutes);
+                timeOutInput.setText(timeOut.toString());
             }
             BigDecimal effectiveHourlyRate = "Daily".equals(rateType)
                     ? enteredRate.divide(regularHours, 8, java.math.RoundingMode.HALF_UP) : enteredRate;
