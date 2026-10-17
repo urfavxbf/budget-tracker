@@ -912,6 +912,21 @@ public final class MainActivity extends FragmentActivity {
             form.addView(quickShift);
         }
 
+        hoursOnlyMode = new CheckBox(this);
+        hoursOnlyMode.setText("Enter total worked hours instead of time out");
+        hoursOnlyMode.setTextSize(14);
+        form.addView(hoursOnlyMode);
+        totalHoursInput = field("Total worked hours, excluding breaks (e.g. 10)", "",
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        TextInputLayout totalHoursLayout = inputLayout("Total worked hours", totalHoursInput);
+        totalHoursLayout.setVisibility(View.GONE);
+        form.addView(totalHoursLayout);
+        hoursOnlyMode.setOnCheckedChangeListener((buttonView, checked) -> {
+            totalHoursLayout.setVisibility(checked ? View.VISIBLE : View.GONE);
+            timeOutInput.setEnabled(!checked);
+            previewWorkEstimate();
+        });
+
         addSection(form, "Break duration");
         breakContainer = new LinearLayout(this);
         breakContainer.setOrientation(LinearLayout.VERTICAL);
