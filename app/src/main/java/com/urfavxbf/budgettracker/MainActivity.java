@@ -1330,8 +1330,6 @@ public final class MainActivity extends FragmentActivity {
                 goalActions.setOrientation(LinearLayout.HORIZONTAL);
                 MaterialButton contribute = compactButton("＋ Add savings", true);
                 contribute.setOnClickListener(v -> showSavingsContributionDialog(goal));
-                MaterialButton withdrawGoal = compactButton("Withdraw", false);
-                withdrawGoal.setOnClickListener(v -> showSavingsWithdrawalDialog(goal));
                 MaterialButton editGoal = compactButton("Edit", false);
                 editGoal.setOnClickListener(v -> showSavingsGoalDialog(goal));
                 MaterialButton deleteGoal = compactButton("Delete", false);
@@ -1346,7 +1344,6 @@ public final class MainActivity extends FragmentActivity {
                             } else toast("Could not delete savings goal.");
                         }).show());
                 goalActions.addView(contribute);
-                goalActions.addView(withdrawGoal);
                 goalActions.addView(editGoal);
                 goalActions.addView(deleteGoal);
                 goalCard.addView(goalActions);
@@ -1430,12 +1427,20 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showSavingsWithdrawalGoalPicker(List<WorkDatabase.SavingsGoal> goals) {
-        String[] names = new String[goals.size()];
-        for (int i = 0; i < goals.size(); i++) names[i] = goals.get(i).name +
-                " · " + money(goals.get(i).savedAmount);
+        List<WorkDatabase.SavingsGoal> fundedGoals = new ArrayList<>();
+        for (WorkDatabase.SavingsGoal goal : goals) {
+            if (goal.savedAmount.signum() > 0) fundedGoals.add(goal);
+        }
+        if (fundedGoals.isEmpty()) {
+            toast("There is no goal savings balance available to withdraw.");
+            return;
+        }
+        String[] names = new String[fundedGoals.size()];
+        for (int i = 0; i < fundedGoals.size(); i++) names[i] = fundedGoals.get(i).name +
+                " · " + money(fundedGoals.get(i).savedAmount);
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Choose savings goal")
-                .setItems(names, (dialog, which) -> showSavingsWithdrawalDialog(goals.get(which)))
+                .setItems(names, (dialog, which) -> showSavingsWithdrawalDialog(fundedGoals.get(which)))
                 .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                 .show();
     }
