@@ -1276,8 +1276,16 @@ public final class MainActivity extends FragmentActivity {
         page.addView(addExpense, addExpenseParams);
 
 
+        section("Savings overview");
+        LinearLayout savingsSummary = cardContainer();
+        savingsSummary.addView(text("Total savings", 13, false));
+        savingsSummary.addView(text(money(database.getTotalSavingsBalance()), 25, true));
+        savingsSummary.addView(text("Available to Spend: " + money(getAvailableCashBalance()), 13, false));
+        savingsSummary.addView(text("Contributions to a goal transfer money from Available to Spend into your savings balance.", 12, false));
+        page.addView(savingsSummary);
+
         section("Savings goals");
-        TextView savingsGoalsInfo = text("Create a target, track contributions, and see how close you are to your goal. Goal balances are tracked separately from your overall savings balance.", 13, false);
+        TextView savingsGoalsInfo = text("Create a target, track contributions, and see how close you are to your goal. Contributions increase total savings and reduce Available to Spend.", 13, false);
         savingsGoalsInfo.setPadding(0, 0, 0, dp(8));
         page.addView(savingsGoalsInfo);
         Button addSavingsGoal = button("＋ Create savings goal", true);
@@ -1400,20 +1408,29 @@ public final class MainActivity extends FragmentActivity {
     private void showSavingsContributionDialog(WorkDatabase.SavingsGoal goal) {
         EditText amountInput = field("Amount to add (₱)", "",
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        BigDecimal available = getAvailableCashBalance();
         new MaterialAlertDialogBuilder(this)
-                .setTitle("Add to " + goal.name)
-                .setMessage("Current progress: " + money(goal.savedAmount) + " of " + money(goal.targetAmount))
+                .setTitle("Transfer to " + goal.name)
+                .setMessage("Current goal progress: " + money(goal.savedAmount) + " of " + money(goal.targetAmount)
+                        + "\nAvailable to Spend: " + money(available)
+                        + "\n\nThe contribution will be added to your real savings balance and deducted from Available to Spend.")
                 .setView(amountInput)
                 .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
-                .setPositiveButton("Add savings", (dialog, which) -> {
+                .setPositiveButton("Transfer savings", (dialog, which) -> {
                     try {
-                        BigDecimal amount = decimal(amountInput, "Contribution");
+                        BigDecimal amount = decimal(amountInput, "Contribution")
+                                .setScale(2, java.math.RoundingMode.HALF_UP);
                         if (amount.signum() <= 0) throw new IllegalArgumentException("Contribution must be greater than zero.");
+                        BigDecimal availableNow = getAvailableCashBalance();
+                        if (amount.compareTo(availableNow) > 0) {
+                            throw new IllegalArgumentException("Not enough Available to Spend. Current available amount: "
+                                    + money(availableNow.max(BigDecimal.ZERO)) + ".");
+                        }
                         if (!database.addToSavingsGoal(goal.id, amount)) {
-                            toast("Could not add contribution.");
+                            toast("Could not transfer savings. No balance was changed.");
                             return;
                         }
-                        toast("Savings contribution recorded.");
+                        toast("Savings transferred successfully.");
                         showTab(2);
                     } catch (IllegalArgumentException ex) {
                         toast(ex.getMessage());
