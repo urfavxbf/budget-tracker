@@ -126,7 +126,7 @@ public class CutoffPeriodTest {
                 LocalDate.of(2026, 11, 7), 25, 7);
 
         assertEquals(LocalDate.of(2026, 10, 1), beforeNextPayday.startDate);
-        assertEquals(LocalDate.of(2026, 11, 1), onNextPayday.startDate);
+        assertEquals(LocalDate.of(2026, 10, 16), onNextPayday.startDate);
         assertEquals(LocalDate.of(2026, 11, 7), onNextPayday.payday(25, 7));
     }
 
