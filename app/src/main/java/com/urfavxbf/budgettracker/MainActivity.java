@@ -1533,7 +1533,7 @@ public final class MainActivity extends FragmentActivity {
                 BigDecimal suggested = remaining.multiply(portions[i])
                         .setScale(2, java.math.RoundingMode.CEILING)
                         .min(available);
-                MaterialButton preset = compactButton(labels[i] + "\n" + money(suggested), false);
+                MaterialButton preset = compactButton(labels[i], false);
                 preset.setOnClickListener(v -> amountInput.setText(suggested.toPlainString()));
                 LinearLayout.LayoutParams presetParams = new LinearLayout.LayoutParams(0, -2, 1f);
                 presetParams.setMargins(0, 0, dp(4), dp(4));
