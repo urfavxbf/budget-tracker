@@ -1275,6 +1275,64 @@ public final class MainActivity extends FragmentActivity {
         addExpenseParams.bottomMargin = dp(8);
         page.addView(addExpense, addExpenseParams);
 
+
+        section("Savings goals");
+        TextView savingsGoalsInfo = text("Create a target, track contributions, and see how close you are to your goal. Goal balances are tracked separately from your overall savings balance.", 13, false);
+        savingsGoalsInfo.setPadding(0, 0, 0, dp(8));
+        page.addView(savingsGoalsInfo);
+        Button addSavingsGoal = button("＋ Create savings goal", true);
+        addSavingsGoal.setOnClickListener(v -> showSavingsGoalDialog(null));
+        page.addView(addSavingsGoal);
+        List<WorkDatabase.SavingsGoal> savingsGoals = database.getSavingsGoals();
+        if (savingsGoals.isEmpty()) {
+            page.addView(emptyState("No savings goals yet", "Try an emergency fund, a gadget, travel, or another personal target."));
+        } else {
+            for (WorkDatabase.SavingsGoal goal : savingsGoals) {
+                LinearLayout goalCard = cardContainer();
+                goalCard.addView(text(goal.name, 16, true));
+                goalCard.addView(text(money(goal.savedAmount) + " saved of " + money(goal.targetAmount), 14, true));
+                int progress = goal.targetAmount.signum() <= 0 ? 0
+                        : goal.savedAmount.multiply(BigDecimal.valueOf(100))
+                        .divide(goal.targetAmount, 0, java.math.RoundingMode.DOWN).intValue();
+                ProgressBar goalProgress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+                goalProgress.setMax(100);
+                goalProgress.setProgress(Math.min(100, Math.max(0, progress)));
+                LinearLayout.LayoutParams goalProgressParams = new LinearLayout.LayoutParams(-1, dp(8));
+                goalProgressParams.topMargin = dp(8);
+                goalProgressParams.bottomMargin = dp(6);
+                goalCard.addView(goalProgress, goalProgressParams);
+                String detail = goal.targetDate.isEmpty() ? "No target date"
+                        : "Target date: " + goal.targetDate;
+                if (goal.savedAmount.compareTo(goal.targetAmount) >= 0) detail += " · Goal reached!";
+                else detail += " · " + money(goal.targetAmount.subtract(goal.savedAmount)) + " to go";
+                TextView detailView = text(detail, 12, false);
+                detailView.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+                goalCard.addView(detailView);
+                LinearLayout goalActions = new LinearLayout(this);
+                goalActions.setOrientation(LinearLayout.HORIZONTAL);
+                MaterialButton contribute = compactButton("＋ Add savings", true);
+                contribute.setOnClickListener(v -> showSavingsContributionDialog(goal));
+                MaterialButton editGoal = compactButton("Edit", false);
+                editGoal.setOnClickListener(v -> showSavingsGoalDialog(goal));
+                MaterialButton deleteGoal = compactButton("Delete", false);
+                deleteGoal.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
+                        .setTitle("Delete savings goal?")
+                        .setMessage("This removes the goal and its tracked progress, but does not change your overall savings balance.")
+                        .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                        .setPositiveButton("Delete", (dialog, which) -> {
+                            if (database.deleteSavingsGoal(goal.id)) {
+                                toast("Savings goal deleted.");
+                                showTab(2);
+                            } else toast("Could not delete savings goal.");
+                        }).show());
+                goalActions.addView(contribute);
+                goalActions.addView(editGoal);
+                goalActions.addView(deleteGoal);
+                goalCard.addView(goalActions);
+                page.addView(goalCard);
+            }
+        }
+
         section("Expenses");
         MaterialAutoCompleteTextView categoryFilter = new MaterialAutoCompleteTextView(this);
         List<String> filterOptions = new ArrayList<>();
@@ -1293,6 +1351,74 @@ public final class MainActivity extends FragmentActivity {
         Button allActivity = button("View all activity", false);
         allActivity.setOnClickListener(v -> showTab(1));
         page.addView(allActivity);
+    }
+
+
+    private void showSavingsGoalDialog(WorkDatabase.SavingsGoal goal) {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(8), dp(20), 0);
+        EditText nameInput = field("Goal name", goal == null ? "" : goal.name,
+                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        EditText targetInput = field("Target amount (₱)", goal == null ? "" : goal.targetAmount.toPlainString(),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        EditText dateInput = field("Target date (optional, YYYY-MM-DD)", goal == null ? "" : goal.targetDate,
+                InputType.TYPE_CLASS_TEXT);
+        addField(form, "Goal name", nameInput);
+        addField(form, "Target amount (₱)", targetInput);
+        addField(form, "Target date (optional)", dateInput);
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+                .setTitle(goal == null ? "Create savings goal" : "Edit savings goal")
+                .setView(form)
+                .setNegativeButton("Cancel", (d, which) -> d.dismiss())
+                .setPositiveButton(goal == null ? "Create goal" : "Save changes", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            try {
+                String name = value(nameInput);
+                BigDecimal target = decimal(targetInput, "Target amount");
+                String targetDate = value(dateInput);
+                if (name.isEmpty()) throw new IllegalArgumentException("Goal name is required.");
+                if (target.signum() <= 0) throw new IllegalArgumentException("Target amount must be greater than zero.");
+                if (!targetDate.isEmpty()) {
+                    try { LocalDate.parse(targetDate); }
+                    catch (DateTimeParseException ex) { throw new IllegalArgumentException("Target date must use YYYY-MM-DD."); }
+                }
+                boolean saved = goal == null
+                        ? database.addSavingsGoal(name, target, targetDate) > 0
+                        : database.updateSavingsGoal(goal.id, name, target, targetDate);
+                if (!saved) throw new IllegalArgumentException("Could not save this savings goal.");
+                dialog.dismiss();
+                showTab(2);
+            } catch (IllegalArgumentException ex) {
+                toast(ex.getMessage());
+            }
+        }));
+        dialog.show();
+    }
+
+    private void showSavingsContributionDialog(WorkDatabase.SavingsGoal goal) {
+        EditText amountInput = field("Amount to add (₱)", "",
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Add to " + goal.name)
+                .setMessage("Current progress: " + money(goal.savedAmount) + " of " + money(goal.targetAmount))
+                .setView(amountInput)
+                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                .setPositiveButton("Add savings", (dialog, which) -> {
+                    try {
+                        BigDecimal amount = decimal(amountInput, "Contribution");
+                        if (amount.signum() <= 0) throw new IllegalArgumentException("Contribution must be greater than zero.");
+                        if (!database.addToSavingsGoal(goal.id, amount)) {
+                            toast("Could not add contribution.");
+                            return;
+                        }
+                        toast("Savings contribution recorded.");
+                        showTab(2);
+                    } catch (IllegalArgumentException ex) {
+                        toast(ex.getMessage());
+                    }
+                }).show();
     }
 
     private void renderBudgetExpenses(LinearLayout container, String selectedCategory) {
