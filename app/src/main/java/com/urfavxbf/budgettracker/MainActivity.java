@@ -1203,7 +1203,7 @@ public final class MainActivity extends FragmentActivity {
 
         header("Budget", "Manage your salary-cycle budget, category limits, and spending.");
         LinearLayout overview = cardContainer();
-        overview.setPadding(dp(18), dp(18), dp(18), dp(18));
+        overview.setPadding(dp(20), dp(20), dp(20), dp(20));
         TextView remainingLabel = text("REMAINING BUDGET", 11, true);
         remainingLabel.setTextColor(resolveColor(android.R.attr.textColorSecondary));
         overview.addView(remainingLabel);
@@ -1247,13 +1247,15 @@ public final class MainActivity extends FragmentActivity {
 
         LinearLayout categoryHeader = new LinearLayout(this);
         categoryHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView categoryTitle = text("Category budgets", 19, true);
+        categoryHeader.setPadding(0, dp(8), 0, dp(8));
+        TextView categoryTitle = text("Category budgets", 20, true);
         categoryHeader.addView(categoryTitle, new LinearLayout.LayoutParams(0, -2, 1f));
-        Button addCategory = button("＋ Add limit", false);
+        MaterialButton addCategory = compactButton("＋ Add limit", true);
         addCategory.setOnClickListener(v -> showCategoryBudgetDialog(null));
         categoryHeader.addView(addCategory);
         LinearLayout.LayoutParams categoryHeaderParams = new LinearLayout.LayoutParams(-1, -2);
-        categoryHeaderParams.topMargin = dp(10);
+        categoryHeaderParams.topMargin = dp(8);
+        categoryHeaderParams.bottomMargin = dp(4);
         page.addView(categoryHeader, categoryHeaderParams);
 
         Map<String, BigDecimal> categoryTotals =
@@ -1276,10 +1278,11 @@ public final class MainActivity extends FragmentActivity {
             }
         }
 
-        Button addExpense = button("＋ Add expense", true);
+        MaterialButton addExpense = button("＋ Add expense", true);
         addExpense.setOnClickListener(v -> showExpenseDialog(null));
         LinearLayout.LayoutParams addExpenseParams = new LinearLayout.LayoutParams(-1, -2);
-        addExpenseParams.topMargin = dp(8);
+        addExpenseParams.topMargin = dp(4);
+        addExpenseParams.bottomMargin = dp(8);
         page.addView(addExpense, addExpenseParams);
 
         section("Expenses");
@@ -1348,13 +1351,17 @@ public final class MainActivity extends FragmentActivity {
 
     private void addCategoryBudgetRow(String category, BigDecimal spent, BigDecimal limit) {
         LinearLayout card = cardContainer();
-        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        card.setPadding(dp(16), dp(14), dp(16), dp(14));
         LinearLayout heading = new LinearLayout(this);
         heading.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = text(category, 15, true);
+        title.setMaxLines(2);
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         heading.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
         TextView amount = text(limit == null || limit.signum() <= 0
                 ? money(spent) + " spent" : money(spent) + " / " + money(limit), 12, true);
+        amount.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        amount.setMaxLines(2);
         heading.addView(amount);
         card.addView(heading);
         if (limit != null && limit.signum() > 0) {
@@ -1381,21 +1388,36 @@ public final class MainActivity extends FragmentActivity {
             card.addView(unset);
         }
         LinearLayout actions = new LinearLayout(this);
-        actions.setGravity(Gravity.END);
-        Button edit = button(limit == null ? "Set limit" : "Edit limit", false);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        actions.setPadding(0, dp(8), 0, 0);
+        MaterialButton edit = compactButton(limit == null ? "Set limit" : "Edit", false);
         edit.setOnClickListener(v -> showCategoryBudgetDialog(category));
         actions.addView(edit);
         if (limit != null) {
-            Button remove = button("Remove", false);
-            remove.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
-                    .setTitle("Remove category limit?")
-                    .setMessage("This removes only the saved limit for " + category + ". Expenses will be kept.")
+            MaterialButton delete = compactButton("Delete", false);
+            delete.setIconResource(com.google.android.material.R.drawable.mtrl_ic_error);
+            delete.setIconTint(ColorStateList.valueOf(resolveColor(androidx.appcompat.R.attr.colorError)));
+            delete.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
+            delete.setBackgroundTintList(ColorStateList.valueOf(
+                    withAlpha(resolveColor(androidx.appcompat.R.attr.colorError), 0x12)));
+            LinearLayout.LayoutParams deleteParams = (LinearLayout.LayoutParams) delete.getLayoutParams();
+            deleteParams.leftMargin = dp(8);
+            delete.setLayoutParams(deleteParams);
+            delete.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
+                    .setTitle("Delete category budget?")
+                    .setMessage("This deletes the saved spending limit for “" + category
+                            + "”. Existing expenses and their category labels will remain unchanged.")
                     .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
-                    .setPositiveButton("Remove", (dialog, which) -> {
-                        database.deleteCategoryBudgetLimit(category);
-                        showTab(2);
+                    .setPositiveButton("Delete limit", (dialog, which) -> {
+                        if (database.deleteCategoryBudgetLimit(category)) {
+                            showTab(2);
+                            toast("Category budget limit deleted.");
+                        } else {
+                            toast("Could not delete this category limit.");
+                        }
                     }).show());
-            actions.addView(remove);
+            actions.addView(delete);
         }
         card.addView(actions);
         page.addView(card);
@@ -2996,6 +3018,34 @@ public final class MainActivity extends FragmentActivity {
         edit.setSelectAllOnFocus(false);
         edit.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(52)));
         return edit;
+    }
+
+
+    private MaterialButton compactButton(String label, boolean primary) {
+        MaterialButton button = new MaterialButton(this);
+        button.setText(label);
+        button.setAllCaps(false);
+        button.setTextSize(13);
+        button.setMinWidth(0);
+        button.setMinimumWidth(0);
+        button.setMinHeight(dp(40));
+        button.setMinimumHeight(dp(40));
+        button.setInsetTop(0);
+        button.setInsetBottom(0);
+        button.setCornerRadius(dp(12));
+        button.setIconPadding(dp(4));
+        button.setPadding(dp(12), dp(4), dp(12), dp(4));
+        button.setElevation(0);
+        if (primary) {
+            button.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnPrimary));
+            button.setBackgroundTintList(ColorStateList.valueOf(resolveColor(androidx.appcompat.R.attr.colorPrimary)));
+        } else {
+            button.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
+            button.setBackgroundTintList(ColorStateList.valueOf(resolveColor(com.google.android.material.R.attr.colorSecondaryContainer)));
+        }
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, dp(40));
+        button.setLayoutParams(params);
+        return button;
     }
 
     private MaterialButton button(String label, boolean primary) {
