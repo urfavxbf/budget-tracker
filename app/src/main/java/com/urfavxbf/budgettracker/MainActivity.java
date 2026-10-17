@@ -1255,36 +1255,59 @@ public final class MainActivity extends FragmentActivity {
         addExpenseParams.topMargin = dp(8);
         page.addView(addExpense, addExpenseParams);
 
-        section("Recent expenses");
-        List<WorkDatabase.ExpenseEntry> recent = database.getRecentExpenseEntries(8);
-        if (recent.isEmpty()) {
-            page.addView(emptyState("No expenses recorded", "Your saved expenses will appear here."));
-        } else {
-            for (WorkDatabase.ExpenseEntry entry : recent) {
-                LinearLayout item = cardContainer();
-                item.setOrientation(LinearLayout.HORIZONTAL);
-                item.setGravity(Gravity.CENTER_VERTICAL);
-                LinearLayout details = new LinearLayout(this);
-                details.setOrientation(LinearLayout.VERTICAL);
-                details.addView(text(entry.category, 14, true));
-                String note = entry.note == null || entry.note.trim().isEmpty() ? entry.date : entry.date + " · " + entry.note;
-                TextView noteView = text(note, 12, false);
-                noteView.setTextColor(resolveColor(android.R.attr.textColorSecondary));
-                details.addView(noteView);
-                item.addView(details, new LinearLayout.LayoutParams(0, -2, 1f));
-                item.addView(text(money(new BigDecimal(entry.amount)), 14, true));
-                Button edit = button("Edit", false);
-                edit.setOnClickListener(v -> showExpenseDialog(entry));
-                item.addView(edit);
-                Button delete = button("×", false);
-                delete.setOnClickListener(v -> confirmDeleteExpense(entry));
-                item.addView(delete);
-                page.addView(item);
-            }
-        }
+        section("Expenses");
+        MaterialAutoCompleteTextView categoryFilter = new MaterialAutoCompleteTextView(this);
+        List<String> filterOptions = new ArrayList<>();
+        filterOptions.add("All categories");
+        filterOptions.addAll(database.getDistinctExpenseCategories());
+        categoryFilter.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, filterOptions));
+        categoryFilter.setText("All categories", false);
+        categoryFilter.setInputType(InputType.TYPE_NULL);
+        addField(page, "Filter by category", categoryFilter);
+        LinearLayout budgetExpenseList = new LinearLayout(this);
+        budgetExpenseList.setOrientation(LinearLayout.VERTICAL);
+        page.addView(budgetExpenseList);
+        renderBudgetExpenses(budgetExpenseList, "All categories");
+        categoryFilter.setOnItemClickListener((parent, view, position, id) ->
+                renderBudgetExpenses(budgetExpenseList, categoryFilter.getText().toString()));
         Button allActivity = button("View all activity", false);
         allActivity.setOnClickListener(v -> showTab(1));
         page.addView(allActivity);
+    }
+
+    private void renderBudgetExpenses(LinearLayout container, String selectedCategory) {
+        container.removeAllViews();
+        List<WorkDatabase.ExpenseEntry> entries = database.getRecentExpenseEntries(1000);
+        int shown = 0;
+        for (WorkDatabase.ExpenseEntry entry : entries) {
+            if (selectedCategory != null && !"All categories".equalsIgnoreCase(selectedCategory)
+                    && !selectedCategory.equalsIgnoreCase(entry.category)) continue;
+            LinearLayout item = cardContainer();
+            item.setOrientation(LinearLayout.HORIZONTAL);
+            item.setGravity(Gravity.CENTER_VERTICAL);
+            LinearLayout details = new LinearLayout(this);
+            details.setOrientation(LinearLayout.VERTICAL);
+            details.addView(text(entry.category, 14, true));
+            String note = entry.note == null || entry.note.trim().isEmpty()
+                    ? entry.date : entry.date + " · " + entry.note;
+            TextView noteView = text(note, 12, false);
+            noteView.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+            details.addView(noteView);
+            item.addView(details, new LinearLayout.LayoutParams(0, -2, 1f));
+            item.addView(text(money(new BigDecimal(entry.amount)), 14, true));
+            Button edit = button("Edit", false);
+            edit.setOnClickListener(v -> showExpenseDialog(entry));
+            item.addView(edit);
+            Button delete = button("×", false);
+            delete.setOnClickListener(v -> confirmDeleteExpense(entry));
+            item.addView(delete);
+            container.addView(item);
+            shown++;
+        }
+        if (shown == 0) {
+            container.addView(emptyState("No matching expenses",
+                    "Try another category or add a new expense."));
+        }
     }
 
     private int parsePaydayPreference(String key, int fallback) {
