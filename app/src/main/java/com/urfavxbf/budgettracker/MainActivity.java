@@ -1299,12 +1299,12 @@ public final class MainActivity extends FragmentActivity {
                 LinearLayout goalCard = cardContainer();
                 goalCard.addView(text(goal.name, 16, true));
                 goalCard.addView(text(money(goal.savedAmount) + " saved of " + money(goal.targetAmount), 14, true));
-                int progress = goal.targetAmount.signum() <= 0 ? 0
+                int goalProgressPercent = goal.targetAmount.signum() <= 0 ? 0
                         : goal.savedAmount.multiply(BigDecimal.valueOf(100))
                         .divide(goal.targetAmount, 0, java.math.RoundingMode.DOWN).intValue();
                 ProgressBar goalProgress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
                 goalProgress.setMax(100);
-                goalProgress.setProgress(Math.min(100, Math.max(0, progress)));
+                goalProgress.setProgress(Math.min(100, Math.max(0, goalProgressPercent)));
                 LinearLayout.LayoutParams goalProgressParams = new LinearLayout.LayoutParams(-1, dp(8));
                 goalProgressParams.topMargin = dp(8);
                 goalProgressParams.bottomMargin = dp(6);
