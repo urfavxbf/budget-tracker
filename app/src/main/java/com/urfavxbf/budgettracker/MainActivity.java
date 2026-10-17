@@ -1270,7 +1270,18 @@ public final class MainActivity extends FragmentActivity {
         if (categories.isEmpty()) {
             page.addView(emptyState("No categories yet", "Add an expense or create a category budget limit."));
         } else {
-            for (String category : categories.values()) {
+            List<String> categoryOrder = new ArrayList<>(categories.values());
+            categoryOrder.sort((left, right) -> {
+                boolean leftHasLimit = categoryLimits.containsKey(left)
+                        && categoryLimits.get(left) != null
+                        && categoryLimits.get(left).signum() > 0;
+                boolean rightHasLimit = categoryLimits.containsKey(right)
+                        && categoryLimits.get(right) != null
+                        && categoryLimits.get(right).signum() > 0;
+                if (leftHasLimit != rightHasLimit) return leftHasLimit ? -1 : 1;
+                return String.CASE_INSENSITIVE_ORDER.compare(left, right);
+            });
+            for (String category : categoryOrder) {
                 BigDecimal categorySpent = categoryTotals.get(category);
                 if (categorySpent == null) categorySpent = BigDecimal.ZERO.setScale(2);
                 BigDecimal categoryLimit = categoryLimits.get(category);
@@ -1312,26 +1323,69 @@ public final class MainActivity extends FragmentActivity {
         for (WorkDatabase.ExpenseEntry entry : entries) {
             if (selectedCategory != null && !"All categories".equalsIgnoreCase(selectedCategory)
                     && !selectedCategory.equalsIgnoreCase(entry.category)) continue;
+
             LinearLayout item = cardContainer();
-            item.setOrientation(LinearLayout.HORIZONTAL);
-            item.setGravity(Gravity.CENTER_VERTICAL);
+            item.setOrientation(LinearLayout.VERTICAL);
+            item.setPadding(dp(16), dp(14), dp(16), dp(12));
+
+            LinearLayout summary = new LinearLayout(this);
+            summary.setOrientation(LinearLayout.HORIZONTAL);
+            summary.setGravity(Gravity.CENTER_VERTICAL);
+
             LinearLayout details = new LinearLayout(this);
             details.setOrientation(LinearLayout.VERTICAL);
-            details.addView(text(entry.category, 14, true));
+            TextView categoryName = text(entry.category, 15, true);
+            categoryName.setMaxLines(1);
+            categoryName.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            details.addView(categoryName);
+
             String note = entry.note == null || entry.note.trim().isEmpty()
-                    ? entry.date : entry.date + " · " + entry.note;
+                    ? entry.date : entry.date + " · " + entry.note.trim();
             TextView noteView = text(note, 12, false);
             noteView.setTextColor(resolveColor(android.R.attr.textColorSecondary));
-            details.addView(noteView);
-            item.addView(details, new LinearLayout.LayoutParams(0, -2, 1f));
-            item.addView(text(money(new BigDecimal(entry.amount)), 14, true));
-            Button edit = button("Edit", false);
+            noteView.setMaxLines(2);
+            noteView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams noteParams = new LinearLayout.LayoutParams(-1, -2);
+            noteParams.topMargin = dp(3);
+            details.addView(noteView, noteParams);
+            summary.addView(details, new LinearLayout.LayoutParams(0, -2, 1f));
+
+            TextView amount = text(money(new BigDecimal(entry.amount)), 16, true);
+            amount.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            amount.setTextColor(resolveColor(android.R.attr.colorError));
+            LinearLayout.LayoutParams amountParams = new LinearLayout.LayoutParams(-2, -2);
+            amountParams.leftMargin = dp(12);
+            summary.addView(amount, amountParams);
+            item.addView(summary);
+
+            View separator = new View(this);
+            separator.setBackgroundColor(withAlpha(
+                    resolveColor(android.R.attr.textColorSecondary), 0x28));
+            LinearLayout.LayoutParams separatorParams = new LinearLayout.LayoutParams(-1, dp(1));
+            separatorParams.topMargin = dp(12);
+            separatorParams.bottomMargin = dp(8);
+            item.addView(separator, separatorParams);
+
+            LinearLayout actions = new LinearLayout(this);
+            actions.setOrientation(LinearLayout.HORIZONTAL);
+            actions.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+            MaterialButton edit = compactButton("Edit", false);
             edit.setOnClickListener(v -> showExpenseDialog(entry));
-            item.addView(edit);
-            Button delete = button("×", false);
+            actions.addView(edit);
+
+            MaterialButton delete = compactButton("Delete", false);
+            delete.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
+            delete.setBackgroundTintList(ColorStateList.valueOf(
+                    withAlpha(resolveColor(androidx.appcompat.R.attr.colorError), 0x12)));
+            LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(-2, -2);
+            deleteParams.leftMargin = dp(8);
+            actions.addView(delete, deleteParams);
             delete.setOnClickListener(v -> confirmDeleteExpense(entry));
-            item.addView(delete);
-            container.addView(item);
+
+            item.addView(actions);
+            LinearLayout.LayoutParams itemParams = new LinearLayout.LayoutParams(-1, -2);
+            itemParams.bottomMargin = dp(8);
+            container.addView(item, itemParams);
             shown++;
         }
         if (shown == 0) {
