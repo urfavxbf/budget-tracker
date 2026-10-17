@@ -17,7 +17,7 @@ import java.util.TreeMap;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
-    private static final int DATABASE_VERSION = 8;
+    private static final int DATABASE_VERSION = 9;
     private final Context context;
 
     public WorkDatabase(Context context) {
@@ -53,6 +53,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         createPaydayPaymentsTable(db);
         createBudgetCycleAllocationsTable(db);
         createExpenseSavingsDrawsTable(db);
+        createCategoryBudgetLimitsTable(db);
     }
 
     private static void createExpensesTable(SQLiteDatabase db) {
@@ -90,6 +91,47 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             db.execSQL("ALTER TABLE budget_cycle_allocations ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0");
         }
         if (oldVersion < 8) createExpenseSavingsDrawsTable(db);
+        if (oldVersion < 9) createCategoryBudgetLimitsTable(db);
+    }
+
+    private static void createCategoryBudgetLimitsTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS category_budget_limits (" +
+                "category TEXT PRIMARY KEY COLLATE NOCASE," +
+                "limit_amount TEXT NOT NULL," +
+                "updated_at INTEGER NOT NULL)");
+    }
+
+    /** Returns saved category spending limits keyed by category name. */
+    public Map<String, BigDecimal> getCategoryBudgetLimits() {
+        Map<String, BigDecimal> limits = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT category, limit_amount FROM category_budget_limits ORDER BY category COLLATE NOCASE", null)) {
+            while (cursor.moveToNext()) {
+                try {
+                    limits.put(cursor.getString(0), new BigDecimal(cursor.getString(1))
+                            .setScale(2, java.math.RoundingMode.HALF_UP));
+                } catch (NumberFormatException ignored) {
+                    // Skip a malformed limit without hiding other valid saved categories.
+                }
+            }
+        }
+        return limits;
+    }
+
+    public boolean saveCategoryBudgetLimit(String category, BigDecimal limit) {
+        if (category == null || category.trim().isEmpty() || limit == null || limit.signum() < 0) return false;
+        ContentValues values = new ContentValues();
+        values.put("category", category.trim());
+        values.put("limit_amount", limit.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        values.put("updated_at", System.currentTimeMillis());
+        return getWritableDatabase().insertWithOnConflict("category_budget_limits", null, values,
+                SQLiteDatabase.CONFLICT_REPLACE) != -1;
+    }
+
+    public boolean deleteCategoryBudgetLimit(String category) {
+        if (category == null || category.trim().isEmpty()) return false;
+        return getWritableDatabase().delete("category_budget_limits", "category = ?",
+                new String[]{category.trim()}) > 0;
     }
 
     private static void createExpenseSavingsDrawsTable(SQLiteDatabase db) {
