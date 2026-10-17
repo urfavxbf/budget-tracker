@@ -1321,8 +1321,31 @@ public final class MainActivity extends FragmentActivity {
                 goalCard.addView(goalProgress, goalProgressParams);
                 String detail = goal.targetDate.isEmpty() ? "No target date"
                         : "Target date: " + goal.targetDate;
-                if (goal.savedAmount.compareTo(goal.targetAmount) >= 0) detail += " · Goal reached!";
-                else detail += " · " + money(goal.targetAmount.subtract(goal.savedAmount)) + " to go";
+                BigDecimal remainingForGoal = goal.targetAmount.subtract(goal.savedAmount).max(BigDecimal.ZERO);
+                if (goal.savedAmount.compareTo(goal.targetAmount) >= 0) {
+                    detail += " · Goal reached!";
+                } else {
+                    detail += " · " + money(remainingForGoal) + " to go";
+                    if (!goal.targetDate.isEmpty()) {
+                        try {
+                            LocalDate deadline = LocalDate.parse(goal.targetDate);
+                            long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), deadline);
+                            if (daysRemaining < 0) {
+                                detail += " · Overdue by " + Math.abs(daysRemaining)
+                                        + (Math.abs(daysRemaining) == 1 ? " day" : " days");
+                            } else if (daysRemaining == 0) {
+                                detail += " · Due today";
+                            } else {
+                                detail += " · " + daysRemaining + (daysRemaining == 1 ? " day" : " days") + " left";
+                                BigDecimal dailyTarget = remainingForGoal.divide(BigDecimal.valueOf(daysRemaining),
+                                        2, java.math.RoundingMode.CEILING);
+                                detail += " · Save about " + money(dailyTarget) + "/day";
+                            }
+                        } catch (DateTimeParseException ignored) {
+                            // Ignore a legacy malformed date; editing the goal lets the user correct it.
+                        }
+                    }
+                }
                 TextView detailView = text(detail, 12, false);
                 detailView.setTextColor(resolveColor(android.R.attr.textColorSecondary));
                 goalCard.addView(detailView);
