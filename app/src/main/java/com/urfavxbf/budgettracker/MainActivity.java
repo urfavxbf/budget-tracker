@@ -401,7 +401,11 @@ public final class MainActivity extends FragmentActivity {
         BigDecimal spent = activePayment == null
                 ? database.getExpenseTotal(cutoffStart.toString(), cutoffEnd.toString())
                 : database.getExpenseTotal(activePayment.paydayDate, today.toString());
-        BigDecimal net = earned.subtract(spent).setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal availableCash = getAvailableCashBalance();
+        CutoffPeriod upcomingPayCutoff = getCutoffAwaitingPayment(today);
+        LocalDate upcomingPayday = getScheduledPayday(upcomingPayCutoff);
+        BigDecimal expectedUpcomingSalary = database.getRecordedNetPayTotal(
+                upcomingPayCutoff.startDate.toString(), upcomingPayCutoff.endDate.toString());
         long daysLeft = Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(today, payday));
 
         final int ink = resolveColor(com.google.android.material.R.attr.colorOnSurface);
@@ -437,7 +441,7 @@ public final class MainActivity extends FragmentActivity {
         balance.setBackground(roundedBackground(navy, dp(22)));
         LinearLayout balanceHeader = new LinearLayout(this);
         balanceHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView balanceLabel = text("AVAILABLE THIS CUTOFF", 11, true);
+        TextView balanceLabel = text("AVAILABLE CASH", 11, true);
         balanceLabel.setTextColor(0xFFB8C7E3);
         balanceHeader.addView(balanceLabel, new LinearLayout.LayoutParams(0, -2, 1f));
         TextView paydayLabel = text("PAYDAY  ·  " + payday.format(DateTimeFormatter.ofPattern("MMM d")), 10, true);
@@ -446,11 +450,11 @@ public final class MainActivity extends FragmentActivity {
         paydayLabel.setBackground(roundedBackground(0xFF2B3B5E, dp(14)));
         balanceHeader.addView(paydayLabel);
         balance.addView(balanceHeader);
-        TextView balanceValue = text(money(net), 30, true);
+        TextView balanceValue = text(money(availableCash), 30, true);
         balanceValue.setTextColor(0xFFFFFFFF);
         balanceValue.setPadding(0, dp(10), 0, dp(5));
         balance.addView(balanceValue);
-        TextView balanceTrend = text((net.signum() >= 0 ? "↗  " : "↘  ")
+        TextView balanceTrend = text((availableCash.signum() >= 0 ? "↗  " : "↘  ")
                 + (daysLeft == 0 ? "Payday is here" : daysLeft + (daysLeft == 1 ? " day" : " days") + " until payday"), 12, true);
         balanceTrend.setTextColor(0xFF87E8B8);
         balance.addView(balanceTrend);
@@ -478,6 +482,8 @@ public final class MainActivity extends FragmentActivity {
         split.addView(expenseColumn, new LinearLayout.LayoutParams(0, -2, 1f));
         balance.addView(split);
         page.addView(balance);
+        rowCards("Expected salary", money(expectedUpcomingSalary), "Next payday",
+                upcomingPayday.format(DateTimeFormatter.ofPattern("MMM d")));
 
         View actionSpacer = space(dp(18));
         page.addView(actionSpacer, new LinearLayout.LayoutParams(1, dp(18)));
@@ -1337,7 +1343,7 @@ public final class MainActivity extends FragmentActivity {
                     .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                     .setPositiveButton("Remove", (dialog, which) -> {
                         database.deleteCategoryBudgetLimit(category);
-                        showTab(3);
+                        showTab(2);
                     }).show());
             actions.addView(remove);
         }
@@ -1372,7 +1378,7 @@ public final class MainActivity extends FragmentActivity {
                         if (!database.saveCategoryBudgetLimit(category, limit)) {
                             throw new IllegalArgumentException("Could not save this category limit.");
                         }
-                        showTab(3);
+                        showTab(2);
                         toast("Category budget saved.");
                     } catch (NumberFormatException ex) {
                         toast("Enter a valid category limit.");
