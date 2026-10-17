@@ -80,6 +80,7 @@ public final class MainActivity extends FragmentActivity {
     private Button saveExpenseButton;
     private boolean lastSaveSucceeded;
     private boolean paydayDialogShowing;
+    private boolean updatingNavigation;
     private View openSwipeContent;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -183,6 +184,7 @@ public final class MainActivity extends FragmentActivity {
         bottomNav.getMenu().add(0, NAV_BUDGET_ID, 2, "Budget").setIcon(R.drawable.ic_history);
         bottomNav.getMenu().add(0, NAV_SETTINGS_ID, 3, "Settings").setIcon(R.drawable.ic_settings);
         bottomNav.setOnItemSelectedListener(item -> {
+            if (updatingNavigation) return true;
             int tab;
             if (item.getItemId() == NAV_HOME_ID) {
                 tab = 0;
@@ -216,7 +218,9 @@ public final class MainActivity extends FragmentActivity {
                     : tab == 1 ? NAV_HISTORY_ID
                     : tab == 2 ? NAV_BUDGET_ID : NAV_SETTINGS_ID;
             if (bottomNav.getSelectedItemId() != selectedId) {
+                updatingNavigation = true;
                 bottomNav.setSelectedItemId(selectedId);
+                updatingNavigation = false;
             }
         }
         page.removeAllViews();
