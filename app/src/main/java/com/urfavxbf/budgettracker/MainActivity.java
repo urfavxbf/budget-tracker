@@ -403,18 +403,21 @@ public final class MainActivity extends FragmentActivity {
 
     private void buildDashboard() {
         LocalDate today = LocalDate.now();
-        LocalDate cutoffStart = today.getDayOfMonth() <= 15
-                ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
-        LocalDate cutoffEnd = today.getDayOfMonth() <= 15
-                ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
-        LocalDate payday = getScheduledPayday(getLatestPaydayCutoff(today));
-        WorkDatabase.PaydayPayment activePayment = database.getLatestPaydayPaymentOnOrBefore(today.toString());
+        int firstPayday = parsePaydayPreference("first_cutoff_payday", 22);
+        int secondPayday = parsePaydayPreference("second_cutoff_payday", 7);
+        CutoffPeriod currentPaydayCutoff = CutoffPeriod.forNextPayday(
+                today.minusDays(1), firstPayday, secondPayday);
+        LocalDate cycleStart = currentPaydayCutoff.payday(firstPayday, secondPayday);
+        LocalDate payday = CutoffPeriod.forNextPayday(today, firstPayday, secondPayday)
+                .payday(firstPayday, secondPayday);
+        WorkDatabase.PaydayPayment latestPayment = database.getLatestPaydayPaymentOnOrBefore(today.toString());
+        WorkDatabase.PaydayPayment activePayment = latestPayment != null
+                && !LocalDate.parse(latestPayment.paydayDate).isBefore(cycleStart) ? latestPayment : null;
         BigDecimal earned = activePayment == null
-                ? database.getRecordedNetPayTotal(cutoffStart.toString(), cutoffEnd.toString())
+                ? database.getRecordedNetPayTotal(currentPaydayCutoff.startDate.toString(),
+                        currentPaydayCutoff.endDate.toString())
                 : new BigDecimal(activePayment.receivedAmount);
-        BigDecimal spent = activePayment == null
-                ? database.getExpenseTotal(cutoffStart.toString(), cutoffEnd.toString())
-                : database.getExpenseTotal(activePayment.paydayDate, today.toString());
+        BigDecimal spent = database.getExpenseTotal(cycleStart.toString(), today.toString());
         BigDecimal availableCash = getAvailableCashBalance();
         CutoffPeriod upcomingPayCutoff = getLatestPaydayCutoff(today);
         LocalDate upcomingPayday = getScheduledPayday(upcomingPayCutoff);
@@ -1141,14 +1144,16 @@ public final class MainActivity extends FragmentActivity {
 
     private void buildBudgetScreen() {
         LocalDate today = LocalDate.now();
-        CutoffPeriod currentCutoff = CutoffPeriod.forDate(today);
-        WorkDatabase.PaydayPayment activePayment =
-                database.getLatestPaydayPaymentOnOrBefore(today.toString());
-        LocalDate cycleStart = activePayment == null
-                ? currentCutoff.startDate : LocalDate.parse(activePayment.paydayDate);
-
         int firstPayday = parsePaydayPreference("first_cutoff_payday", 22);
         int secondPayday = parsePaydayPreference("second_cutoff_payday", 7);
+        CutoffPeriod currentPaydayCutoff = CutoffPeriod.forNextPayday(
+                today.minusDays(1), firstPayday, secondPayday);
+        LocalDate cycleStart = currentPaydayCutoff.payday(firstPayday, secondPayday);
+        WorkDatabase.PaydayPayment latestPayment =
+                database.getLatestPaydayPaymentOnOrBefore(today.toString());
+        WorkDatabase.PaydayPayment activePayment = latestPayment != null
+                && !LocalDate.parse(latestPayment.paydayDate).isBefore(cycleStart) ? latestPayment : null;
+
         CutoffPeriod nextCutoff = CutoffPeriod.forNextPayday(today, firstPayday, secondPayday);
         LocalDate nextPayday = nextCutoff.payday(firstPayday, secondPayday);
         long daysUntilPayday = Math.max(0,
@@ -2276,23 +2281,17 @@ public final class MainActivity extends FragmentActivity {
         if (budgetSummaryView == null) return;
 
         LocalDate today = LocalDate.now();
-        CutoffPeriod cutoff = CutoffPeriod.forDate(today);
-        int firstPayday;
-        int secondPayday;
-        try {
-            firstPayday = Integer.parseInt(pref("first_cutoff_payday", "22"));
-        } catch (NumberFormatException ignored) {
-            firstPayday = 22;
-        }
-        try {
-            secondPayday = Integer.parseInt(pref("second_cutoff_payday", "7"));
-        } catch (NumberFormatException ignored) {
-            secondPayday = 7;
-        }
-
-        LocalDate payday = cutoff.payday(firstPayday, secondPayday);
-        WorkDatabase.PaydayPayment activePayment = database.getLatestPaydayPaymentOnOrBefore(today.toString());
-        LocalDate cycleStart = activePayment == null ? cutoff.startDate : LocalDate.parse(activePayment.paydayDate);
+        int firstPayday = parsePaydayPreference("first_cutoff_payday", 22);
+        int secondPayday = parsePaydayPreference("second_cutoff_payday", 7);
+        CutoffPeriod cutoff = CutoffPeriod.forNextPayday(
+                today.minusDays(1), firstPayday, secondPayday);
+        LocalDate cycleStart = cutoff.payday(firstPayday, secondPayday);
+        LocalDate payday = CutoffPeriod.forNextPayday(today, firstPayday, secondPayday)
+                .payday(firstPayday, secondPayday);
+        WorkDatabase.PaydayPayment latestPayment =
+                database.getLatestPaydayPaymentOnOrBefore(today.toString());
+        WorkDatabase.PaydayPayment activePayment = latestPayment != null
+                && !LocalDate.parse(latestPayment.paydayDate).isBefore(cycleStart) ? latestPayment : null;
         long daysUntilPayday = Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(today, payday));
         BigDecimal spent = database.getExpenseTotal(cycleStart.toString(), today.toString());
         BigDecimal totalCash = getTotalCashBalance();
