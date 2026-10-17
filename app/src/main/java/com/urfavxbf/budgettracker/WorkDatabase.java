@@ -17,7 +17,7 @@ import java.util.TreeMap;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
-    private static final int DATABASE_VERSION = 13;
+    private static final int DATABASE_VERSION = 14;
     private final Context context;
 
     public WorkDatabase(Context context) {
@@ -100,6 +100,10 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         if (oldVersion < 11) createSavingsGoalsTable(db);
         if (oldVersion < 12) createSavingsContributionsTable(db);
         if (oldVersion < 13) createSavingsWithdrawalsTable(db);
+        if (oldVersion < 14) {
+            db.execSQL("ALTER TABLE savings_goals ADD COLUMN completion_date TEXT NOT NULL DEFAULT ''");
+            backfillSavingsGoalCompletionDates(db);
+        }
     }
 
     private static void createCategoryBudgetLimitsTable(SQLiteDatabase db) {
@@ -919,6 +923,57 @@ public final class WorkDatabase extends SQLiteOpenHelper {
     }
 
 
+    /** Backfills a best-effort first completion date for existing goals with transfer history. */
+    private static void backfillSavingsGoalCompletionDates(SQLiteDatabase db) {
+        try (Cursor goals = db.rawQuery("SELECT id, target_amount, saved_amount FROM savings_goals", null)) {
+            while (goals.moveToNext()) {
+                long goalId = goals.getLong(0);
+                try {
+                    BigDecimal target = new BigDecimal(goals.getString(1));
+                    BigDecimal saved = new BigDecimal(goals.getString(2));
+                    if (saved.compareTo(target) < 0) continue;
+                    String completionDate = null;
+                    String sql = "SELECT activity_date, amount, direction FROM (" +
+                            "SELECT contribution_date AS activity_date, amount, 'in' AS direction, created_at " +
+                            "FROM savings_contributions WHERE goal_id = ? UNION ALL " +
+                            "SELECT withdrawal_date AS activity_date, amount, 'out' AS direction, created_at " +
+                            "FROM savings_withdrawals WHERE goal_id = ?) ORDER BY created_at ASC";
+                    BigDecimal running = BigDecimal.ZERO;
+                    try (Cursor history = db.rawQuery(sql,
+                            new String[]{Long.toString(goalId), Long.toString(goalId)})) {
+                        while (history.moveToNext()) {
+                            BigDecimal amount = new BigDecimal(history.getString(1));
+                            running = "in".equals(history.getString(2)) ? running.add(amount) : running.subtract(amount);
+                            if (running.compareTo(target) >= 0) {
+                                completionDate = history.getString(0);
+                                break;
+                            }
+                        }
+                    } catch (NumberFormatException ignored) {
+                        // Historical rows may predate strict amount validation.
+                    }
+                    if (completionDate == null) {
+                        try (Cursor created = db.rawQuery("SELECT created_at FROM savings_goals WHERE id = ?",
+                                new String[]{Long.toString(goalId)})) {
+                            if (created.moveToFirst()) {
+                                completionDate = java.time.Instant.ofEpochMilli(created.getLong(0))
+                                        .atZone(java.time.ZoneId.systemDefault()).toLocalDate().toString();
+                            }
+                        }
+                    }
+                    if (completionDate != null) {
+                        ContentValues values = new ContentValues();
+                        values.put("completion_date", completionDate);
+                        db.update("savings_goals", values, "id = ? AND completion_date = ''",
+                                new String[]{Long.toString(goalId)});
+                    }
+                } catch (NumberFormatException ignored) {
+                    // Ignore malformed legacy amounts without blocking database upgrades.
+                }
+            }
+        }
+    }
+
     private static void createSavingsGoalsTable(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS savings_goals (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
@@ -926,7 +981,8 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 "target_amount TEXT NOT NULL," +
                 "saved_amount TEXT NOT NULL DEFAULT '0.00'," +
                 "target_date TEXT NOT NULL DEFAULT ''," +
-                "created_at INTEGER NOT NULL)");
+                "created_at INTEGER NOT NULL," +
+                "completion_date TEXT NOT NULL DEFAULT '')");
     }
 
 
@@ -1037,12 +1093,12 @@ public final class WorkDatabase extends SQLiteOpenHelper {
     public List<SavingsGoal> getSavingsGoals() {
         List<SavingsGoal> goals = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().rawQuery(
-                "SELECT id, name, target_amount, saved_amount, target_date FROM savings_goals ORDER BY created_at DESC, id DESC", null)) {
+                "SELECT id, name, target_amount, saved_amount, target_date, completion_date FROM savings_goals ORDER BY created_at DESC, id DESC", null)) {
             while (cursor.moveToNext()) {
                 try {
                     goals.add(new SavingsGoal(cursor.getLong(0), cursor.getString(1),
                             new BigDecimal(cursor.getString(2)), new BigDecimal(cursor.getString(3)),
-                            cursor.getString(4)));
+                            cursor.getString(4), cursor.getString(5)));
                 } catch (NumberFormatException ignored) {
                     // Skip only malformed goal rows; preserve the rest of the list.
                 }
@@ -1057,15 +1113,28 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         db.beginTransaction();
         try {
             String current = null;
-            try (Cursor cursor = db.rawQuery("SELECT saved_amount FROM savings_goals WHERE id = ?",
+            String target = null;
+            String completionDate = "";
+            try (Cursor cursor = db.rawQuery("SELECT saved_amount, target_amount, completion_date FROM savings_goals WHERE id = ?",
                     new String[]{Long.toString(goalId)})) {
-                if (cursor.moveToFirst()) current = cursor.getString(0);
+                if (cursor.moveToFirst()) {
+                    current = cursor.getString(0);
+                    target = cursor.getString(1);
+                    completionDate = cursor.getString(2);
+                }
             }
-            if (current == null) return false;
+            if (current == null || target == null) return false;
             BigDecimal normalized = amount.setScale(2, java.math.RoundingMode.HALF_UP);
-            BigDecimal next = new BigDecimal(current).add(normalized).setScale(2, java.math.RoundingMode.HALF_UP);
+            BigDecimal currentAmount = new BigDecimal(current);
+            BigDecimal targetAmount = new BigDecimal(target);
+            BigDecimal next = currentAmount.add(normalized).setScale(2, java.math.RoundingMode.HALF_UP);
             ContentValues update = new ContentValues();
             update.put("saved_amount", next.toPlainString());
+            if (completionDate == null || completionDate.isEmpty()) {
+                if (currentAmount.compareTo(targetAmount) < 0 && next.compareTo(targetAmount) >= 0) {
+                    update.put("completion_date", java.time.LocalDate.now().toString());
+                }
+            }
             boolean success = db.update("savings_goals", update, "id = ?", new String[]{Long.toString(goalId)}) > 0;
             if (success) {
                 ContentValues transaction = new ContentValues();
@@ -1107,13 +1176,20 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         public final BigDecimal targetAmount;
         public final BigDecimal savedAmount;
         public final String targetDate;
+        public final String completionDate;
 
-        SavingsGoal(long id, String name, BigDecimal targetAmount, BigDecimal savedAmount, String targetDate) {
+        SavingsGoal(long id, String name, BigDecimal targetAmount, BigDecimal savedAmount,
+                    String targetDate, String completionDate) {
             this.id = id;
             this.name = name;
             this.targetAmount = targetAmount;
             this.savedAmount = savedAmount;
             this.targetDate = targetDate == null ? "" : targetDate;
+            this.completionDate = completionDate == null ? "" : completionDate;
+        }
+
+        public boolean isCompleted() {
+            return savedAmount.compareTo(targetAmount) >= 0;
         }
     }
 
