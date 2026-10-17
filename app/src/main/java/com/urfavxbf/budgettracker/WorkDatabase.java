@@ -17,7 +17,7 @@ import java.util.TreeMap;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
-    private static final int DATABASE_VERSION = 9;
+    private static final int DATABASE_VERSION = 10;
     private final Context context;
 
     public WorkDatabase(Context context) {
@@ -54,6 +54,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         createBudgetCycleAllocationsTable(db);
         createExpenseSavingsDrawsTable(db);
         createCategoryBudgetLimitsTable(db);
+        createCashBalanceAdjustmentsTable(db);
     }
 
     private static void createExpensesTable(SQLiteDatabase db) {
@@ -92,6 +93,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         }
         if (oldVersion < 8) createExpenseSavingsDrawsTable(db);
         if (oldVersion < 9) createCategoryBudgetLimitsTable(db);
+        if (oldVersion < 10) createCashBalanceAdjustmentsTable(db);
     }
 
     private static void createCategoryBudgetLimitsTable(SQLiteDatabase db) {
@@ -307,6 +309,70 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             PaydayPayment payment = new PaydayPayment(cursor.getString(0), cursor.getString(1),
                     cursor.getString(2), cursor.getString(3), cursor.getString(4));
             return new BudgetCyclePending(payment, cursor.getString(5));
+        }
+    }
+
+
+    private static void createCashBalanceAdjustmentsTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS cash_balance_adjustments (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "adjustment_date TEXT NOT NULL," +
+                "adjustment_amount TEXT NOT NULL," +
+                "target_available_balance TEXT NOT NULL," +
+                "note TEXT NOT NULL DEFAULT ''," +
+                "created_at INTEGER NOT NULL)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_cash_balance_adjustments_date " +
+                "ON cash_balance_adjustments(adjustment_date, id)");
+    }
+
+    /** Stores the signed difference needed to reconcile calculated available cash to the user's actual cash. */
+    public boolean addCashBalanceAdjustment(String date, BigDecimal adjustmentAmount,
+                                            BigDecimal targetAvailableBalance, String note) {
+        if (date == null || date.trim().isEmpty() || adjustmentAmount == null
+                || targetAvailableBalance == null || targetAvailableBalance.signum() < 0) return false;
+        ContentValues values = new ContentValues();
+        values.put("adjustment_date", date);
+        values.put("adjustment_amount", adjustmentAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        values.put("target_available_balance", targetAvailableBalance.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        values.put("note", note == null ? "" : note.trim());
+        values.put("created_at", System.currentTimeMillis());
+        return getWritableDatabase().insert("cash_balance_adjustments", null, values) != -1;
+    }
+
+    public BigDecimal getCashBalanceAdjustmentTotalOnOrBefore(String date) {
+        BigDecimal total = BigDecimal.ZERO;
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT adjustment_amount FROM cash_balance_adjustments WHERE adjustment_date <= ?",
+                new String[]{date})) {
+            while (cursor.moveToNext()) total = total.add(new BigDecimal(cursor.getString(0)));
+        }
+        return total.setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    public List<CashBalanceAdjustment> getRecentCashBalanceAdjustments(int limit) {
+        List<CashBalanceAdjustment> adjustments = new ArrayList<>();
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT id, adjustment_date, adjustment_amount, target_available_balance, note " +
+                        "FROM cash_balance_adjustments ORDER BY adjustment_date DESC, id DESC LIMIT ?",
+                new String[]{Integer.toString(Math.max(1, limit))})) {
+            while (cursor.moveToNext()) {
+                adjustments.add(new CashBalanceAdjustment(cursor.getLong(0), cursor.getString(1),
+                        cursor.getString(2), cursor.getString(3), cursor.getString(4)));
+            }
+        }
+        return adjustments;
+    }
+
+    public static final class CashBalanceAdjustment {
+        public final long id;
+        public final String date, amount, targetAvailableBalance, note;
+
+        CashBalanceAdjustment(long id, String date, String amount, String targetAvailableBalance, String note) {
+            this.id = id;
+            this.date = date;
+            this.amount = amount;
+            this.targetAvailableBalance = targetAvailableBalance;
+            this.note = note;
         }
     }
 
