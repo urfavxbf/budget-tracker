@@ -1281,7 +1281,17 @@ public final class MainActivity extends FragmentActivity {
         savingsSummary.addView(text("Total savings", 13, false));
         savingsSummary.addView(text(money(database.getTotalSavingsBalance()), 25, true));
         savingsSummary.addView(text("Available to Spend: " + money(getAvailableCashBalance()), 13, false));
-        savingsSummary.addView(text("Contributions to a goal transfer money from Available to Spend into your savings balance.", 12, false));
+        savingsSummary.addView(text("Contributions transfer money from Available to Spend into savings. Withdrawals return money to Available to Spend.", 12, false));
+        MaterialButton withdrawSavings = button("Withdraw from savings", false);
+        withdrawSavings.setOnClickListener(v -> {
+            List<WorkDatabase.SavingsGoal> goals = database.getSavingsGoals();
+            if (goals.isEmpty()) {
+                toast("Create a savings goal first to track a withdrawal.");
+                return;
+            }
+            showSavingsWithdrawalGoalPicker(goals);
+        });
+        savingsSummary.addView(withdrawSavings);
         page.addView(savingsSummary);
 
         section("Savings goals");
@@ -1320,6 +1330,8 @@ public final class MainActivity extends FragmentActivity {
                 goalActions.setOrientation(LinearLayout.HORIZONTAL);
                 MaterialButton contribute = compactButton("＋ Add savings", true);
                 contribute.setOnClickListener(v -> showSavingsContributionDialog(goal));
+                MaterialButton withdrawGoal = compactButton("Withdraw", false);
+                withdrawGoal.setOnClickListener(v -> showSavingsWithdrawalDialog(goal));
                 MaterialButton editGoal = compactButton("Edit", false);
                 editGoal.setOnClickListener(v -> showSavingsGoalDialog(goal));
                 MaterialButton deleteGoal = compactButton("Delete", false);
@@ -1334,11 +1346,23 @@ public final class MainActivity extends FragmentActivity {
                             } else toast("Could not delete savings goal.");
                         }).show());
                 goalActions.addView(contribute);
+                goalActions.addView(withdrawGoal);
                 goalActions.addView(editGoal);
                 goalActions.addView(deleteGoal);
                 goalCard.addView(goalActions);
                 page.addView(goalCard);
             }
+        }
+
+        section("Savings activity");
+        List<String> savingsActivity = database.getRecentSavingsActivity(20);
+        if (savingsActivity.isEmpty()) {
+            page.addView(emptyState("No savings transfers yet", "Contributions and withdrawals will appear here."));
+        } else {
+            LinearLayout savingsActivityList = new LinearLayout(this);
+            savingsActivityList.setOrientation(LinearLayout.VERTICAL);
+            page.addView(savingsActivityList);
+            for (String activity : savingsActivity) addListItem(savingsActivityList, activity);
         }
 
         section("Expenses");
@@ -1403,6 +1427,51 @@ public final class MainActivity extends FragmentActivity {
             }
         }));
         dialog.show();
+    }
+
+    private void showSavingsWithdrawalGoalPicker(List<WorkDatabase.SavingsGoal> goals) {
+        String[] names = new String[goals.size()];
+        for (int i = 0; i < goals.size(); i++) names[i] = goals.get(i).name +
+                " · " + money(goals.get(i).savedAmount);
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Choose savings goal")
+                .setItems(names, (dialog, which) -> showSavingsWithdrawalDialog(goals.get(which)))
+                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                .show();
+    }
+
+    private void showSavingsWithdrawalDialog(WorkDatabase.SavingsGoal goal) {
+        EditText amountInput = field("Amount to withdraw (₱)", "",
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        BigDecimal savings = database.getTotalSavingsBalance();
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Withdraw from " + goal.name)
+                .setMessage("Goal balance: " + money(goal.savedAmount) +
+                        "\nTotal savings: " + money(savings) +
+                        "\nAvailable to Spend now: " + money(getAvailableCashBalance()) +
+                        "\n\nThe withdrawal reduces this goal and total savings, and returns the amount to Available to Spend.")
+                .setView(amountInput)
+                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                .setPositiveButton("Withdraw", (dialog, which) -> {
+                    try {
+                        BigDecimal amount = decimal(amountInput, "Withdrawal")
+                                .setScale(2, java.math.RoundingMode.HALF_UP);
+                        if (amount.signum() <= 0) throw new IllegalArgumentException("Withdrawal must be greater than zero.");
+                        if (amount.compareTo(goal.savedAmount) > 0) {
+                            throw new IllegalArgumentException("You can withdraw up to " + money(goal.savedAmount) +
+                                    " from this goal.");
+                        }
+                        if (!database.withdrawFromSavingsGoal(goal.id, amount)) {
+                            toast("Could not withdraw. Refresh the goal balance and try again.");
+                            return;
+                        }
+                        toast("Savings withdrawn to Available to Spend.");
+                        showTab(2);
+                    } catch (IllegalArgumentException ex) {
+                        toast(ex.getMessage());
+                    }
+                })
+                .show();
     }
 
     private void showSavingsContributionDialog(WorkDatabase.SavingsGoal goal) {
