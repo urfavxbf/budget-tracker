@@ -458,6 +458,16 @@ public final class MainActivity extends FragmentActivity {
         TextView balanceLabel = text("AVAILABLE CASH", 11, true);
         balanceLabel.setTextColor(0xFFB8C7E3);
         balanceHeader.addView(balanceLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView editCashButton = text("✎ Edit", 12, true);
+        editCashButton.setTextColor(0xFFFFFFFF);
+        editCashButton.setPadding(dp(10), dp(7), dp(10), dp(7));
+        editCashButton.setBackground(roundedBackground(0xFF2B3B5E, dp(12)));
+        editCashButton.setClickable(true);
+        editCashButton.setFocusable(true);
+        editCashButton.setOnClickListener(v -> showReconcileCashDialog(getAvailableCashBalance()));
+        LinearLayout.LayoutParams editCashParams = new LinearLayout.LayoutParams(-2, -2);
+        editCashParams.rightMargin = dp(8);
+        balanceHeader.addView(editCashButton, editCashParams);
         TextView paydayLabel = text("PAYDAY  ·  " + payday.format(DateTimeFormatter.ofPattern("MMM d")), 10, true);
         paydayLabel.setTextColor(0xFFFFFFFF);
         paydayLabel.setPadding(dp(9), dp(6), dp(9), dp(6));
@@ -1798,9 +1808,37 @@ public final class MainActivity extends FragmentActivity {
         actionsParams.bottomMargin = dp(10);
         historyContainer.addView(actions, actionsParams);
 
+        List<WorkDatabase.CashBalanceAdjustment> cashAdjustments =
+                database.getRecentCashBalanceAdjustments(10);
+        if (!cashAdjustments.isEmpty()) {
+            addSection(historyContainer, "Cash balance adjustments");
+            TextView adjustmentHint = text("Reconciliation records are kept separately and do not change past income or expense entries.", 12, false);
+            adjustmentHint.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+            historyContainer.addView(adjustmentHint);
+            for (WorkDatabase.CashBalanceAdjustment adjustment : cashAdjustments) {
+                LinearLayout adjustmentCard = cardContainer();
+                adjustmentCard.setPadding(dp(14), dp(12), dp(14), dp(12));
+                TextView adjustmentTitle = text(adjustment.date + " · " + money(new BigDecimal(adjustment.targetAvailableBalance))
+                        + " actual cash", 14, true);
+                adjustmentCard.addView(adjustmentTitle);
+                BigDecimal delta = new BigDecimal(adjustment.amount);
+                TextView adjustmentDelta = text("Adjustment: " + (delta.signum() > 0 ? "+" : "") + money(delta), 13, true);
+                adjustmentDelta.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+                adjustmentCard.addView(adjustmentDelta);
+                if (adjustment.note != null && !adjustment.note.trim().isEmpty()) {
+                    TextView adjustmentNote = text(adjustment.note, 12, false);
+                    adjustmentNote.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+                    adjustmentCard.addView(adjustmentNote);
+                }
+                historyContainer.addView(adjustmentCard);
+            }
+        }
+
         if (days.isEmpty()) {
-            historyContainer.addView(emptyState("No activity yet",
-                    "Add a work shift or expense to start tracking your activity."));
+            if (cashAdjustments.isEmpty()) {
+                historyContainer.addView(emptyState("No activity yet",
+                        "Add a work shift or expense to start tracking your activity."));
+            }
             return;
         }
 
@@ -2289,6 +2327,62 @@ public final class MainActivity extends FragmentActivity {
         budgetSummaryView.setText(summary.toString());
     }
 
+
+    private void showReconcileCashDialog(BigDecimal currentAvailableCash) {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(4), dp(4), dp(4), dp(4));
+
+        TextView current = text("Calculated available cash: " + money(currentAvailableCash), 14, true);
+        current.setPadding(0, 0, 0, dp(8));
+        form.addView(current);
+        TextView explanation = text(
+                "Enter the actual cash you currently have. The app will save the difference as a separate adjustment record; existing income, expenses, and savings records will remain unchanged.",
+                13, false);
+        explanation.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        explanation.setPadding(0, 0, 0, dp(10));
+        form.addView(explanation);
+
+        EditText actualCashInput = field("Actual available cash", currentAvailableCash.max(BigDecimal.ZERO)
+                        .setScale(2, java.math.RoundingMode.HALF_UP).toPlainString(),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        addField(form, "Actual available cash (₱)", actualCashInput);
+
+        EditText noteInput = field("Optional reason (e.g. cash not recorded)", "",
+                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        addField(form, "Note (optional)", noteInput);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("Reconcile available cash")
+                .setView(form)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Save adjustment", (dialog, which) -> {
+                    try {
+                        BigDecimal actual = decimal(actualCashInput, "Actual available cash")
+                                .setScale(2, java.math.RoundingMode.HALF_UP);
+                        if (actual.signum() < 0) {
+                            toast("Actual available cash cannot be negative.");
+                            return;
+                        }
+                        BigDecimal currentBalance = getAvailableCashBalance();
+                        BigDecimal difference = actual.subtract(currentBalance)
+                                .setScale(2, java.math.RoundingMode.HALF_UP);
+                        boolean saved = database.addCashBalanceAdjustment(LocalDate.now().toString(),
+                                difference, actual, value(noteInput));
+                        if (!saved) {
+                            toast("Could not save the cash adjustment. Please try again.");
+                            return;
+                        }
+                        toast("Cash reconciled. Adjustment: " + (difference.signum() > 0 ? "+" : "")
+                                + money(difference));
+                        showTab(0);
+                    } catch (IllegalArgumentException ex) {
+                        toast(ex.getMessage());
+                    }
+                })
+                .show();
+    }
+
     private BigDecimal getTotalCashBalance() {
         BigDecimal opening;
         try {
@@ -2299,6 +2393,7 @@ public final class MainActivity extends FragmentActivity {
         String today = LocalDate.now().toString();
         return opening.add(database.getTotalReceivedPayOnOrBefore(today))
                 .subtract(database.getAllExpensesTotalOnOrBefore(today))
+                .add(database.getCashBalanceAdjustmentTotalOnOrBefore(today))
                 .setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
