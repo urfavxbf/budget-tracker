@@ -59,6 +59,8 @@ public final class MainActivity extends FragmentActivity {
     private static final int NAV_SETTINGS_ID = 3;
     private int currentTab = 0;
     private EditText dateInput, timeInInput, timeOutInput;
+    private EditText totalHoursInput;
+    private CheckBox hoursOnlyMode;
     private EditText hourlyRateInput, regularHoursInput, overtimeMultiplierInput, allowanceInput, deductionInput;
     private EditText firstPaydayInput, secondPaydayInput;
     private MaterialAutoCompleteTextView payRateTypeInput;
@@ -205,6 +207,8 @@ public final class MainActivity extends FragmentActivity {
         page.removeAllViews();
         breakInputs.clear();
         dateInput = timeInInput = timeOutInput = null;
+        totalHoursInput = null;
+        hoursOnlyMode = null;
         hourlyRateInput = regularHoursInput = overtimeMultiplierInput = allowanceInput = deductionInput = null;
         expenseDateInput = null;
         expenseCategoryInput = null;
