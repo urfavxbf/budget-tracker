@@ -23,6 +23,38 @@ public final class CutoffPeriod {
         return new CutoffPeriod(date.withDayOfMonth(16), date.withDayOfMonth(date.lengthOfMonth()));
     }
 
+    /**
+     * Returns the cutoff whose payday is next after today. On the payday itself,
+     * advances to the following scheduled payday and its cutoff.
+     */
+    public static CutoffPeriod forNextPayday(LocalDate today, int firstCutoffPayday, int secondCutoffPayday) {
+        if (today == null) {
+            throw new IllegalArgumentException("Date is required.");
+        }
+
+        CutoffPeriod next = null;
+        LocalDate nextPayday = null;
+        // Search surrounding months because the second cutoff is paid in the following month.
+        for (int offset = -1; offset <= 2; offset++) {
+            LocalDate month = today.withDayOfMonth(1).plusMonths(offset);
+            CutoffPeriod[] candidates = {
+                    forDate(month.withDayOfMonth(1)),
+                    forDate(month.withDayOfMonth(16))
+            };
+            for (CutoffPeriod candidate : candidates) {
+                LocalDate payday = candidate.payday(firstCutoffPayday, secondCutoffPayday);
+                if (payday.isAfter(today) && (nextPayday == null || payday.isBefore(nextPayday))) {
+                    next = candidate;
+                    nextPayday = payday;
+                }
+            }
+        }
+        if (next == null) {
+            throw new IllegalStateException("Unable to determine the next cutoff payday.");
+        }
+        return next;
+    }
+
     public LocalDate payday(int firstCutoffPayday, int secondCutoffPayday) {
         boolean firstCutoff = startDate.getDayOfMonth() == 1;
         int requestedDay = firstCutoff ? firstCutoffPayday : secondCutoffPayday;
