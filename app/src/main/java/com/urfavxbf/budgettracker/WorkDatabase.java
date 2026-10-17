@@ -17,7 +17,7 @@ import java.util.TreeMap;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
-    private static final int DATABASE_VERSION = 12;
+    private static final int DATABASE_VERSION = 13;
     private final Context context;
 
     public WorkDatabase(Context context) {
@@ -57,6 +57,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         createCashBalanceAdjustmentsTable(db);
         createSavingsGoalsTable(db);
         createSavingsContributionsTable(db);
+        createSavingsWithdrawalsTable(db);
     }
 
     private static void createExpensesTable(SQLiteDatabase db) {
@@ -98,6 +99,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         if (oldVersion < 10) createCashBalanceAdjustmentsTable(db);
         if (oldVersion < 11) createSavingsGoalsTable(db);
         if (oldVersion < 12) createSavingsContributionsTable(db);
+        if (oldVersion < 13) createSavingsWithdrawalsTable(db);
     }
 
     private static void createCategoryBudgetLimitsTable(SQLiteDatabase db) {
@@ -251,6 +253,10 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             try (Cursor contributions = getReadableDatabase().rawQuery(
                     "SELECT amount FROM savings_contributions", null)) {
                 while (contributions.moveToNext()) total = total.add(new BigDecimal(contributions.getString(0)));
+            }
+            try (Cursor withdrawals = getReadableDatabase().rawQuery(
+                    "SELECT amount FROM savings_withdrawals", null)) {
+                while (withdrawals.moveToNext()) total = total.subtract(new BigDecimal(withdrawals.getString(0)));
             }
             return total.max(BigDecimal.ZERO).setScale(2, java.math.RoundingMode.HALF_UP);
         }
@@ -934,6 +940,86 @@ public final class WorkDatabase extends SQLiteOpenHelper {
                 "created_at INTEGER NOT NULL)");
         db.execSQL("CREATE INDEX IF NOT EXISTS index_savings_contributions_date " +
                 "ON savings_contributions(contribution_date, id)");
+    }
+
+    private static void createSavingsWithdrawalsTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS savings_withdrawals (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "goal_id INTEGER NOT NULL," +
+                "amount TEXT NOT NULL," +
+                "withdrawal_date TEXT NOT NULL," +
+                "note TEXT NOT NULL DEFAULT ''," +
+                "created_at INTEGER NOT NULL)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_savings_withdrawals_date " +
+                "ON savings_withdrawals(withdrawal_date, id)");
+    }
+
+    /** Withdraws from a specific goal and records the balance transfer atomically. */
+    public boolean withdrawFromSavingsGoal(long goalId, BigDecimal amount) {
+        if (goalId <= 0 || amount == null || amount.signum() <= 0) return false;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            String current = null;
+            try (Cursor cursor = db.rawQuery("SELECT saved_amount FROM savings_goals WHERE id = ?",
+                    new String[]{Long.toString(goalId)})) {
+                if (cursor.moveToFirst()) current = cursor.getString(0);
+            }
+            if (current == null) return false;
+            BigDecimal normalized = amount.setScale(2, java.math.RoundingMode.HALF_UP);
+            BigDecimal currentAmount = new BigDecimal(current);
+            if (normalized.compareTo(currentAmount) > 0) return false;
+            BigDecimal next = currentAmount.subtract(normalized).setScale(2, java.math.RoundingMode.HALF_UP);
+            ContentValues update = new ContentValues();
+            update.put("saved_amount", next.toPlainString());
+            boolean success = db.update("savings_goals", update, "id = ?",
+                    new String[]{Long.toString(goalId)}) > 0;
+            if (success) {
+                ContentValues transaction = new ContentValues();
+                transaction.put("goal_id", goalId);
+                transaction.put("amount", normalized.toPlainString());
+                transaction.put("withdrawal_date", java.time.LocalDate.now().toString());
+                transaction.put("note", "Savings goal withdrawal");
+                transaction.put("created_at", System.currentTimeMillis());
+                success = db.insert("savings_withdrawals", null, transaction) != -1;
+            }
+            if (success) db.setTransactionSuccessful();
+            return success;
+        } catch (NumberFormatException ignored) {
+            return false;
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    /** Recent savings transfers, newest first. Amounts are signed from the savings perspective. */
+    public List<String> getRecentSavingsActivity(int limit) {
+        List<String> activity = new ArrayList<>();
+        int safeLimit = Math.max(1, Math.min(limit, 100));
+        String sql = "SELECT activity_date, description, amount, direction FROM (" +
+                "SELECT c.contribution_date AS activity_date, c.amount AS amount, " +
+                "'in' AS direction, c.created_at AS created_at, " +
+                "'Added to ' || COALESCE(g.name, 'Savings goal') AS description " +
+                "FROM savings_contributions c LEFT JOIN savings_goals g ON g.id = c.goal_id " +
+                "UNION ALL " +
+                "SELECT w.withdrawal_date AS activity_date, w.amount AS amount, " +
+                "'out' AS direction, w.created_at AS created_at, " +
+                "'Withdrawn from ' || COALESCE(g.name, 'Savings goal') AS description " +
+                "FROM savings_withdrawals w LEFT JOIN savings_goals g ON g.id = w.goal_id" +
+                ") ORDER BY created_at DESC LIMIT ?";
+        try (Cursor cursor = getReadableDatabase().rawQuery(sql, new String[]{Integer.toString(safeLimit)})) {
+            while (cursor.moveToNext()) {
+                try {
+                    BigDecimal amount = new BigDecimal(cursor.getString(2));
+                    String sign = "in".equals(cursor.getString(3)) ? "+" : "−";
+                    activity.add(cursor.getString(0) + " · " + cursor.getString(1) + " · " +
+                            sign + amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+                } catch (NumberFormatException ignored) {
+                    // Ignore malformed amounts while preserving valid history rows.
+                }
+            }
+        }
+        return activity;
     }
 
     /** Adds a savings goal without changing any existing cash or savings records. */
