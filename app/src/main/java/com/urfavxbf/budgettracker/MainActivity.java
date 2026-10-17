@@ -1464,22 +1464,22 @@ public final class MainActivity extends FragmentActivity {
         }
 
         LocalDate today = LocalDate.now();
-        LocalDate cutoffStart = today.getDayOfMonth() <= 15
-                ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
-        LocalDate cutoffEnd = today.getDayOfMonth() <= 15
-                ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
+        CutoffPeriod displayCutoff = getLatestPaydayCutoff(today);
+        LocalDate cutoffStart = displayCutoff.startDate;
+        LocalDate cutoffEnd = displayCutoff.endDate;
         BigDecimal expectedSalary = database.getRecordedNetPayTotal(cutoffStart.toString(), cutoffEnd.toString());
 
         LinearLayout salaryCard = cardContainer();
         salaryCard.setPadding(dp(16), dp(14), dp(16), dp(14));
-        TextView salaryLabel = text("EXPECTED SALARY · CURRENT CUTOFF", 11, true);
+        TextView salaryLabel = text("EXPECTED SALARY · LAST PAYDAY CUTOFF", 11, true);
         salaryLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
         salaryCard.addView(salaryLabel);
         TextView salaryAmount = text(money(expectedSalary), 27, true);
         salaryAmount.setPadding(0, dp(5), 0, dp(3));
         salaryAmount.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
         salaryCard.addView(salaryAmount);
-        TextView salaryDates = text(cutoffStart + " to " + cutoffEnd + " · Based on saved work shifts", 12, false);
+        TextView salaryDates = text(cutoffStart + " to " + cutoffEnd
+                + " · Based on saved work shifts · Updates on payday", 12, false);
         salaryDates.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
         salaryCard.addView(salaryDates);
         historyContainer.addView(salaryCard);
@@ -2297,6 +2297,49 @@ public final class MainActivity extends FragmentActivity {
         } catch (IllegalArgumentException ex) {
             toast(ex.getMessage());
         }
+    }
+
+    /**
+     * Keeps Activity's expected salary on the most recently reached payday cutoff.
+     * A newer cutoff is shown only once its configured payday has arrived.
+     */
+    private CutoffPeriod getLatestPaydayCutoff(LocalDate today) {
+        int firstPayday;
+        int secondPayday;
+        try {
+            firstPayday = Integer.parseInt(pref("first_cutoff_payday", "22"));
+        } catch (NumberFormatException ignored) {
+            firstPayday = 22;
+        }
+        try {
+            secondPayday = Integer.parseInt(pref("second_cutoff_payday", "7"));
+        } catch (NumberFormatException ignored) {
+            secondPayday = 7;
+        }
+
+        CutoffPeriod latest = null;
+        LocalDate latestPayday = null;
+        // Look back far enough to cover the prior cutoff and payday, including month boundaries.
+        for (int offset = -2; offset <= 1; offset++) {
+            LocalDate month = today.withDayOfMonth(1).plusMonths(offset);
+            CutoffPeriod firstHalf = CutoffPeriod.forDate(month.withDayOfMonth(1));
+            CutoffPeriod secondHalf = CutoffPeriod.forDate(month.withDayOfMonth(16));
+            CutoffPeriod[] candidates = { firstHalf, secondHalf };
+            for (CutoffPeriod candidate : candidates) {
+                LocalDate payday = candidate.payday(firstPayday, secondPayday);
+                if (!payday.isAfter(today) && (latestPayday == null || payday.isAfter(latestPayday))) {
+                    latest = candidate;
+                    latestPayday = payday;
+                }
+            }
+        }
+        // If the user opens the app before the first configured payday in the search window,
+        // fall back to the previous calendar cutoff rather than displaying an empty period.
+        if (latest == null) {
+            LocalDate previousMonth = today.withDayOfMonth(1).minusMonths(1);
+            return CutoffPeriod.forDate(previousMonth.withDayOfMonth(16));
+        }
+        return latest;
     }
 
     private LocalDate getPaydayForCurrentCutoff(LocalDate today) {
