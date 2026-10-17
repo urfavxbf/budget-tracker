@@ -1,113 +1,42 @@
 package com.urfavxbf.budgettracker;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import org.junit.Test;
 
-/**
- * Philippine minimum-rate premium calculator for covered employees.
- *
- * This class calculates wage components only. It does not determine legal coverage,
- * holiday eligibility/no-work-no-pay conditions, company CBA rates, or statutory
- * deductions. Callers must supply the correctly classified minutes for each shift.
- */
-public final class PhilippinePayrollCalculator {
-    private static final BigDecimal ORDINARY_OT = new BigDecimal("1.25");
-    private static final BigDecimal NIGHT_DIFFERENTIAL = new BigDecimal("0.10");
-    private static final BigDecimal ONE = BigDecimal.ONE;
-
-    private PhilippinePayrollCalculator() {}
-
-    public enum DayType {
-        ORDINARY,
-        REGULAR_HOLIDAY,
-        SPECIAL_NON_WORKING_DAY
+public class PhilippinePayrollCalculatorTest {
+    @Test public void ordinaryDayOvertimeIsPaidAt125Percent() {
+        PhilippinePayrollCalculator.Result result = PhilippinePayrollCalculator.calculate(
+                new BigDecimal("100"), 480, 120, 0, 0,
+                PhilippinePayrollCalculator.DayType.ORDINARY, false);
+        assertEquals(new BigDecimal("800.00"), result.regularPay);
+        assertEquals(new BigDecimal("250.00"), result.overtimePay);
+        assertEquals(new BigDecimal("1050.00"), result.totalWage);
     }
 
-    public static Result calculate(
-            BigDecimal hourlyRate,
-            int regularMinutes,
-            int overtimeMinutes,
-            int regularNightMinutes,
-            int overtimeNightMinutes,
-            DayType dayType,
-            boolean restDay) {
-        if (hourlyRate == null || hourlyRate.signum() < 0) {
-            throw new IllegalArgumentException("Hourly rate cannot be negative or missing.");
-        }
-        if (regularMinutes < 0 || overtimeMinutes < 0
-                || regularNightMinutes < 0 || overtimeNightMinutes < 0) {
-            throw new IllegalArgumentException("Work minutes cannot be negative.");
-        }
-        if (regularNightMinutes > regularMinutes || overtimeNightMinutes > overtimeMinutes) {
-            throw new IllegalArgumentException("Night minutes cannot exceed their corresponding work minutes.");
-        }
-        if (dayType == null) throw new IllegalArgumentException("Day type is required.");
-
-        BigDecimal regularFactor = regularFactor(dayType, restDay);
-        BigDecimal overtimeFactor = overtimeFactor(dayType, restDay);
-        BigDecimal regularPay = wage(hourlyRate, regularMinutes, regularFactor);
-        BigDecimal overtimePay = wage(hourlyRate, overtimeMinutes, overtimeFactor);
-        BigDecimal regularNightPay = wage(hourlyRate, regularNightMinutes,
-                regularFactor.multiply(NIGHT_DIFFERENTIAL));
-        BigDecimal overtimeNightPay = wage(hourlyRate, overtimeNightMinutes,
-                overtimeFactor.multiply(NIGHT_DIFFERENTIAL));
-        BigDecimal total = regularPay.add(overtimePay)
-                .add(regularNightPay).add(overtimeNightPay)
-                .setScale(2, RoundingMode.HALF_UP);
-
-        return new Result(regularPay, overtimePay, regularNightPay, overtimeNightPay, total,
-                regularFactor, overtimeFactor);
+    @Test public void addsNightDifferentialToRegularAndOvertimeHours() {
+        PhilippinePayrollCalculator.Result result = PhilippinePayrollCalculator.calculate(
+                new BigDecimal("100"), 480, 60, 120, 30,
+                PhilippinePayrollCalculator.DayType.ORDINARY, false);
+        assertEquals(new BigDecimal("20.00"), result.regularNightDifferential);
+        assertEquals(new BigDecimal("12.50"), result.overtimeNightDifferential);
+        assertEquals(new BigDecimal("957.50"), result.totalWage);
     }
 
-    private static BigDecimal regularFactor(DayType type, boolean restDay) {
-        switch (type) {
-            case REGULAR_HOLIDAY:
-                return restDay ? new BigDecimal("2.60") : new BigDecimal("2.00");
-            case SPECIAL_NON_WORKING_DAY:
-                return restDay ? new BigDecimal("1.50") : new BigDecimal("1.30");
-            case ORDINARY:
-            default:
-                return restDay ? new BigDecimal("1.30") : ONE;
-        }
+    @Test public void appliesHolidayAndRestDayMultipliers() {
+        PhilippinePayrollCalculator.Result result = PhilippinePayrollCalculator.calculate(
+                new BigDecimal("100"), 480, 60, 0, 0,
+                PhilippinePayrollCalculator.DayType.REGULAR_HOLIDAY, true);
+        assertEquals(new BigDecimal("2080.00"), result.regularPay);
+        assertEquals(new BigDecimal("338.00"), result.overtimePay);
+        assertEquals(new BigDecimal("2418.00"), result.totalWage);
     }
 
-    private static BigDecimal overtimeFactor(DayType type, boolean restDay) {
-        switch (type) {
-            case REGULAR_HOLIDAY:
-                return restDay ? new BigDecimal("3.38") : new BigDecimal("2.60");
-            case SPECIAL_NON_WORKING_DAY:
-                return restDay ? new BigDecimal("1.95") : new BigDecimal("1.69");
-            case ORDINARY:
-            default:
-                return restDay ? new BigDecimal("1.69") : ORDINARY_OT;
-        }
-    }
-
-    private static BigDecimal wage(BigDecimal hourlyRate, int minutes, BigDecimal factor) {
-        return hourlyRate.multiply(factor).multiply(BigDecimal.valueOf(minutes))
-                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
-    }
-
-    public static final class Result {
-        public final BigDecimal regularPay;
-        public final BigDecimal overtimePay;
-        public final BigDecimal regularNightDifferential;
-        public final BigDecimal overtimeNightDifferential;
-        public final BigDecimal totalWage;
-        public final BigDecimal regularRateMultiplier;
-        public final BigDecimal overtimeRateMultiplier;
-
-        private Result(BigDecimal regularPay, BigDecimal overtimePay,
-                       BigDecimal regularNightDifferential, BigDecimal overtimeNightDifferential,
-                       BigDecimal totalWage, BigDecimal regularRateMultiplier,
-                       BigDecimal overtimeRateMultiplier) {
-            this.regularPay = regularPay;
-            this.overtimePay = overtimePay;
-            this.regularNightDifferential = regularNightDifferential;
-            this.overtimeNightDifferential = overtimeNightDifferential;
-            this.totalWage = totalWage;
-            this.regularRateMultiplier = regularRateMultiplier;
-            this.overtimeRateMultiplier = overtimeRateMultiplier;
-        }
+    @Test public void rejectsNightMinutesAboveWorkedMinutes() {
+        assertThrows(IllegalArgumentException.class, () -> PhilippinePayrollCalculator.calculate(
+                new BigDecimal("100"), 480, 60, 481, 0,
+                PhilippinePayrollCalculator.DayType.ORDINARY, false));
     }
 }
