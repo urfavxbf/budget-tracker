@@ -21,8 +21,8 @@ public class PhilippinePayrollCalculatorTest {
                 new BigDecimal("100"), 480, 60, 120, 30,
                 PhilippinePayrollCalculator.DayType.ORDINARY, false);
         assertEquals(new BigDecimal("20.00"), result.regularNightDifferential);
-        assertEquals(new BigDecimal("12.50"), result.overtimeNightDifferential);
-        assertEquals(new BigDecimal("957.50"), result.totalWage);
+        assertEquals(new BigDecimal("6.25"), result.overtimeNightDifferential);
+        assertEquals(new BigDecimal("951.25"), result.totalWage);
     }
 
     @Test public void appliesHolidayAndRestDayMultipliers() {
