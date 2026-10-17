@@ -178,7 +178,7 @@ public final class MainActivity extends FragmentActivity {
     private void buildBottomNav() {
         bottomNav.getMenu().clear();
         bottomNav.getMenu().add(0, NAV_HOME_ID, 0, "Home").setIcon(R.drawable.ic_home);
-        bottomNav.getMenu().add(0, NAV_HISTORY_ID, 1, "History").setIcon(R.drawable.ic_history);
+        bottomNav.getMenu().add(0, NAV_HISTORY_ID, 1, "Activity").setIcon(R.drawable.ic_history);
         bottomNav.getMenu().add(0, NAV_SETTINGS_ID, 2, "Settings").setIcon(R.drawable.ic_settings);
         bottomNav.setOnItemSelectedListener(item -> {
             int tab;
@@ -862,7 +862,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void buildHistoryScreen() {
-        header("History", "Review, edit, or delete your saved shifts and expenses.");
+        header("Activity", "Expected salary, work shifts, and expenses in one place.");
         
         historyContainer = new LinearLayout(this);
         historyContainer.setOrientation(LinearLayout.VERTICAL);
@@ -1463,9 +1463,48 @@ public final class MainActivity extends FragmentActivity {
             expenseTotal = expenseTotal.add(new BigDecimal(entry.amount));
         }
 
+        LocalDate today = LocalDate.now();
+        LocalDate cutoffStart = today.getDayOfMonth() <= 15
+                ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
+        LocalDate cutoffEnd = today.getDayOfMonth() <= 15
+                ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
+        BigDecimal expectedSalary = database.getRecordedNetPayTotal(cutoffStart.toString(), cutoffEnd.toString());
+
+        LinearLayout salaryCard = cardContainer();
+        salaryCard.setPadding(dp(16), dp(14), dp(16), dp(14));
+        TextView salaryLabel = text("EXPECTED SALARY · CURRENT CUTOFF", 11, true);
+        salaryLabel.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+        salaryCard.addView(salaryLabel);
+        TextView salaryAmount = text(money(expectedSalary), 27, true);
+        salaryAmount.setPadding(0, dp(5), 0, dp(3));
+        salaryAmount.setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary));
+        salaryCard.addView(salaryAmount);
+        TextView salaryDates = text(cutoffStart + " to " + cutoffEnd + " · Based on saved work shifts", 12, false);
+        salaryDates.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+        salaryCard.addView(salaryDates);
+        historyContainer.addView(salaryCard);
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        Button addShiftButton = button("＋ Add work shift", true);
+        addShiftButton.setTextSize(13);
+        addShiftButton.setOnClickListener(v -> showWorkDialog(null));
+        Button addExpenseButton = button("＋ Add expenses", false);
+        addExpenseButton.setTextSize(13);
+        addExpenseButton.setOnClickListener(v -> showExpenseDialog(null));
+        LinearLayout.LayoutParams actionParams = new LinearLayout.LayoutParams(0, dp(50), 1f);
+        actionParams.rightMargin = dp(6);
+        actions.addView(addShiftButton, actionParams);
+        LinearLayout.LayoutParams expenseParams = new LinearLayout.LayoutParams(0, dp(50), 1f);
+        expenseParams.leftMargin = dp(6);
+        actions.addView(addExpenseButton, expenseParams);
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(-1, -2);
+        actionsParams.bottomMargin = dp(10);
+        historyContainer.addView(actions, actionsParams);
+
         if (days.isEmpty()) {
             historyContainer.addView(emptyState("No activity yet",
-                    "Your shifts and expenses will appear here once you start recording them."));
+                    "Add a work shift or expense to start tracking your activity."));
             return;
         }
 
