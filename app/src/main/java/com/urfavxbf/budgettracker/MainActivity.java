@@ -964,6 +964,20 @@ public final class MainActivity extends FragmentActivity {
                 : "Editing saved shift. Saving will recalculate this record using the values above.", 14, false);
         resultView.setPadding(0, dp(12), 0, dp(4));
         form.addView(resultView);
+        android.text.TextWatcher previewWatcher = new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { previewWorkEstimate(); }
+            @Override public void afterTextChanged(android.text.Editable s) {}
+        };
+        timeInInput.addTextChangedListener(previewWatcher);
+        timeOutInput.addTextChangedListener(previewWatcher);
+        hourlyRateInput.addTextChangedListener(previewWatcher);
+        regularHoursInput.addTextChangedListener(previewWatcher);
+        overtimeMultiplierInput.addTextChangedListener(previewWatcher);
+        allowanceInput.addTextChangedListener(previewWatcher);
+        deductionInput.addTextChangedListener(previewWatcher);
+        totalHoursInput.addTextChangedListener(previewWatcher);
+        previewWorkEstimate();
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(false);
@@ -1238,6 +1252,43 @@ public final class MainActivity extends FragmentActivity {
         });
         breakInputs.add(input);
         breakContainer.addView(row);
+    }
+
+    /** Updates the estimate while editing. This method never writes to the database. */
+    private void previewWorkEstimate() {
+        if (resultView == null || timeInInput == null || timeOutInput == null || hourlyRateInput == null
+                || regularHoursInput == null || overtimeMultiplierInput == null || allowanceInput == null || deductionInput == null) return;
+        try {
+            LocalTime start = LocalTime.parse(value(timeInInput), DateTimeFormatter.ofPattern("HH:mm"));
+            LocalTime end = LocalTime.parse(value(timeOutInput), DateTimeFormatter.ofPattern("HH:mm"));
+            int breaks = 0;
+            for (BreakInput item : breakInputs) {
+                String raw = value(item.hours);
+                if (!raw.isEmpty()) breaks = Math.addExact(breaks, new BigDecimal(raw).multiply(BigDecimal.valueOf(60)).intValueExact());
+            }
+            if (hoursOnlyMode != null && hoursOnlyMode.isChecked()) {
+                String raw = value(totalHoursInput);
+                if (raw.isEmpty()) { resultView.setText("Enter total worked hours. Break duration is added to time out."); return; }
+                int netMinutes = new BigDecimal(raw).multiply(BigDecimal.valueOf(60)).intValueExact();
+                end = start.plusMinutes((long) netMinutes + breaks);
+            }
+            BigDecimal rate = decimal(hourlyRateInput, "Pay rate");
+            BigDecimal regularHours = decimal(regularHoursInput, "Regular hours");
+            if (regularHours.signum() <= 0 || regularHours.multiply(BigDecimal.valueOf(60)).stripTrailingZeros().scale() > 0) return;
+            String rateType = payRateTypeInput == null ? "Hourly" : payRateTypeInput.getText().toString();
+            BigDecimal hourly = "Daily".equals(rateType) ? rate.divide(regularHours, 8, java.math.RoundingMode.HALF_UP) : rate;
+            SalaryCalculator.Result result = SalaryCalculator.calculateWithBreakMinutes(start, end, breaks,
+                    regularHours.multiply(BigDecimal.valueOf(60)).intValueExact(), hourly,
+                    decimal(overtimeMultiplierInput, "OT multiplier"), decimal(allowanceInput, "Allowance"), decimal(deductionInput, "Deduction"));
+            resultView.setText("LIVE PAY PREVIEW (not saved)\n\nShift     " + duration(result.shiftMinutes)
+                    + "\nBreak     " + duration(result.breakMinutes) + "\nNet work  " + duration(result.netWorkMinutes)
+                    + "\nRegular   " + duration(result.regularMinutes) + "\nOvertime  " + duration(result.overtimeMinutes)
+                    + "\n\nRegular pay   " + money(result.regularPay) + "\nOT pay        " + money(result.overtimePay)
+                    + "\nAllowance     " + money(result.allowance) + "\nDeduction     " + money(result.deduction)
+                    + "\nGross pay     " + money(result.grossPay) + "\nEstimated net " + money(result.estimatedNetPay));
+        } catch (Exception ignored) {
+            // Partial values are normal while the user types; save performs strict validation.
+        }
     }
 
     private void calculateAndSave() {
