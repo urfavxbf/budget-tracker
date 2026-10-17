@@ -550,37 +550,51 @@ public final class MainActivity extends FragmentActivity {
         snapshotTitles.setOrientation(LinearLayout.VERTICAL);
         TextView snapshotTitle = text("Budget snapshot", 16, true);
         snapshotTitle.setTextColor(ink);
+        android.graphics.drawable.Drawable snapshotIcon = getDrawable(R.drawable.ic_budget).mutate();
+        snapshotIcon.setTint(accent);
+        snapshotTitle.setCompoundDrawablesWithIntrinsicBounds(snapshotIcon, null, null, null);
+        snapshotTitle.setCompoundDrawablePadding(dp(8));
         snapshotTitles.addView(snapshotTitle);
-        TextView cutoffCaption = text("Your spending at a glance", 12, false);
+        TextView cutoffCaption = text("Spending in your current salary cycle", 12, false);
         cutoffCaption.setTextColor(muted);
+        cutoffCaption.setPadding(0, dp(3), 0, 0);
         snapshotTitles.addView(cutoffCaption);
         snapshotHeader.addView(snapshotTitles, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView viewBudget = text("View all  ›", 11, true);
-        viewBudget.setTextColor(accent);
+        MaterialButton viewBudget = compactButton("View budget", false);
+        viewBudget.setIconResource(R.drawable.ic_budget);
         viewBudget.setOnClickListener(v -> showTab(2));
-        snapshotHeader.addView(viewBudget);
+        LinearLayout.LayoutParams viewBudgetParams = new LinearLayout.LayoutParams(-2, dp(36));
+        viewBudgetParams.leftMargin = dp(8);
+        snapshotHeader.addView(viewBudget, viewBudgetParams);
         snapshot.addView(snapshotHeader);
 
         BigDecimal limit;
         try {
             limit = new BigDecimal(pref("spending_budget", "0.00"));
+            if (limit.signum() < 0) limit = BigDecimal.ZERO;
         } catch (NumberFormatException ignored) {
             limit = BigDecimal.ZERO;
         }
-        TextView limitText = text(money(spent) + "  of  " + (limit.signum() > 0 ? money(limit) : "Budget not set"), 12, false);
-        limitText.setTextColor(muted);
-        limitText.setPadding(0, dp(12), 0, dp(9));
+        BigDecimal cycleBudget = activePayment == null ? BigDecimal.ZERO
+                : new BigDecimal(activePayment.receivedAmount).add(getCarryoverIntoPayment(activePayment));
+        BigDecimal budgetBase = BudgetInsights.resolveBudgetBase(cycleBudget, limit);
+        String spentLabel = budgetBase.signum() > 0
+                ? money(spent) + " spent  ·  " + money(budgetBase) + " budget"
+                : money(spent) + " spent  ·  No budget set";
+        TextView limitText = text(spentLabel, 13, true);
+        limitText.setTextColor(ink);
+        limitText.setPadding(0, dp(16), 0, dp(10));
         snapshot.addView(limitText);
         budgetProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         budgetProgressBar.setMax(100);
         budgetProgressBar.setProgressTintList(ColorStateList.valueOf(green));
         budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(resolveColor(com.google.android.material.R.attr.colorOutlineVariant)));
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(8));
-        progressParams.bottomMargin = dp(9);
+        progressParams.bottomMargin = dp(12);
         snapshot.addView(budgetProgressBar, progressParams);
         budgetSummaryView = text("", 12, false);
         budgetSummaryView.setTextColor(muted);
-        budgetSummaryView.setLineSpacing(dp(3), 1.0f);
+        budgetSummaryView.setLineSpacing(dp(5), 1.0f);
         snapshot.addView(budgetSummaryView);
         page.addView(snapshot);
         LinearLayout.LayoutParams snapshotParams = (LinearLayout.LayoutParams) snapshot.getLayoutParams();
@@ -2343,12 +2357,18 @@ public final class MainActivity extends FragmentActivity {
                 summary.append("\nOver budget by ").append(money(spent.subtract(budgetBase)))
                         .append(". Review non-essential spending and upcoming needs.");
                 budgetSummaryView.setTextColor(resolveColor(android.R.attr.colorError));
+                budgetProgressBar.setProgressTintList(ColorStateList.valueOf(
+                        resolveColor(android.R.attr.colorError)));
             } else if (status == BudgetInsights.Status.WARNING) {
                 summary.append("\nMost of this cycle’s budget is used. Check upcoming bills.");
                 budgetSummaryView.setTextColor(resolveColor(android.R.attr.colorError));
+                budgetProgressBar.setProgressTintList(ColorStateList.valueOf(
+                        resolveColor(android.R.attr.colorError)));
             } else {
                 summary.append("\nYour spending is within the cycle budget so far.");
                 budgetSummaryView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSecondaryContainer));
+                budgetProgressBar.setProgressTintList(ColorStateList.valueOf(
+                        resolveColor(androidx.appcompat.R.attr.colorPrimary)));
             }
         } else {
             budgetProgressBar.setVisibility(View.GONE);
