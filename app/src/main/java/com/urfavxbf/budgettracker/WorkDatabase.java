@@ -951,8 +951,6 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         SQLiteDatabase db = getWritableDatabase();
         db.beginTransaction();
         try {
-            ContentValues values = new ContentValues();
-            values.put("saved_amount", "CAST(saved_amount AS REAL)"); // overwritten below with exact decimal arithmetic
             String current = null;
             try (Cursor cursor = db.rawQuery("SELECT saved_amount FROM savings_goals WHERE id = ?",
                     new String[]{Long.toString(goalId)})) {
