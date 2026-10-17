@@ -1276,6 +1276,7 @@ public final class MainActivity extends FragmentActivity {
                 if (raw.isEmpty()) { resultView.setText("Enter total worked hours. Break duration is added to time out."); return; }
                 int netMinutes = new BigDecimal(raw).multiply(BigDecimal.valueOf(60)).intValueExact();
                 end = start.plusMinutes((long) netMinutes + breaks);
+                if (!value(timeOutInput).equals(end.toString())) timeOutInput.setText(end.toString());
             }
             BigDecimal rate = decimal(hourlyRateInput, "Pay rate");
             BigDecimal regularHours = decimal(regularHoursInput, "Regular hours");
