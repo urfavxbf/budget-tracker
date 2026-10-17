@@ -405,8 +405,8 @@ public final class MainActivity extends FragmentActivity {
         LocalDate today = LocalDate.now();
         int firstPayday = parsePaydayPreference("first_cutoff_payday", 22);
         int secondPayday = parsePaydayPreference("second_cutoff_payday", 7);
-        CutoffPeriod currentPaydayCutoff = CutoffPeriod.forNextPayday(
-                today.minusDays(1), firstPayday, secondPayday);
+        CutoffPeriod currentPaydayCutoff = CutoffPeriod.forLatestPaydayOnOrBefore(
+                today, firstPayday, secondPayday);
         LocalDate cycleStart = currentPaydayCutoff.payday(firstPayday, secondPayday);
         LocalDate payday = CutoffPeriod.forNextPayday(today, firstPayday, secondPayday)
                 .payday(firstPayday, secondPayday);
@@ -1146,8 +1146,8 @@ public final class MainActivity extends FragmentActivity {
         LocalDate today = LocalDate.now();
         int firstPayday = parsePaydayPreference("first_cutoff_payday", 22);
         int secondPayday = parsePaydayPreference("second_cutoff_payday", 7);
-        CutoffPeriod currentPaydayCutoff = CutoffPeriod.forNextPayday(
-                today.minusDays(1), firstPayday, secondPayday);
+        CutoffPeriod currentPaydayCutoff = CutoffPeriod.forLatestPaydayOnOrBefore(
+                today, firstPayday, secondPayday);
         LocalDate cycleStart = currentPaydayCutoff.payday(firstPayday, secondPayday);
         WorkDatabase.PaydayPayment latestPayment =
                 database.getLatestPaydayPaymentOnOrBefore(today.toString());
@@ -2500,8 +2500,8 @@ public final class MainActivity extends FragmentActivity {
         LocalDate today = LocalDate.now();
         int firstPayday = parsePaydayPreference("first_cutoff_payday", 22);
         int secondPayday = parsePaydayPreference("second_cutoff_payday", 7);
-        CutoffPeriod cutoff = CutoffPeriod.forNextPayday(
-                today.minusDays(1), firstPayday, secondPayday);
+        CutoffPeriod cutoff = CutoffPeriod.forLatestPaydayOnOrBefore(
+                today, firstPayday, secondPayday);
         LocalDate cycleStart = cutoff.payday(firstPayday, secondPayday);
         LocalDate payday = CutoffPeriod.forNextPayday(today, firstPayday, secondPayday)
                 .payday(firstPayday, secondPayday);

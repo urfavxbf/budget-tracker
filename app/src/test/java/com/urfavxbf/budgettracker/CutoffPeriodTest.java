@@ -109,6 +109,37 @@ public class CutoffPeriodTest {
     }
 
     @Test
+    public void latestPaydayRemainsActiveTheDayAfterPayday() {
+        CutoffPeriod cutoff = CutoffPeriod.forLatestPaydayOnOrBefore(
+                LocalDate.of(2026, 10, 26), 25, 7);
+
+        assertEquals(LocalDate.of(2026, 10, 1), cutoff.startDate);
+        assertEquals(LocalDate.of(2026, 10, 15), cutoff.endDate);
+        assertEquals(LocalDate.of(2026, 10, 25), cutoff.payday(25, 7));
+    }
+
+    @Test
+    public void latestPaydayAdvancesOnlyWhenTheNextScheduledPaydayArrives() {
+        CutoffPeriod beforeNextPayday = CutoffPeriod.forLatestPaydayOnOrBefore(
+                LocalDate.of(2026, 11, 6), 25, 7);
+        CutoffPeriod onNextPayday = CutoffPeriod.forLatestPaydayOnOrBefore(
+                LocalDate.of(2026, 11, 7), 25, 7);
+
+        assertEquals(LocalDate.of(2026, 10, 1), beforeNextPayday.startDate);
+        assertEquals(LocalDate.of(2026, 10, 16), onNextPayday.startDate);
+        assertEquals(LocalDate.of(2026, 11, 7), onNextPayday.payday(25, 7));
+    }
+
+    @Test
+    public void latestPaydayWorksAcrossDecemberAndJanuary() {
+        CutoffPeriod cutoff = CutoffPeriod.forLatestPaydayOnOrBefore(
+                LocalDate.of(2027, 1, 8), 25, 7);
+
+        assertEquals(LocalDate.of(2026, 12, 16), cutoff.startDate);
+        assertEquals(LocalDate.of(2027, 1, 7), cutoff.payday(25, 7));
+    }
+
+    @Test
     public void paydayIsClampedToLastDayOfFebruary() {
         CutoffPeriod cutoff = CutoffPeriod.forDate(LocalDate.of(2025, 1, 16));
 
