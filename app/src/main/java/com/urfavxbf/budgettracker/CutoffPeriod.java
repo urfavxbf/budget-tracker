@@ -55,6 +55,41 @@ public final class CutoffPeriod {
         return next;
     }
 
+    /**
+     * Returns the cutoff associated with the most recent scheduled payday on or before today.
+     * This keeps a salary cycle anchored to the payday that has already arrived, including
+     * the days immediately after payday.
+     */
+    public static CutoffPeriod forLatestPaydayOnOrBefore(
+            LocalDate today, int firstCutoffPayday, int secondCutoffPayday) {
+        if (today == null) {
+            throw new IllegalArgumentException("Date is required.");
+        }
+
+        CutoffPeriod latest = null;
+        LocalDate latestPayday = null;
+        // The second cutoff is paid in the following month, so inspect surrounding months.
+        for (int offset = -2; offset <= 1; offset++) {
+            LocalDate month = today.withDayOfMonth(1).plusMonths(offset);
+            CutoffPeriod[] candidates = {
+                    forDate(month.withDayOfMonth(1)),
+                    forDate(month.withDayOfMonth(16))
+            };
+            for (CutoffPeriod candidate : candidates) {
+                LocalDate payday = candidate.payday(firstCutoffPayday, secondCutoffPayday);
+                if (!payday.isAfter(today)
+                        && (latestPayday == null || payday.isAfter(latestPayday))) {
+                    latest = candidate;
+                    latestPayday = payday;
+                }
+            }
+        }
+        if (latest == null) {
+            throw new IllegalStateException("Unable to determine the latest scheduled payday.");
+        }
+        return latest;
+    }
+
     public LocalDate payday(int firstCutoffPayday, int secondCutoffPayday) {
         boolean firstCutoff = startDate.getDayOfMonth() == 1;
         int requestedDay = firstCutoff ? firstCutoffPayday : secondCutoffPayday;
