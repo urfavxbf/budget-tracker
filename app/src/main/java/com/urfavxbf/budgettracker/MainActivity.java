@@ -181,7 +181,7 @@ public final class MainActivity extends FragmentActivity {
         bottomNav.getMenu().clear();
         bottomNav.getMenu().add(0, NAV_HOME_ID, 0, "Home").setIcon(R.drawable.ic_home);
         bottomNav.getMenu().add(0, NAV_HISTORY_ID, 1, "Activity").setIcon(R.drawable.ic_history);
-        bottomNav.getMenu().add(0, NAV_BUDGET_ID, 2, "Budget").setIcon(R.drawable.ic_history);
+        bottomNav.getMenu().add(0, NAV_BUDGET_ID, 2, "Budget").setIcon(R.drawable.ic_budget);
         bottomNav.getMenu().add(0, NAV_SETTINGS_ID, 3, "Settings").setIcon(R.drawable.ic_settings);
         bottomNav.setOnItemSelectedListener(item -> {
             if (updatingNavigation) return true;
@@ -281,7 +281,7 @@ public final class MainActivity extends FragmentActivity {
 
     private void showFirstTimeSetup() {
         page.removeAllViews();
-        header("Welcome to Budget Tracker 👋", "Let's set up your pay, payday, cash, and savings. You can change these later in Settings.");
+        header("Welcome to Budget Tracker", "Let's set up your pay, payday, cash, and savings. You can change these later in Settings.");
         TextView note = text("Currency: Philippine peso (₱). Enter your actual details. The app's estimated salary is based on your saved work shifts; it is not a confirmed payment.", 14, false);
         note.setPadding(0, 0, 0, dp(12));
         page.addView(note);
@@ -435,7 +435,7 @@ public final class MainActivity extends FragmentActivity {
         top.setPadding(0, 0, 0, dp(18));
         LinearLayout greeting = new LinearLayout(this);
         greeting.setOrientation(LinearLayout.VERTICAL);
-        TextView hello = text("Good day 👋", 12, false);
+        TextView hello = text("Good day", 12, false);
         hello.setTextColor(muted);
         greeting.addView(hello);
         TextView title = text("My finances", 25, true);
@@ -458,7 +458,11 @@ public final class MainActivity extends FragmentActivity {
         TextView balanceLabel = text("AVAILABLE CASH", 11, true);
         balanceLabel.setTextColor(0xFFB8C7E3);
         balanceHeader.addView(balanceLabel, new LinearLayout.LayoutParams(0, -2, 1f));
-        TextView editCashButton = text("✎ Edit", 12, true);
+        TextView editCashButton = text("Edit", 12, true);
+        android.graphics.drawable.Drawable editCashIcon = getDrawable(R.drawable.ic_edit).mutate();
+        editCashIcon.setTint(0xFFFFFFFF);
+        editCashButton.setCompoundDrawablesWithIntrinsicBounds(editCashIcon, null, null, null);
+        editCashButton.setCompoundDrawablePadding(dp(4));
         editCashButton.setTextColor(0xFFFFFFFF);
         editCashButton.setPadding(dp(10), dp(7), dp(10), dp(7));
         editCashButton.setBackground(roundedBackground(0xFF2B3B5E, dp(12)));
@@ -714,75 +718,15 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private View actionIcon(String symbol, int accent) {
-        return new View(this) {
-            private final android.graphics.Paint paint = new android.graphics.Paint(
-                    android.graphics.Paint.ANTI_ALIAS_FLAG);
-            private final android.graphics.Path path = new android.graphics.Path();
-
-            @Override
-            protected void onDraw(android.graphics.Canvas canvas) {
-                super.onDraw(canvas);
-                float unit = Math.min(getWidth(), getHeight()) / 24f;
-                canvas.save();
-                canvas.translate((getWidth() - 24f * unit) / 2f, (getHeight() - 24f * unit) / 2f);
-                canvas.scale(unit, unit);
-                paint.setColor(accent);
-                paint.setStyle(android.graphics.Paint.Style.STROKE);
-                paint.setStrokeWidth(1.9f);
-                paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
-                paint.setStrokeJoin(android.graphics.Paint.Join.ROUND);
-
-                if ("＋".equals(symbol)) {
-                    // Work briefcase with an upward income arrow.
-                    canvas.drawRoundRect(3, 8, 21, 20, 2, 2, paint);
-                    canvas.drawRoundRect(8, 4, 16, 9, 1.5f, 1.5f, paint);
-                    canvas.drawLine(3, 12, 21, 12, paint);
-                    canvas.drawLine(12, 10, 12, 14, paint);
-                    canvas.drawLine(9.5f, 12, 12, 9.5f, paint);
-                    canvas.drawLine(14.5f, 12, 12, 9.5f, paint);
-                } else if ("−".equals(symbol)) {
-                    // Receipt with a downward expense arrow, distinct from income.
-                    path.reset();
-                    path.moveTo(6, 3); path.lineTo(18, 3); path.lineTo(18, 21);
-                    path.lineTo(15, 19); path.lineTo(12, 21); path.lineTo(9, 19);
-                    path.lineTo(6, 21); path.close();
-                    canvas.drawPath(path, paint);
-                    canvas.drawLine(9, 7, 15, 7, paint);
-                    canvas.drawLine(9, 10, 13, 10, paint);
-                    canvas.drawLine(12, 12, 12, 17, paint);
-                    canvas.drawLine(9.5f, 14.5f, 12, 17, paint);
-                    canvas.drawLine(14.5f, 14.5f, 12, 17, paint);
-                } else if ("◉".equals(symbol)) {
-                    // Budget wallet with a coin and reserved balance line.
-                    canvas.drawRoundRect(3, 6, 21, 20, 2, 2, paint);
-                    canvas.drawLine(3, 9, 21, 9, paint);
-                    canvas.drawCircle(15.5f, 14.5f, 2.2f, paint);
-                    canvas.drawLine(6, 14, 10, 14, paint);
-                } else if ("▦".equals(symbol)) {
-                    // Calendar with binding rings and date cells.
-                    canvas.drawRoundRect(3, 5, 21, 21, 2, 2, paint);
-                    canvas.drawLine(3, 9, 21, 9, paint);
-                    canvas.drawLine(8, 3, 8, 7, paint);
-                    canvas.drawLine(16, 3, 16, 7, paint);
-                    canvas.drawLine(8, 12, 8, 12.1f, paint);
-                    canvas.drawLine(12, 12, 12, 12.1f, paint);
-                    canvas.drawLine(16, 12, 16, 12.1f, paint);
-                    canvas.drawLine(8, 16, 8, 16.1f, paint);
-                    canvas.drawLine(12, 16, 12, 16.1f, paint);
-                    canvas.drawLine(16, 16, 16, 16.1f, paint);
-                } else {
-                    // Report page with a compact bar chart.
-                    canvas.drawRoundRect(4, 3, 20, 21, 2, 2, paint);
-                    canvas.drawLine(8, 7, 14, 7, paint);
-                    canvas.drawLine(8, 10, 12, 10, paint);
-                    canvas.drawLine(8, 17, 8, 14, paint);
-                    canvas.drawLine(12, 17, 12, 12, paint);
-                    canvas.drawLine(16, 17, 16, 9, paint);
-                    canvas.drawLine(7, 18.5f, 18, 18.5f, paint);
-                }
-                canvas.restore();
-            }
-        };
+        android.widget.ImageView icon = new android.widget.ImageView(this);
+        int iconRes = "＋".equals(symbol) ? R.drawable.ic_income
+                : "−".equals(symbol) ? R.drawable.ic_expense
+                : "◉".equals(symbol) ? R.drawable.ic_budget
+                : "▦".equals(symbol) ? R.drawable.ic_calendar : R.drawable.ic_trending;
+        icon.setImageResource(iconRes);
+        icon.setColorFilter(accent);
+        icon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        return icon;
     }
 
     private View metricCard(String label, String amount, int accent) {
@@ -2962,6 +2906,13 @@ public final class MainActivity extends FragmentActivity {
 
     private void header(String title, String subtitle) {
         TextView titleView = text(title, 28, true);
+        int headerIcon = iconForLabel(title);
+        if (headerIcon != 0) {
+            android.graphics.drawable.Drawable icon = getDrawable(headerIcon).mutate();
+            icon.setTint(resolveColor(androidx.appcompat.R.attr.colorPrimary));
+            titleView.setCompoundDrawablesWithIntrinsicBounds(icon, null, null, null);
+            titleView.setCompoundDrawablePadding(dp(10));
+        }
         titleView.setTextColor(resolveColor(android.R.attr.textColorPrimary));
         page.addView(titleView);
         TextView sub = text(subtitle, 14, false);
@@ -2976,6 +2927,13 @@ public final class MainActivity extends FragmentActivity {
 
     private void addSection(LinearLayout parent, String label) {
         TextView heading = text(label, 18, true);
+        int sectionIcon = iconForLabel(label);
+        if (sectionIcon != 0) {
+            android.graphics.drawable.Drawable icon = getDrawable(sectionIcon).mutate();
+            icon.setTint(resolveColor(androidx.appcompat.R.attr.colorPrimary));
+            heading.setCompoundDrawablesWithIntrinsicBounds(icon, null, null, null);
+            heading.setCompoundDrawablePadding(dp(8));
+        }
         heading.setPadding(0, dp(12), 0, dp(8));
         parent.addView(heading);
     }
@@ -3113,6 +3071,26 @@ public final class MainActivity extends FragmentActivity {
     }
 
 
+    private int iconForLabel(String label) {
+        if (label == null) return 0;
+        String value = label.toLowerCase(Locale.ROOT);
+        if (value.contains("delete") || value.contains("remove")) return R.drawable.ic_delete;
+        if (value.contains("edit") || value.contains("correct")) return R.drawable.ic_edit;
+        if (value.contains("expense") || value.contains("spending") || value.contains("spent")) return R.drawable.ic_expense;
+        if (value.contains("category")) return R.drawable.ic_category;
+        if (value.contains("budget") || value.contains("limit")) return R.drawable.ic_budget;
+        if (value.contains("calendar") || value.contains("date")) return R.drawable.ic_calendar;
+        if (value.contains("payday") || value.contains("cutoff") || value.contains("salary")) return R.drawable.ic_payday;
+        if (value.contains("saving")) return R.drawable.ic_savings;
+        if (value.contains("cash") || value.contains("balance") || value.contains("payment")) return R.drawable.ic_cash;
+        if (value.contains("work shift") || value.contains("income") || value.contains("quick shift")) return R.drawable.ic_income;
+        if (value.contains("add") || value.contains("new")) return R.drawable.ic_add;
+        if (value.contains("activity") || value.contains("history")) return R.drawable.ic_history;
+        if (value.contains("settings")) return R.drawable.ic_settings;
+        if (value.contains("welcome") || value.contains("finances")) return R.drawable.ic_cash;
+        return 0;
+    }
+
     private MaterialButton compactButton(String label, boolean primary) {
         MaterialButton button = new MaterialButton(this);
         button.setText(label);
@@ -3126,6 +3104,14 @@ public final class MainActivity extends FragmentActivity {
         button.setInsetBottom(0);
         button.setCornerRadius(dp(12));
         button.setIconPadding(dp(4));
+        int iconRes = iconForLabel(label);
+        if (iconRes != 0) {
+            button.setIconResource(iconRes);
+            button.setIconTint(ColorStateList.valueOf(resolveColor(
+                    primary ? com.google.android.material.R.attr.colorOnPrimary
+                            : com.google.android.material.R.attr.colorOnSecondaryContainer)));
+            button.setIconGravity(MaterialButton.ICON_GRAVITY_TEXT_START);
+        }
         button.setPadding(dp(12), dp(4), dp(12), dp(4));
         button.setElevation(0);
         if (primary) {
@@ -3145,6 +3131,15 @@ public final class MainActivity extends FragmentActivity {
         button.setText(label);
         button.setAllCaps(false);
         button.setTextSize(14);
+        int iconRes = iconForLabel(label);
+        if (iconRes != 0) {
+            button.setIconResource(iconRes);
+            button.setIconTint(ColorStateList.valueOf(resolveColor(
+                    primary ? com.google.android.material.R.attr.colorOnPrimary
+                            : com.google.android.material.R.attr.colorOnSecondaryContainer)));
+            button.setIconGravity(MaterialButton.ICON_GRAVITY_TEXT_START);
+            button.setIconPadding(dp(8));
+        }
         button.setCornerRadius(dp(16));
         button.setInsetTop(0);
         button.setInsetBottom(0);
