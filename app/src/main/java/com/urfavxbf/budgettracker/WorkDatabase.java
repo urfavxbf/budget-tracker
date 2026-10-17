@@ -17,7 +17,7 @@ import java.util.TreeMap;
 
 public final class WorkDatabase extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "budget_tracker.db";
-    private static final int DATABASE_VERSION = 10;
+    private static final int DATABASE_VERSION = 11;
     private final Context context;
 
     public WorkDatabase(Context context) {
@@ -55,6 +55,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         createExpenseSavingsDrawsTable(db);
         createCategoryBudgetLimitsTable(db);
         createCashBalanceAdjustmentsTable(db);
+        createSavingsGoalsTable(db);
     }
 
     private static void createExpensesTable(SQLiteDatabase db) {
@@ -94,6 +95,7 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         if (oldVersion < 8) createExpenseSavingsDrawsTable(db);
         if (oldVersion < 9) createCategoryBudgetLimitsTable(db);
         if (oldVersion < 10) createCashBalanceAdjustmentsTable(db);
+        if (oldVersion < 11) createSavingsGoalsTable(db);
     }
 
     private static void createCategoryBudgetLimitsTable(SQLiteDatabase db) {
@@ -902,6 +904,104 @@ public final class WorkDatabase extends SQLiteOpenHelper {
             }
         }
         return entries;
+    }
+
+
+    private static void createSavingsGoalsTable(SQLiteDatabase db) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS savings_goals (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+                "name TEXT NOT NULL," +
+                "target_amount TEXT NOT NULL," +
+                "saved_amount TEXT NOT NULL DEFAULT '0.00'," +
+                "target_date TEXT NOT NULL DEFAULT ''," +
+                "created_at INTEGER NOT NULL)");
+    }
+
+    /** Adds a savings goal without changing any existing cash or savings records. */
+    public long addSavingsGoal(String name, BigDecimal targetAmount, String targetDate) {
+        if (name == null || name.trim().isEmpty() || targetAmount == null || targetAmount.signum() <= 0) return -1;
+        ContentValues values = new ContentValues();
+        values.put("name", name.trim());
+        values.put("target_amount", targetAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        values.put("saved_amount", "0.00");
+        values.put("target_date", targetDate == null ? "" : targetDate.trim());
+        values.put("created_at", System.currentTimeMillis());
+        return getWritableDatabase().insert("savings_goals", null, values);
+    }
+
+    public List<SavingsGoal> getSavingsGoals() {
+        List<SavingsGoal> goals = new ArrayList<>();
+        try (Cursor cursor = getReadableDatabase().rawQuery(
+                "SELECT id, name, target_amount, saved_amount, target_date FROM savings_goals ORDER BY created_at DESC, id DESC", null)) {
+            while (cursor.moveToNext()) {
+                try {
+                    goals.add(new SavingsGoal(cursor.getLong(0), cursor.getString(1),
+                            new BigDecimal(cursor.getString(2)), new BigDecimal(cursor.getString(3)),
+                            cursor.getString(4)));
+                } catch (NumberFormatException ignored) {
+                    // Skip only malformed goal rows; preserve the rest of the list.
+                }
+            }
+        }
+        return goals;
+    }
+
+    public boolean addToSavingsGoal(long goalId, BigDecimal amount) {
+        if (goalId <= 0 || amount == null || amount.signum() <= 0) return false;
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            ContentValues values = new ContentValues();
+            values.put("saved_amount", "CAST(saved_amount AS REAL)"); // overwritten below with exact decimal arithmetic
+            String current = null;
+            try (Cursor cursor = db.rawQuery("SELECT saved_amount FROM savings_goals WHERE id = ?",
+                    new String[]{Long.toString(goalId)})) {
+                if (cursor.moveToFirst()) current = cursor.getString(0);
+            }
+            if (current == null) return false;
+            BigDecimal next = new BigDecimal(current).add(amount).setScale(2, java.math.RoundingMode.HALF_UP);
+            ContentValues update = new ContentValues();
+            update.put("saved_amount", next.toPlainString());
+            boolean success = db.update("savings_goals", update, "id = ?", new String[]{Long.toString(goalId)}) > 0;
+            if (success) db.setTransactionSuccessful();
+            return success;
+        } catch (NumberFormatException ignored) {
+            return false;
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    public boolean updateSavingsGoal(long goalId, String name, BigDecimal targetAmount, String targetDate) {
+        if (goalId <= 0 || name == null || name.trim().isEmpty()
+                || targetAmount == null || targetAmount.signum() <= 0) return false;
+        ContentValues values = new ContentValues();
+        values.put("name", name.trim());
+        values.put("target_amount", targetAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        values.put("target_date", targetDate == null ? "" : targetDate.trim());
+        return getWritableDatabase().update("savings_goals", values, "id = ?",
+                new String[]{Long.toString(goalId)}) > 0;
+    }
+
+    public boolean deleteSavingsGoal(long goalId) {
+        return goalId > 0 && getWritableDatabase().delete("savings_goals", "id = ?",
+                new String[]{Long.toString(goalId)}) > 0;
+    }
+
+    public static final class SavingsGoal {
+        public final long id;
+        public final String name;
+        public final BigDecimal targetAmount;
+        public final BigDecimal savedAmount;
+        public final String targetDate;
+
+        SavingsGoal(long id, String name, BigDecimal targetAmount, BigDecimal savedAmount, String targetDate) {
+            this.id = id;
+            this.name = name;
+            this.targetAmount = targetAmount;
+            this.savedAmount = savedAmount;
+            this.targetDate = targetDate == null ? "" : targetDate;
+        }
     }
 
     public List<String> getRecentEntries(int limit) {
