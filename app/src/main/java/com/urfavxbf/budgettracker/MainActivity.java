@@ -209,6 +209,16 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showTab(int tab) {
+        if (tab < 0 || tab > 3) tab = 0;
+        currentTab = tab;
+        if (bottomNav != null) {
+            int selectedId = tab == 0 ? NAV_HOME_ID
+                    : tab == 1 ? NAV_HISTORY_ID
+                    : tab == 2 ? NAV_BUDGET_ID : NAV_SETTINGS_ID;
+            if (bottomNav.getSelectedItemId() != selectedId) {
+                bottomNav.setSelectedItemId(selectedId);
+            }
+        }
         page.removeAllViews();
         breakInputs.clear();
         dateInput = timeInInput = timeOutInput = null;
