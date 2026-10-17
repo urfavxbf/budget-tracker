@@ -1396,8 +1396,6 @@ public final class MainActivity extends FragmentActivity {
         actions.addView(edit);
         if (limit != null) {
             MaterialButton delete = compactButton("Delete", false);
-            delete.setIconResource(com.google.android.material.R.drawable.mtrl_ic_error);
-            delete.setIconTint(ColorStateList.valueOf(resolveColor(androidx.appcompat.R.attr.colorError)));
             delete.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
             delete.setBackgroundTintList(ColorStateList.valueOf(
                     withAlpha(resolveColor(androidx.appcompat.R.attr.colorError), 0x12)));
