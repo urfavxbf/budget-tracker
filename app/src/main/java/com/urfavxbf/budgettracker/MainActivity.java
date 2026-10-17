@@ -58,7 +58,8 @@ public final class MainActivity extends FragmentActivity {
     private static final int NAV_HISTORY_ID = 2;
     private static final int NAV_SETTINGS_ID = 3;
     private int currentTab = 0;
-    private EditText dateInput, timeInInput, timeOutInput;
+    private EditText dateInput, timeInInput, timeOutInput, dutyHoursInput;
+    private MaterialAutoCompleteTextView workShiftEntryModeInput;
     private EditText hourlyRateInput, regularHoursInput, overtimeMultiplierInput, allowanceInput, deductionInput;
     private EditText firstPaydayInput, secondPaydayInput;
     private MaterialAutoCompleteTextView payRateTypeInput;
@@ -247,8 +248,7 @@ public final class MainActivity extends FragmentActivity {
 
     private void requestNotificationPermissionIfNeeded() {
         android.content.SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        if (!prefs.getBoolean("notifications_enabled", false)) return;
-        if (android.os.Build.VERSION.SDK_INT >= 33
+        if (!prefs.getBoolean("notifications_enabled", false)) return;        if (android.os.Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                 != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 7127);
@@ -497,8 +497,7 @@ public final class MainActivity extends FragmentActivity {
         TextView snapshotTitle = text("Budget snapshot", 16, true);
         snapshotTitle.setTextColor(ink);
         snapshotTitles.addView(snapshotTitle);
-        TextView cutoffCaption = text("Your spending at a glance", 12, false);
-        cutoffCaption.setTextColor(muted);
+        TextView cutoffCaption = text("Your spending at a glance", 12, false);        cutoffCaption.setTextColor(muted);
         snapshotTitles.addView(cutoffCaption);
         snapshotHeader.addView(snapshotTitles, new LinearLayout.LayoutParams(0, -2, 1f));
         TextView viewBudget = text("View all  ›", 11, true);
@@ -747,8 +746,7 @@ public final class MainActivity extends FragmentActivity {
 
     private View metricCard(String label, String amount, int accent) {
         LinearLayout metric = cardContainer();
-        metric.setPadding(dp(14), dp(14), dp(10), dp(14));
-        TextView labelView = text(label, 11, true);
+        metric.setPadding(dp(14), dp(14), dp(10), dp(14));        TextView labelView = text(label, 11, true);
         labelView.setAlpha(0.75f);
         metric.addView(labelView);
         TextView amountView = text(amount, 18, true);
@@ -877,18 +875,35 @@ public final class MainActivity extends FragmentActivity {
         configureDatePicker(dateInput);
         addField(form, "Work date", dateInput);
 
-        LinearLayout times = new LinearLayout(this);
-        times.setOrientation(LinearLayout.HORIZONTAL);
-        timeInInput = field("Choose time", entry == null ? "08:00" : entry.timeIn, InputType.TYPE_NULL);
-        timeOutInput = field("Choose time", entry == null ? "17:00" : entry.timeOut, InputType.TYPE_NULL);
-        configureTimePicker(timeInInput);
-        configureTimePicker(timeOutInput);
-        TextInputLayout timeInLayout = inputLayout("Time in", timeInInput);
-        TextInputLayout timeOutLayout = inputLayout("Time out", timeOutInput);
-        times.addView(timeInLayout, new LinearLayout.LayoutParams(0, -2, 1f));
-        times.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
-        times.addView(timeOutLayout, new LinearLayout.LayoutParams(0, -2, 1f));
-        form.addView(times);
+        boolean dutyHoursMode = "Duty Hours".equals(pref("work_shift_entry_mode", "Duty Time"));
+        timeInInput = null;
+        timeOutInput = null;
+        dutyHoursInput = null;
+        if (dutyHoursMode) {
+            String initialDutyHours = entry == null
+                    ? pref("regular_hours", "8")
+                    : BigDecimal.valueOf(entry.netMinutes).divide(BigDecimal.valueOf(60), 2,
+                            java.math.RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
+            dutyHoursInput = field("Total duty hours (e.g. 8 or 10)", initialDutyHours,
+                    InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+            addField(form, "Duty hours (breaks entered separately below)", dutyHoursInput);
+            TextView dutyModeNote = text("Regular hours and overtime will be split automatically using your Regular hours setting.", 12, false);
+            dutyModeNote.setPadding(0, 0, 0, dp(8));
+            form.addView(dutyModeNote);
+        } else {
+            LinearLayout times = new LinearLayout(this);
+            times.setOrientation(LinearLayout.HORIZONTAL);
+            timeInInput = field("Choose time", entry == null ? "08:00" : entry.timeIn, InputType.TYPE_NULL);
+            timeOutInput = field("Choose time", entry == null ? "17:00" : entry.timeOut, InputType.TYPE_NULL);
+            configureTimePicker(timeInInput);
+            configureTimePicker(timeOutInput);
+            TextInputLayout timeInLayout = inputLayout("Time in", timeInInput);
+            TextInputLayout timeOutLayout = inputLayout("Time out", timeOutInput);
+            times.addView(timeInLayout, new LinearLayout.LayoutParams(0, -2, 1f));
+            times.addView(space(dp(8)), new LinearLayout.LayoutParams(dp(8), 1));
+            times.addView(timeOutLayout, new LinearLayout.LayoutParams(0, -2, 1f));
+            form.addView(times);
+        }
 
         addSection(form, "Break duration");
         breakContainer = new LinearLayout(this);
@@ -997,7 +1012,6 @@ public final class MainActivity extends FragmentActivity {
         }
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> attemptExpenseSave(dialog));
     }
-
     private void attemptExpenseSave(AlertDialog expenseDialog) {
         try {
             LocalDate.parse(value(expenseDateInput), DateTimeFormatter.ISO_LOCAL_DATE);
@@ -1085,6 +1099,16 @@ public final class MainActivity extends FragmentActivity {
         header("Settings", "Set your usual pay rates and cutoff schedule.");
         LinearLayout card = cardContainer();
         page.addView(card);
+        addSection(card, "Work shift entry");
+        workShiftEntryModeInput = createWorkShiftEntryModeSpinner();
+        addField(card, "Entry mode", workShiftEntryModeInput);
+        TextView workModeInfo = text("Duty Hours lets you enter total work hours directly. Duty Time lets you enter actual start and end times. Overtime is calculated after your Regular hours setting.", 13, false);
+        workModeInfo.setPadding(0, 0, 0, dp(8));
+        card.addView(workModeInfo);
+        Button saveWorkMode = button("Save work shift mode", false);
+        saveWorkMode.setOnClickListener(v -> saveWorkShiftEntryMode());
+        card.addView(saveWorkMode);
+
         addSection(card, "Salary defaults");
         hourlyRateInput = field("Rate amount", pref("pay_rate", pref("hourly_rate", "100.00")), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         regularHoursInput = field("Regular hours per day", pref("regular_hours", "8"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
@@ -1207,8 +1231,13 @@ public final class MainActivity extends FragmentActivity {
         lastSaveSucceeded = false;
         try {
             LocalDate date = LocalDate.parse(value(dateInput), DateTimeFormatter.ISO_LOCAL_DATE);
-            LocalTime timeIn = LocalTime.parse(value(timeInInput), DateTimeFormatter.ofPattern("HH:mm"));
-            LocalTime timeOut = LocalTime.parse(value(timeOutInput), DateTimeFormatter.ofPattern("HH:mm"));
+            boolean dutyHoursMode = "Duty Hours".equals(pref("work_shift_entry_mode", "Duty Time"));
+            LocalTime timeIn = null;
+            LocalTime timeOut = null;
+            if (!dutyHoursMode) {
+                timeIn = LocalTime.parse(value(timeInInput), DateTimeFormatter.ofPattern("HH:mm"));
+                timeOut = LocalTime.parse(value(timeOutInput), DateTimeFormatter.ofPattern("HH:mm"));
+            }
             BigDecimal enteredRate = decimal(hourlyRateInput, "Pay rate");
             String rateType = payRateTypeInput == null ? pref("pay_rate_type", "Hourly") : payRateTypeInput.getText().toString();
             BigDecimal regularHours = decimal(regularHoursInput, "Regular hours");
@@ -1230,6 +1259,21 @@ public final class MainActivity extends FragmentActivity {
                 totalBreakMinutes = Math.addExact(totalBreakMinutes, minutes);
                 if (minutes > 0) serializedBreaks.add(breakHours.stripTrailingZeros().toPlainString() + "h");
             }
+            if (dutyHoursMode) {
+                BigDecimal dutyHours = decimal(dutyHoursInput, "Duty hours");
+                if (dutyHours.signum() <= 0 || dutyHours.multiply(BigDecimal.valueOf(60)).stripTrailingZeros().scale() > 0) {
+                    throw new IllegalArgumentException("Duty hours must be positive and convert to whole minutes.");
+                }
+                int dutyMinutes = dutyHours.multiply(BigDecimal.valueOf(60)).intValueExact();
+                int totalShiftMinutes = Math.addExact(dutyMinutes, totalBreakMinutes);
+                if (totalShiftMinutes >= 24 * 60) {
+                    throw new IllegalArgumentException("Duty hours plus breaks must be less than 24 hours.");
+                }
+                // The current database schema stores a time span. Use a synthetic span
+                // while preserving entered net duty duration after subtracting breaks.
+                timeIn = LocalTime.of(8, 0);
+                timeOut = timeIn.plusMinutes(totalShiftMinutes);
+            }
             BigDecimal effectiveHourlyRate = "Daily".equals(rateType)
                     ? enteredRate.divide(regularHours, 8, java.math.RoundingMode.HALF_UP) : enteredRate;
             SalaryCalculator.Result result = SalaryCalculator.calculateWithBreakMinutes(timeIn, timeOut,
@@ -1247,8 +1291,7 @@ public final class MainActivity extends FragmentActivity {
                 }
                 editingWorkEntryId = -1;
                 if (saveWorkButton != null) saveWorkButton.setText("Calculate and save shift");
-            } else {
-                saveSalaryPreferences(enteredRate, rateType, regularHours, multiplier, allowance, deduction);
+            } else {                saveSalaryPreferences(enteredRate, rateType, regularHours, multiplier, allowance, deduction);
                 database.insertEntry(date.toString(), timeIn.toString(), timeOut.toString(),
                         savedBreaks, result, effectiveHourlyRate, rateType, enteredRate, multiplier, regularMinutes);
             }
@@ -1497,8 +1540,7 @@ public final class MainActivity extends FragmentActivity {
                 recordContent.setOrientation(LinearLayout.VERTICAL);
                 LinearLayout summary = new LinearLayout(this);
                 summary.setOrientation(LinearLayout.HORIZONTAL);
-                summary.setGravity(Gravity.CENTER_VERTICAL);
-                LinearLayout summaryText = new LinearLayout(this);
+                summary.setGravity(Gravity.CENTER_VERTICAL);                LinearLayout summaryText = new LinearLayout(this);
                 summaryText.setOrientation(LinearLayout.VERTICAL);
                 TextView expenseLine = text(entry.category + "  ·  " + money(new BigDecimal(entry.amount)), 14, true);
                 expenseLine.setPadding(0, dp(2), 0, 0);
@@ -1747,8 +1789,7 @@ public final class MainActivity extends FragmentActivity {
         int secondPayday;
         try {
             firstPayday = Integer.parseInt(pref("first_cutoff_payday", "22"));
-        } catch (NumberFormatException ignored) {
-            firstPayday = 22;
+        } catch (NumberFormatException ignored) {            firstPayday = 22;
         }
         try {
             secondPayday = Integer.parseInt(pref("second_cutoff_payday", "7"));
@@ -1997,8 +2038,7 @@ public final class MainActivity extends FragmentActivity {
                                 .putString("opening_savings_balance",
                                         opening.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
                                 .apply();
-                        Toast.makeText(this, "Starting savings balance saved", Toast.LENGTH_SHORT).show();
-                        showTab(2);
+                        Toast.makeText(this, "Starting savings balance saved", Toast.LENGTH_SHORT).show();                        showTab(2);
                     }).show();
         } catch (IllegalArgumentException ex) {
             toast(ex.getMessage());
@@ -2221,6 +2261,32 @@ public final class MainActivity extends FragmentActivity {
         return getSharedPreferences(PREFS, MODE_PRIVATE).getString(key, fallback);
     }
 
+    private MaterialAutoCompleteTextView createWorkShiftEntryModeSpinner() {
+        MaterialAutoCompleteTextView dropdown = new MaterialAutoCompleteTextView(this);
+        dropdown.setInputType(InputType.TYPE_NULL);
+        dropdown.setKeyListener(null);
+        dropdown.setThreshold(0);
+        dropdown.setSimpleItems(new String[]{"Duty Time", "Duty Hours"});
+        String savedMode = pref("work_shift_entry_mode", "Duty Time");
+        dropdown.setText("Duty Hours".equals(savedMode) ? "Duty Hours" : "Duty Time", false);
+        dropdown.setOnClickListener(v -> dropdown.showDropDown());
+        dropdown.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(56)));
+        return dropdown;
+    }
+
+    private void saveWorkShiftEntryMode() {
+        String selected = workShiftEntryModeInput == null
+                ? "Duty Time" : workShiftEntryModeInput.getText().toString().trim();
+        if (!"Duty Hours".equals(selected) && !"Duty Time".equals(selected)) {
+            toast("Choose Duty Hours or Duty Time.");
+            return;
+        }
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putString("work_shift_entry_mode", selected)
+                .apply();
+        Toast.makeText(this, "Work shift entry mode saved", Toast.LENGTH_SHORT).show();
+    }
+
     private MaterialAutoCompleteTextView createRateTypeSpinner() {
         MaterialAutoCompleteTextView dropdown = new MaterialAutoCompleteTextView(this);
         dropdown.setInputType(InputType.TYPE_NULL);
@@ -2247,8 +2313,7 @@ public final class MainActivity extends FragmentActivity {
         input.setFocusable(false);
         input.setClickable(true);
         input.setOnClickListener(v -> {
-            LocalDate current;
-            try {
+            LocalDate current;            try {
                 current = LocalDate.parse(value(input));
             } catch (Exception ignored) {
                 current = LocalDate.now();
@@ -2497,8 +2562,7 @@ public final class MainActivity extends FragmentActivity {
         TextView view = new TextView(this);
         view.setText(value);
         view.setTextSize(size);
-        view.setTextColor(resolveColor(android.R.attr.textColorPrimary));
-        if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        view.setTextColor(resolveColor(android.R.attr.textColorPrimary));        if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         return view;
     }
 
