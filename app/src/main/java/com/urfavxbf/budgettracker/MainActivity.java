@@ -1203,10 +1203,16 @@ public final class MainActivity extends FragmentActivity {
 
         header("Budget", "Manage your salary-cycle budget, category limits, and spending.");
         LinearLayout overview = cardContainer();
-        overview.setPadding(dp(20), dp(20), dp(20), dp(20));
+        overview.setPadding(dp(20), dp(18), dp(20), dp(20));
+        LinearLayout overviewHeader = new LinearLayout(this);
+        overviewHeader.setGravity(Gravity.CENTER_VERTICAL);
         TextView remainingLabel = text("REMAINING BUDGET", 11, true);
         remainingLabel.setTextColor(resolveColor(android.R.attr.textColorSecondary));
-        overview.addView(remainingLabel);
+        overviewHeader.addView(remainingLabel, new LinearLayout.LayoutParams(0, -2, 1f));
+        MaterialButton editBudget = compactButton("Edit", false);
+        editBudget.setOnClickListener(v -> showSpendingBudgetDialog());
+        overviewHeader.addView(editBudget);
+        overview.addView(overviewHeader);
         TextView remainingValue = text(budgetBase.signum() > 0
                 ? money(budgetRemaining.max(BigDecimal.ZERO)) : "Not set", 28, true);
         remainingValue.setPadding(0, dp(6), 0, dp(5));
@@ -2745,6 +2751,40 @@ public final class MainActivity extends FragmentActivity {
                         toast("Could not delete this salary payment.");
                     }
                 }).show();
+    }
+
+    private void showSpendingBudgetDialog() {
+        EditText limitInput = field("0.00", pref("spending_budget", "0.00"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(24), dp(8), dp(24), 0);
+        addField(form, "Spending limit per salary cycle (₱, 0 to disable)", limitInput);
+
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+                .setTitle("Edit spending budget")
+                .setView(form)
+                .setNegativeButton("Cancel", (d, which) -> d.dismiss())
+                .setPositiveButton("Save", null)
+                .create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            try {
+                BigDecimal limit = decimal(limitInput, "Spending limit");
+                if (limit.signum() < 0) {
+                    throw new IllegalArgumentException("Spending limit cannot be negative. Enter 0 to disable it.");
+                }
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                        .putString("spending_budget",
+                                limit.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
+                        .apply();
+                dialog.dismiss();
+                showTab(2);
+                toast(limit.signum() == 0 ? "Spending limit disabled" : "Spending budget saved");
+            } catch (IllegalArgumentException ex) {
+                toast(ex.getMessage());
+            }
+        }));
+        dialog.show();
     }
 
     private void saveSpendingBudget() {
