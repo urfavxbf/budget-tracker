@@ -50,13 +50,14 @@ import java.util.TreeMap;
 
 public final class MainActivity extends FragmentActivity {
     private static final String PREFS = "salary_preferences";
-    private static final String[] TAB_NAMES = {"Home", "History", "Settings"};
+    private static final String[] TAB_NAMES = {"Home", "Activity", "Budget", "Settings"};
     private final List<BreakInput> breakInputs = new ArrayList<>();
     private LinearLayout page;
     private BottomNavigationView bottomNav;
     private static final int NAV_HOME_ID = 1;
     private static final int NAV_HISTORY_ID = 2;
     private static final int NAV_SETTINGS_ID = 3;
+    private static final int NAV_BUDGET_ID = 4;
     private int currentTab = 0;
     private EditText dateInput, timeInInput, timeOutInput;
     private EditText totalHoursInput;
@@ -179,15 +180,18 @@ public final class MainActivity extends FragmentActivity {
         bottomNav.getMenu().clear();
         bottomNav.getMenu().add(0, NAV_HOME_ID, 0, "Home").setIcon(R.drawable.ic_home);
         bottomNav.getMenu().add(0, NAV_HISTORY_ID, 1, "Activity").setIcon(R.drawable.ic_history);
-        bottomNav.getMenu().add(0, NAV_SETTINGS_ID, 2, "Settings").setIcon(R.drawable.ic_settings);
+        bottomNav.getMenu().add(0, NAV_BUDGET_ID, 2, "Budget").setIcon(R.drawable.ic_history);
+        bottomNav.getMenu().add(0, NAV_SETTINGS_ID, 3, "Settings").setIcon(R.drawable.ic_settings);
         bottomNav.setOnItemSelectedListener(item -> {
             int tab;
             if (item.getItemId() == NAV_HOME_ID) {
                 tab = 0;
             } else if (item.getItemId() == NAV_HISTORY_ID) {
                 tab = 1;
-            } else if (item.getItemId() == NAV_SETTINGS_ID) {
+            } else if (item.getItemId() == NAV_BUDGET_ID) {
                 tab = 2;
+            } else if (item.getItemId() == NAV_SETTINGS_ID) {
+                tab = 3;
             } else {
                 return false;
             }
@@ -200,7 +204,8 @@ public final class MainActivity extends FragmentActivity {
             return true;
         });
         bottomNav.setSelectedItemId(currentTab == 0 ? NAV_HOME_ID
-                : currentTab == 1 ? NAV_HISTORY_ID : NAV_SETTINGS_ID);
+                : currentTab == 1 ? NAV_HISTORY_ID
+                : currentTab == 2 ? NAV_BUDGET_ID : NAV_SETTINGS_ID);
     }
 
     private void showTab(int tab) {
@@ -225,7 +230,8 @@ public final class MainActivity extends FragmentActivity {
         switch (tab) {
             case 0: buildDashboard(); break;
             case 1: buildHistoryScreen(); break;
-            case 2: buildSettingsScreen(); break;
+            case 2: buildBudgetScreen(); break;
+            case 3: buildSettingsScreen(); break;
             default: buildDashboard();
         }
     }
@@ -1130,6 +1136,250 @@ public final class MainActivity extends FragmentActivity {
             if (existing.equalsIgnoreCase(trimmed)) return;
         }
         categories.add(trimmed);
+    }
+
+    private void buildBudgetScreen() {
+        LocalDate today = LocalDate.now();
+        CutoffPeriod currentCutoff = CutoffPeriod.forDate(today);
+        WorkDatabase.PaydayPayment activePayment =
+                database.getLatestPaydayPaymentOnOrBefore(today.toString());
+        LocalDate cycleStart = activePayment == null
+                ? currentCutoff.startDate : LocalDate.parse(activePayment.paydayDate);
+
+        int firstPayday = parsePaydayPreference("first_cutoff_payday", 22);
+        int secondPayday = parsePaydayPreference("second_cutoff_payday", 7);
+        CutoffPeriod nextCutoff = CutoffPeriod.forNextPayday(today, firstPayday, secondPayday);
+        LocalDate nextPayday = nextCutoff.payday(firstPayday, secondPayday);
+        long daysUntilPayday = Math.max(0,
+                java.time.temporal.ChronoUnit.DAYS.between(today, nextPayday));
+
+        BigDecimal spent = database.getExpenseTotal(cycleStart.toString(), today.toString());
+        BigDecimal availableCash = getAvailableCashBalance();
+        BigDecimal cycleBudget = activePayment == null ? BigDecimal.ZERO
+                : new BigDecimal(activePayment.receivedAmount).add(getCarryoverIntoPayment(activePayment));
+        BigDecimal spendingLimit;
+        try {
+            spendingLimit = new BigDecimal(pref("spending_budget", "0.00")).max(BigDecimal.ZERO);
+        } catch (NumberFormatException ignored) {
+            spendingLimit = BigDecimal.ZERO;
+        }
+        BigDecimal budgetBase = BudgetInsights.resolveBudgetBase(cycleBudget, spendingLimit);
+        BigDecimal budgetRemaining = budgetBase.subtract(spent);
+        BigDecimal dailyGuide = BudgetInsights.dailySpendingGuide(
+                budgetBase, spent, availableCash, daysUntilPayday);
+
+        header("Budget", "Manage your salary-cycle budget, category limits, and spending.");
+        LinearLayout overview = cardContainer();
+        overview.setPadding(dp(18), dp(18), dp(18), dp(18));
+        TextView remainingLabel = text("REMAINING BUDGET", 11, true);
+        remainingLabel.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        overview.addView(remainingLabel);
+        TextView remainingValue = text(budgetBase.signum() > 0
+                ? money(budgetRemaining.max(BigDecimal.ZERO)) : "Not set", 28, true);
+        remainingValue.setPadding(0, dp(6), 0, dp(5));
+        overview.addView(remainingValue);
+        String budgetDetail = budgetBase.signum() > 0
+                ? money(spent) + " spent of " + money(budgetBase)
+                : "Set a salary-cycle limit in Settings to track budget usage.";
+        TextView budgetDetailView = text(budgetDetail, 13, false);
+        budgetDetailView.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        overview.addView(budgetDetailView);
+        ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(100);
+        int usedPercent = budgetBase.signum() > 0
+                ? spent.multiply(BigDecimal.valueOf(100))
+                    .divide(budgetBase, 0, java.math.RoundingMode.HALF_UP)
+                    .max(BigDecimal.ZERO).min(BigDecimal.valueOf(100)).intValue() : 0;
+        progress.setProgress(usedPercent);
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(8));
+        progressParams.topMargin = dp(12);
+        overview.addView(progress, progressParams);
+        page.addView(overview);
+
+        rowCards("Spent this cycle", money(spent), "Available cash", money(availableCash));
+        LinearLayout cycleCard = cardContainer();
+        cycleCard.addView(text("SALARY CYCLE", 11, true));
+        cycleCard.addView(text("From " + cycleStart.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
+                + " to today", 14, true));
+        cycleCard.addView(text("Next payday: " + nextPayday.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
+                + " · " + daysUntilPayday + (daysUntilPayday == 1 ? " day" : " days") + " left",
+                13, false));
+        BigDecimal dailySpendable = dailyGuide;
+        cycleCard.addView(text("Daily spending guide: " + money(dailySpendable),
+                15, true));
+        TextView dailyNote = text("Guide is capped by both remaining budget and available cash. Set aside bills due before payday.", 12, false);
+        dailyNote.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        cycleCard.addView(dailyNote);
+        page.addView(cycleCard);
+
+        LinearLayout categoryHeader = new LinearLayout(this);
+        categoryHeader.setGravity(Gravity.CENTER_VERTICAL);
+        TextView categoryTitle = text("Category budgets", 19, true);
+        categoryHeader.addView(categoryTitle, new LinearLayout.LayoutParams(0, -2, 1f));
+        Button addCategory = button("＋ Add limit", false);
+        addCategory.setOnClickListener(v -> showCategoryBudgetDialog(null));
+        categoryHeader.addView(addCategory);
+        LinearLayout.LayoutParams categoryHeaderParams = new LinearLayout.LayoutParams(-1, -2);
+        categoryHeaderParams.topMargin = dp(10);
+        page.addView(categoryHeader, categoryHeaderParams);
+
+        Map<String, BigDecimal> categoryTotals =
+                database.getExpenseTotalsByCategory(cycleStart.toString(), today.toString());
+        Map<String, BigDecimal> categoryLimits = database.getCategoryBudgetLimits();
+        Map<String, String> categories = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        for (String name : new String[]{"Food & Groceries", "Transportation", "Bills", "Savings", "Personal", "Shopping", "Others"}) {
+            categories.put(name, name);
+        }
+        for (String name : database.getDistinctExpenseCategories()) categories.put(name, name);
+        for (String name : categoryLimits.keySet()) categories.put(name, name);
+        if (categories.isEmpty()) {
+            page.addView(emptyState("No categories yet", "Add an expense or create a category budget limit."));
+        } else {
+            for (String category : categories.values()) {
+                BigDecimal categorySpent = categoryTotals.get(category);
+                if (categorySpent == null) categorySpent = BigDecimal.ZERO.setScale(2);
+                BigDecimal categoryLimit = categoryLimits.get(category);
+                addCategoryBudgetRow(category, categorySpent, categoryLimit);
+            }
+        }
+
+        Button addExpense = button("＋ Add expense", true);
+        addExpense.setOnClickListener(v -> showExpenseDialog(null));
+        LinearLayout.LayoutParams addExpenseParams = new LinearLayout.LayoutParams(-1, -2);
+        addExpenseParams.topMargin = dp(8);
+        page.addView(addExpense, addExpenseParams);
+
+        section("Recent expenses");
+        List<WorkDatabase.ExpenseEntry> recent = database.getRecentExpenseEntries(8);
+        if (recent.isEmpty()) {
+            page.addView(emptyState("No expenses recorded", "Your saved expenses will appear here."));
+        } else {
+            for (WorkDatabase.ExpenseEntry entry : recent) {
+                LinearLayout item = cardContainer();
+                item.setOrientation(LinearLayout.HORIZONTAL);
+                item.setGravity(Gravity.CENTER_VERTICAL);
+                LinearLayout details = new LinearLayout(this);
+                details.setOrientation(LinearLayout.VERTICAL);
+                details.addView(text(entry.category, 14, true));
+                String note = entry.note == null || entry.note.trim().isEmpty() ? entry.date : entry.date + " · " + entry.note;
+                TextView noteView = text(note, 12, false);
+                noteView.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+                details.addView(noteView);
+                item.addView(details, new LinearLayout.LayoutParams(0, -2, 1f));
+                item.addView(text(money(new BigDecimal(entry.amount)), 14, true));
+                Button edit = button("Edit", false);
+                edit.setOnClickListener(v -> showExpenseDialog(entry));
+                item.addView(edit);
+                Button delete = button("×", false);
+                delete.setOnClickListener(v -> confirmDeleteExpense(entry));
+                item.addView(delete);
+                page.addView(item);
+            }
+        }
+        Button allActivity = button("View all activity", false);
+        allActivity.setOnClickListener(v -> showTab(1));
+        page.addView(allActivity);
+    }
+
+    private int parsePaydayPreference(String key, int fallback) {
+        try {
+            int value = Integer.parseInt(pref(key, Integer.toString(fallback)));
+            return Math.min(31, Math.max(1, value));
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
+    }
+
+    private void addCategoryBudgetRow(String category, BigDecimal spent, BigDecimal limit) {
+        LinearLayout card = cardContainer();
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        LinearLayout heading = new LinearLayout(this);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text(category, 15, true);
+        heading.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
+        TextView amount = text(limit == null || limit.signum() <= 0
+                ? money(spent) + " spent" : money(spent) + " / " + money(limit), 12, true);
+        heading.addView(amount);
+        card.addView(heading);
+        if (limit != null && limit.signum() > 0) {
+            ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+            bar.setMax(100);
+            int pct = spent.multiply(BigDecimal.valueOf(100))
+                    .divide(limit, 0, java.math.RoundingMode.HALF_UP)
+                    .max(BigDecimal.ZERO).min(BigDecimal.valueOf(100)).intValue();
+            bar.setProgress(pct);
+            LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(-1, dp(6));
+            barParams.topMargin = dp(8);
+            card.addView(bar, barParams);
+            BigDecimal remaining = limit.subtract(spent);
+            TextView remainingText = text(remaining.signum() < 0
+                    ? "Over limit by " + money(remaining.abs())
+                    : money(remaining) + " remaining", 12, false);
+            remainingText.setTextColor(remaining.signum() < 0
+                    ? resolveColor(android.R.attr.colorError)
+                    : resolveColor(android.R.attr.textColorSecondary));
+            card.addView(remainingText);
+        } else {
+            TextView unset = text("No category limit set", 12, false);
+            unset.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+            card.addView(unset);
+        }
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.END);
+        Button edit = button(limit == null ? "Set limit" : "Edit limit", false);
+        edit.setOnClickListener(v -> showCategoryBudgetDialog(category));
+        actions.addView(edit);
+        if (limit != null) {
+            Button remove = button("Remove", false);
+            remove.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
+                    .setTitle("Remove category limit?")
+                    .setMessage("This removes only the saved limit for " + category + ". Expenses will be kept.")
+                    .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                    .setPositiveButton("Remove", (dialog, which) -> {
+                        database.deleteCategoryBudgetLimit(category);
+                        showTab(3);
+                    }).show());
+            actions.addView(remove);
+        }
+        card.addView(actions);
+        page.addView(card);
+    }
+
+    private void showCategoryBudgetDialog(String existingCategory) {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(4), dp(8), dp(4), dp(4));
+        EditText categoryInput = field("Category name", existingCategory == null ? "" : existingCategory,
+                InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        EditText limitInput = field("0.00", existingCategory == null ? "" :
+                database.getCategoryBudgetLimits().get(existingCategory) == null ? "" :
+                        database.getCategoryBudgetLimits().get(existingCategory).toPlainString(),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        if (existingCategory != null) categoryInput.setEnabled(false);
+        addField(form, "Category", categoryInput);
+        addField(form, "Limit per salary cycle (₱)", limitInput);
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(existingCategory == null ? "Add category budget" : "Edit category budget")
+                .setView(form)
+                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                .setPositiveButton("Save", (dialog, which) -> {
+                    String category = categoryInput.getText() == null ? "" : categoryInput.getText().toString().trim();
+                    String rawLimit = limitInput.getText() == null ? "" : limitInput.getText().toString().trim();
+                    try {
+                        if (category.isEmpty()) throw new IllegalArgumentException("Category name is required.");
+                        BigDecimal limit = new BigDecimal(rawLimit);
+                        if (limit.signum() <= 0) throw new IllegalArgumentException("Limit must be greater than zero.");
+                        if (!database.saveCategoryBudgetLimit(category, limit)) {
+                            throw new IllegalArgumentException("Could not save this category limit.");
+                        }
+                        showTab(3);
+                        toast("Category budget saved.");
+                    } catch (NumberFormatException ex) {
+                        toast("Enter a valid category limit.");
+                    } catch (IllegalArgumentException ex) {
+                        toast(ex.getMessage());
+                    }
+                }).show();
     }
 
     private void buildSettingsScreen() {
@@ -2116,7 +2366,7 @@ public final class MainActivity extends FragmentActivity {
                                         opening.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
                                 .apply();
                         Toast.makeText(this, "Starting cash balance saved", Toast.LENGTH_SHORT).show();
-                        showTab(2);
+                        showTab(3);
                     }).show();
         } catch (IllegalArgumentException ex) {
             toast(ex.getMessage());
@@ -2143,7 +2393,7 @@ public final class MainActivity extends FragmentActivity {
                                         opening.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
                                 .apply();
                         Toast.makeText(this, "Starting savings balance saved", Toast.LENGTH_SHORT).show();
-                        showTab(2);
+                        showTab(3);
                     }).show();
         } catch (IllegalArgumentException ex) {
             toast(ex.getMessage());
@@ -2275,7 +2525,7 @@ public final class MainActivity extends FragmentActivity {
                 .setPositiveButton("Delete", (dialog, which) -> {
                     if (database.deletePaydayPayment(payment.cutoffStart, payment.cutoffEnd)) {
                         Toast.makeText(this, "Salary payment deleted", Toast.LENGTH_SHORT).show();
-                        showTab(2);
+                        showTab(3);
                     } else {
                         toast("Could not delete this salary payment.");
                     }
@@ -2293,7 +2543,7 @@ public final class MainActivity extends FragmentActivity {
                     .apply();
             Toast.makeText(this, limit.signum() == 0
                     ? "Spending limit disabled" : "Spending budget saved", Toast.LENGTH_SHORT).show();
-            showTab(2);
+            showTab(3);
         } catch (IllegalArgumentException ex) {
             toast(ex.getMessage());
         }
@@ -2342,7 +2592,7 @@ public final class MainActivity extends FragmentActivity {
                     .apply();
             PaydayReminderScheduler.schedule(this);
             Toast.makeText(this, "Cutoff and payday settings saved", Toast.LENGTH_SHORT).show();
-            showTab(2);
+            showTab(3);
         } catch (NumberFormatException ex) {
             toast("Enter a valid payday day from 1 to 31.");
         } catch (IllegalArgumentException ex) {
