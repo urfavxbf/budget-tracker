@@ -393,7 +393,7 @@ public final class MainActivity extends FragmentActivity {
                 ? today.withDayOfMonth(1) : today.withDayOfMonth(16);
         LocalDate cutoffEnd = today.getDayOfMonth() <= 15
                 ? today.withDayOfMonth(15) : today.withDayOfMonth(today.lengthOfMonth());
-        LocalDate payday = getPaydayForCurrentCutoff(today);
+        LocalDate payday = getScheduledPayday(getLatestPaydayCutoff(today));
         WorkDatabase.PaydayPayment activePayment = database.getLatestPaydayPaymentOnOrBefore(today.toString());
         BigDecimal earned = activePayment == null
                 ? database.getRecordedNetPayTotal(cutoffStart.toString(), cutoffEnd.toString())
@@ -402,7 +402,7 @@ public final class MainActivity extends FragmentActivity {
                 ? database.getExpenseTotal(cutoffStart.toString(), cutoffEnd.toString())
                 : database.getExpenseTotal(activePayment.paydayDate, today.toString());
         BigDecimal availableCash = getAvailableCashBalance();
-        CutoffPeriod upcomingPayCutoff = getCutoffAwaitingPayment(today);
+        CutoffPeriod upcomingPayCutoff = getLatestPaydayCutoff(today);
         LocalDate upcomingPayday = getScheduledPayday(upcomingPayCutoff);
         BigDecimal expectedUpcomingSalary = database.getRecordedNetPayTotal(
                 upcomingPayCutoff.startDate.toString(), upcomingPayCutoff.endDate.toString());
