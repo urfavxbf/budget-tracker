@@ -1358,6 +1358,13 @@ public final class MainActivity extends FragmentActivity {
         card.setPadding(dp(16), dp(14), dp(16), dp(14));
         LinearLayout heading = new LinearLayout(this);
         heading.setGravity(Gravity.CENTER_VERTICAL);
+        android.widget.ImageView categoryIcon = new android.widget.ImageView(this);
+        categoryIcon.setImageResource(R.drawable.ic_category);
+        categoryIcon.setColorFilter(resolveColor(androidx.appcompat.R.attr.colorPrimary));
+        categoryIcon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams categoryIconParams = new LinearLayout.LayoutParams(dp(24), dp(24));
+        categoryIconParams.rightMargin = dp(10);
+        heading.addView(categoryIcon, categoryIconParams);
         TextView title = text(category, 15, true);
         title.setMaxLines(2);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
