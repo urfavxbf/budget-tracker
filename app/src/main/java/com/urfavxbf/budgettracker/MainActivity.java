@@ -894,6 +894,24 @@ public final class MainActivity extends FragmentActivity {
         times.addView(timeOutLayout, new LinearLayout.LayoutParams(0, -2, 1f));
         form.addView(times);
 
+        // Suggest the most frequently saved time-in/time-out pair.
+        Map<String, Integer> shiftCounts = new TreeMap<>();
+        for (WorkDatabase.WorkEntry saved : database.getRecentWorkEntries(1000)) {
+            String key = saved.timeIn + "|" + saved.timeOut;
+            shiftCounts.put(key, shiftCounts.getOrDefault(key, 0) + 1);
+        }
+        String usualShift = null;
+        int usualCount = 0;
+        for (Map.Entry<String, Integer> candidate : shiftCounts.entrySet()) {
+            if (candidate.getValue() > usualCount) { usualShift = candidate.getKey(); usualCount = candidate.getValue(); }
+        }
+        if (usualShift != null) {
+            final String[] usualTimes = usualShift.split("\\|", -1);
+            Button quickShift = button("Quick Shift - " + usualTimes[0] + " to " + usualTimes[1] + " (" + usualCount + " saved)", false);
+            quickShift.setOnClickListener(v -> { timeInInput.setText(usualTimes[0]); timeOutInput.setText(usualTimes[1]); previewWorkEstimate(); });
+            form.addView(quickShift);
+        }
+
         addSection(form, "Break duration");
         breakContainer = new LinearLayout(this);
         breakContainer.setOrientation(LinearLayout.VERTICAL);
