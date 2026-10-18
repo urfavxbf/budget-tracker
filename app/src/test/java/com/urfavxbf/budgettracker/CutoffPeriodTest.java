@@ -152,4 +152,23 @@ public class CutoffPeriodTest {
 
         assertEquals(LocalDate.of(2024, 2, 29), cutoff.payday(22, 31));
     }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsNullDateForCutoff() {
+        CutoffPeriod.forDate(null);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsNullDateForLatestPayday() {
+        CutoffPeriod.forLatestPaydayOnOrBefore(null, 15, 30);
+    }
+
+    @Test
+    public void clampsConfiguredPaydaysToValidDays() {
+        CutoffPeriod first = CutoffPeriod.forDate(LocalDate.of(2026, 10, 1));
+        CutoffPeriod second = CutoffPeriod.forDate(LocalDate.of(2026, 10, 16));
+        assertEquals(LocalDate.of(2026, 10, 1), first.payday(0, 30));
+        assertEquals(LocalDate.of(2026, 11, 30), second.payday(0, 30));
+    }
+
 }
