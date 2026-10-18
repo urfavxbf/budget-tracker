@@ -118,4 +118,59 @@ public class SalaryCalculatorTest {
                 BigDecimal.ZERO, BigDecimal.ZERO);
     }
 
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsBreakOutsideDayShift() {
+        SalaryCalculator.calculate(
+                LocalTime.of(8, 0), LocalTime.of(17, 0),
+                Collections.singletonList(new BreakInterval(LocalTime.of(7, 0), LocalTime.of(7, 15))),
+                8 * 60, new BigDecimal("100"), new BigDecimal("1.25"),
+                BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsBreakOutsideOvernightShift() {
+        SalaryCalculator.calculate(
+                LocalTime.of(22, 0), LocalTime.of(6, 0),
+                Collections.singletonList(new BreakInterval(LocalTime.of(12, 0), LocalTime.of(12, 30))),
+                8 * 60, new BigDecimal("100"), new BigDecimal("1.25"),
+                BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsRegularDurationLongerThanTwentyFourHours() {
+        SalaryCalculator.calculateWithBreakMinutes(
+                LocalTime.of(8, 0), LocalTime.of(17, 0), 0,
+                24 * 60 + 1, new BigDecimal("100"), new BigDecimal("1.25"),
+                BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void rejectsNegativeHourlyRate() {
+        SalaryCalculator.calculateWithBreakMinutes(
+                LocalTime.of(8, 0), LocalTime.of(17, 0), 0,
+                8 * 60, new BigDecimal("-0.01"), new BigDecimal("1.25"),
+                BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    @Test
+    public void zeroHourlyRateProducesZeroPayWithoutFailure() {
+        SalaryCalculator.Result result = SalaryCalculator.calculateWithBreakMinutes(
+                LocalTime.of(8, 0), LocalTime.of(17, 0), 60,
+                8 * 60, BigDecimal.ZERO, new BigDecimal("1.25"),
+                BigDecimal.ZERO, BigDecimal.ZERO);
+
+        assertEquals(new BigDecimal("0.00"), result.grossPay);
+        assertEquals(new BigDecimal("0.00"), result.estimatedNetPay);
+    }
+
+
+
+
+
+
+
+
+
+
 }
