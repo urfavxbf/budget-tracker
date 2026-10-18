@@ -2236,12 +2236,10 @@ public final class MainActivity extends FragmentActivity {
             for (WorkDatabase.CashBalanceAdjustment adjustment : cashAdjustments) {
                 LinearLayout adjustmentCard = cardContainer();
                 adjustmentCard.setPadding(dp(14), dp(12), dp(14), dp(12));
-                BigDecimal newBalance = new BigDecimal(adjustment.targetAvailableBalance)
-                        .setScale(2, java.math.RoundingMode.HALF_UP);
-                BigDecimal delta = new BigDecimal(adjustment.amount)
-                        .setScale(2, java.math.RoundingMode.HALF_UP);
-                BigDecimal previousBalance = newBalance.subtract(delta)
-                        .setScale(2, java.math.RoundingMode.HALF_UP);
+                BigDecimal newBalance = CashBalanceAdjustmentDetails.normalize(
+                        new BigDecimal(adjustment.targetAvailableBalance));
+                BigDecimal delta = CashBalanceAdjustmentDetails.change(new BigDecimal(adjustment.amount));
+                BigDecimal previousBalance = CashBalanceAdjustmentDetails.previousBalance(newBalance, delta);
                 TextView adjustmentTitle = text(adjustment.date + " · Cash balance adjustment", 14, true);
                 adjustmentCard.addView(adjustmentTitle);
                 TextView previousBalanceView = text("Previous balance: " + money(previousBalance), 13, false);
