@@ -1017,17 +1017,25 @@ public final class WorkDatabase extends SQLiteOpenHelper {
         db.beginTransaction();
         try {
             String current = null;
-            try (Cursor cursor = db.rawQuery("SELECT saved_amount FROM savings_goals WHERE id = ?",
+            String target = null;
+            try (Cursor cursor = db.rawQuery("SELECT saved_amount, target_amount FROM savings_goals WHERE id = ?",
                     new String[]{Long.toString(goalId)})) {
-                if (cursor.moveToFirst()) current = cursor.getString(0);
+                if (cursor.moveToFirst()) {
+                    current = cursor.getString(0);
+                    target = cursor.getString(1);
+                }
             }
-            if (current == null) return false;
+            if (current == null || target == null) return false;
             BigDecimal normalized = amount.setScale(2, java.math.RoundingMode.HALF_UP);
             BigDecimal currentAmount = new BigDecimal(current);
+            BigDecimal targetAmount = new BigDecimal(target);
             if (normalized.compareTo(currentAmount) > 0) return false;
             BigDecimal next = currentAmount.subtract(normalized).setScale(2, java.math.RoundingMode.HALF_UP);
             ContentValues update = new ContentValues();
             update.put("saved_amount", next.toPlainString());
+            // Completion is a current state, not a permanent flag. Clear it if a withdrawal
+            // takes the goal below target so a later completion can record a fresh date.
+            if (next.compareTo(targetAmount) < 0) update.put("completion_date", "");
             boolean success = db.update("savings_goals", update, "id = ?",
                     new String[]{Long.toString(goalId)}) > 0;
             if (success) {
@@ -1157,11 +1165,32 @@ public final class WorkDatabase extends SQLiteOpenHelper {
     public boolean updateSavingsGoal(long goalId, String name, BigDecimal targetAmount, String targetDate) {
         if (goalId <= 0 || name == null || name.trim().isEmpty()
                 || targetAmount == null || targetAmount.signum() <= 0) return false;
+        SQLiteDatabase db = getWritableDatabase();
+        String savedAmount = null;
+        String completionDate = "";
+        try (Cursor cursor = db.rawQuery(
+                "SELECT saved_amount, completion_date FROM savings_goals WHERE id = ?",
+                new String[]{Long.toString(goalId)})) {
+            if (cursor.moveToFirst()) {
+                savedAmount = cursor.getString(0);
+                completionDate = cursor.getString(1);
+            }
+        }
+        if (savedAmount == null) return false;
+        BigDecimal normalizedTarget = targetAmount.setScale(2, java.math.RoundingMode.HALF_UP);
+        BigDecimal currentSaved = new BigDecimal(savedAmount);
         ContentValues values = new ContentValues();
         values.put("name", name.trim());
-        values.put("target_amount", targetAmount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+        values.put("target_amount", normalizedTarget.toPlainString());
         values.put("target_date", targetDate == null ? "" : targetDate.trim());
-        return getWritableDatabase().update("savings_goals", values, "id = ?",
+        // Keep completion history while still complete; clear stale completion if the edited
+        // target moves above the saved balance, and mark a newly satisfied lower target.
+        if (currentSaved.compareTo(normalizedTarget) < 0) {
+            values.put("completion_date", "");
+        } else if (completionDate == null || completionDate.isEmpty()) {
+            values.put("completion_date", java.time.LocalDate.now().toString());
+        }
+        return db.update("savings_goals", values, "id = ?",
                 new String[]{Long.toString(goalId)}) > 0;
     }
 
