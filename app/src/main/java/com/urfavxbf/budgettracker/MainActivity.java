@@ -2236,11 +2236,19 @@ public final class MainActivity extends FragmentActivity {
             for (WorkDatabase.CashBalanceAdjustment adjustment : cashAdjustments) {
                 LinearLayout adjustmentCard = cardContainer();
                 adjustmentCard.setPadding(dp(14), dp(12), dp(14), dp(12));
-                TextView adjustmentTitle = text(adjustment.date + " · " + money(new BigDecimal(adjustment.targetAvailableBalance))
-                        + " actual cash", 14, true);
+                BigDecimal newBalance = CashBalanceAdjustmentDetails.normalize(
+                        new BigDecimal(adjustment.targetAvailableBalance));
+                BigDecimal delta = CashBalanceAdjustmentDetails.change(new BigDecimal(adjustment.amount));
+                BigDecimal previousBalance = CashBalanceAdjustmentDetails.previousBalance(newBalance, delta);
+                TextView adjustmentTitle = text(adjustment.date + " · Cash balance adjustment", 14, true);
                 adjustmentCard.addView(adjustmentTitle);
-                BigDecimal delta = new BigDecimal(adjustment.amount);
-                TextView adjustmentDelta = text("Adjustment: " + (delta.signum() > 0 ? "+" : "") + money(delta), 13, true);
+                TextView previousBalanceView = text("Previous balance: " + money(previousBalance), 13, false);
+                previousBalanceView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+                adjustmentCard.addView(previousBalanceView);
+                TextView newBalanceView = text("New balance: " + money(newBalance), 13, false);
+                newBalanceView.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
+                adjustmentCard.addView(newBalanceView);
+                TextView adjustmentDelta = text("Change: " + (delta.signum() > 0 ? "+" : "") + money(delta), 13, true);
                 adjustmentDelta.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant));
                 adjustmentCard.addView(adjustmentDelta);
                 if (adjustment.note != null && !adjustment.note.trim().isEmpty()) {
