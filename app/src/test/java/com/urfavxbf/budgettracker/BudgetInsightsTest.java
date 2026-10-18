@@ -121,4 +121,43 @@ public class BudgetInsightsTest {
                 new BigDecimal("10.00"), new BigDecimal("100.00"), new BigDecimal("-5.00")));
     }
 
+
+    @Test
+    public void returnsNoBudgetWhenBudgetBaseIsZero() {
+        assertEquals(BudgetInsights.Status.NO_BUDGET,
+                BudgetInsights.classify(new BigDecimal("0.00"), BigDecimal.ZERO));
+    }
+
+    @Test
+    public void exactBudgetIsWarningRatherThanOverBudget() {
+        assertEquals(BudgetInsights.Status.WARNING,
+                BudgetInsights.classify(new BigDecimal("500.00"), new BigDecimal("500.00")));
+    }
+
+    @Test
+    public void returnsZeroDailyGuideOnPaydayOrAfter() {
+        assertEquals(new BigDecimal("0.00"),
+                BudgetInsights.dailySpendingGuide(new BigDecimal("500.00"),
+                        new BigDecimal("100.00"), new BigDecimal("400.00"), 0));
+        assertEquals(new BigDecimal("0.00"),
+                BudgetInsights.dailySpendingGuide(new BigDecimal("500.00"),
+                        new BigDecimal("100.00"), new BigDecimal("400.00"), -1));
+    }
+
+    @Test
+    public void normalizesNullBudgetInputsToZero() {
+        assertEquals(new BigDecimal("0.00"),
+                BudgetInsights.resolveBudgetBase(null, null));
+        assertEquals(BudgetInsights.Status.NO_BUDGET,
+                BudgetInsights.classify(null, null));
+    }
+
+    @Test
+    public void doesNotDrawSavingsForZeroOrNegativeExpense() {
+        assertEquals(new BigDecimal("0.00"), BudgetInsights.savingsDrawForExpense(
+                new BigDecimal("10.00"), new BigDecimal("100.00"), BigDecimal.ZERO));
+        assertEquals(new BigDecimal("0.00"), BudgetInsights.savingsDrawForExpense(
+                new BigDecimal("10.00"), new BigDecimal("100.00"), new BigDecimal("-5.00")));
+    }
+
 }
