@@ -1575,7 +1575,7 @@ public final class MainActivity extends FragmentActivity {
                             return;
                         }
                         toast("Savings withdrawn to Available to Spend.");
-                        showTab(2);
+                        showTab(3);
                     } catch (IllegalArgumentException ex) {
                         toast(ex.getMessage());
                     }
