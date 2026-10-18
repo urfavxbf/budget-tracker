@@ -50,7 +50,7 @@ import java.util.TreeMap;
 
 public final class MainActivity extends FragmentActivity {
     private static final String PREFS = "salary_preferences";
-    private static final String[] TAB_NAMES = {"Home", "Activity", "Budget", "Settings"};
+    private static final String[] TAB_NAMES = {"Home", "Activity", "Budget", "Savings", "Settings"};
     private final List<BreakInput> breakInputs = new ArrayList<>();
     private LinearLayout page;
     private BottomNavigationView bottomNav;
@@ -58,6 +58,7 @@ public final class MainActivity extends FragmentActivity {
     private static final int NAV_HISTORY_ID = 2;
     private static final int NAV_SETTINGS_ID = 3;
     private static final int NAV_BUDGET_ID = 4;
+    private static final int NAV_SAVINGS_ID = 5;
     private int currentTab = 0;
     private EditText dateInput, timeInInput, timeOutInput;
     private EditText totalHoursInput;
@@ -182,7 +183,8 @@ public final class MainActivity extends FragmentActivity {
         bottomNav.getMenu().add(0, NAV_HOME_ID, 0, "Home").setIcon(R.drawable.ic_home);
         bottomNav.getMenu().add(0, NAV_HISTORY_ID, 1, "Activity").setIcon(R.drawable.ic_history);
         bottomNav.getMenu().add(0, NAV_BUDGET_ID, 2, "Budget").setIcon(R.drawable.ic_budget);
-        bottomNav.getMenu().add(0, NAV_SETTINGS_ID, 3, "Settings").setIcon(R.drawable.ic_settings);
+        bottomNav.getMenu().add(0, NAV_SAVINGS_ID, 3, "Savings").setIcon(R.drawable.ic_savings);
+        bottomNav.getMenu().add(0, NAV_SETTINGS_ID, 4, "Settings").setIcon(R.drawable.ic_settings);
         bottomNav.setOnItemSelectedListener(item -> {
             if (updatingNavigation) return true;
             int tab;
@@ -192,8 +194,10 @@ public final class MainActivity extends FragmentActivity {
                 tab = 1;
             } else if (item.getItemId() == NAV_BUDGET_ID) {
                 tab = 2;
-            } else if (item.getItemId() == NAV_SETTINGS_ID) {
+            } else if (item.getItemId() == NAV_SAVINGS_ID) {
                 tab = 3;
+            } else if (item.getItemId() == NAV_SETTINGS_ID) {
+                tab = 4;
             } else {
                 return false;
             }
@@ -207,16 +211,18 @@ public final class MainActivity extends FragmentActivity {
         });
         bottomNav.setSelectedItemId(currentTab == 0 ? NAV_HOME_ID
                 : currentTab == 1 ? NAV_HISTORY_ID
-                : currentTab == 2 ? NAV_BUDGET_ID : NAV_SETTINGS_ID);
+                : currentTab == 2 ? NAV_BUDGET_ID
+                : currentTab == 3 ? NAV_SAVINGS_ID : NAV_SETTINGS_ID);
     }
 
     private void showTab(int tab) {
-        if (tab < 0 || tab > 3) tab = 0;
+        if (tab < 0 || tab > 4) tab = 0;
         currentTab = tab;
         if (bottomNav != null) {
             int selectedId = tab == 0 ? NAV_HOME_ID
                     : tab == 1 ? NAV_HISTORY_ID
-                    : tab == 2 ? NAV_BUDGET_ID : NAV_SETTINGS_ID;
+                    : tab == 2 ? NAV_BUDGET_ID
+                    : tab == 3 ? NAV_SAVINGS_ID : NAV_SETTINGS_ID;
             if (bottomNav.getSelectedItemId() != selectedId) {
                 updatingNavigation = true;
                 bottomNav.setSelectedItemId(selectedId);
@@ -245,7 +251,8 @@ public final class MainActivity extends FragmentActivity {
             case 0: buildDashboard(); break;
             case 1: buildHistoryScreen(); break;
             case 2: buildBudgetScreen(); break;
-            case 3: buildSettingsScreen(); break;
+            case 3: buildSavingsScreen(); break;
+            case 4: buildSettingsScreen(); break;
             default: buildDashboard();
         }
     }
@@ -633,6 +640,30 @@ public final class MainActivity extends FragmentActivity {
         page.addView(historyContainer);
         refreshDashboardActivity();
         maybePromptForSavingsAllocation();
+
+        List<WorkDatabase.SavingsGoal> dashboardSavingsGoals = database.getSavingsGoals();
+        int dashboardActiveGoals = 0;
+        int dashboardCompletedGoals = 0;
+        for (WorkDatabase.SavingsGoal goal : dashboardSavingsGoals) {
+            if (goal.isCompleted()) dashboardCompletedGoals++;
+            else dashboardActiveGoals++;
+        }
+        LinearLayout dashboardSavingsCard = cardContainer();
+        LinearLayout dashboardSavingsHeader = new LinearLayout(this);
+        dashboardSavingsHeader.setGravity(Gravity.CENTER_VERTICAL);
+        TextView dashboardSavingsTitle = text("Savings", 16, true);
+        android.graphics.drawable.Drawable dashboardSavingsIcon = getDrawable(R.drawable.ic_savings).mutate();
+        dashboardSavingsIcon.setTint(accent);
+        dashboardSavingsTitle.setCompoundDrawablesWithIntrinsicBounds(dashboardSavingsIcon, null, null, null);
+        dashboardSavingsTitle.setCompoundDrawablePadding(dp(8));
+        dashboardSavingsHeader.addView(dashboardSavingsTitle, new LinearLayout.LayoutParams(0, -2, 1f));
+        MaterialButton dashboardSavingsOpen = compactButton("View", false);
+        dashboardSavingsOpen.setOnClickListener(v -> showTab(3));
+        dashboardSavingsHeader.addView(dashboardSavingsOpen);
+        dashboardSavingsCard.addView(dashboardSavingsHeader);
+        dashboardSavingsCard.addView(text(money(database.getTotalSavingsBalance()), 24, true));
+        dashboardSavingsCard.addView(text(dashboardActiveGoals + " active goals · " + dashboardCompletedGoals + " completed", 12, false));
+        page.addView(dashboardSavingsCard);
 
         TextView disclaimer = text("Salary amounts are estimates until you record a confirmed payday payment. Available-to-spend cash excludes reserved savings.", 11, false);
         disclaimer.setTextColor(muted);
@@ -1276,6 +1307,61 @@ public final class MainActivity extends FragmentActivity {
         page.addView(addExpense, addExpenseParams);
 
 
+        section("Savings");
+        List<WorkDatabase.SavingsGoal> savingsGoalsPreview = database.getSavingsGoals();
+        int activeSavingsGoals = 0;
+        int completedSavingsGoals = 0;
+        for (WorkDatabase.SavingsGoal goal : savingsGoalsPreview) {
+            if (goal.isCompleted()) completedSavingsGoals++;
+            else activeSavingsGoals++;
+        }
+        LinearLayout savingsPreview = cardContainer();
+        savingsPreview.addView(text("Total saved", 12, false));
+        savingsPreview.addView(text(money(database.getTotalSavingsBalance()), 24, true));
+        savingsPreview.addView(text(activeSavingsGoals + " active goals · " + completedSavingsGoals + " completed", 13, false));
+        MaterialButton openSavings = button("Open savings", true);
+        openSavings.setOnClickListener(v -> showTab(3));
+        savingsPreview.addView(openSavings);
+        page.addView(savingsPreview);
+
+        section("Expenses");
+        MaterialAutoCompleteTextView categoryFilter = new MaterialAutoCompleteTextView(this);
+        List<String> filterOptions = new ArrayList<>();
+        filterOptions.add("All categories");
+        filterOptions.addAll(database.getDistinctExpenseCategories());
+        categoryFilter.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, filterOptions));
+        categoryFilter.setText("All categories", false);
+        categoryFilter.setInputType(InputType.TYPE_NULL);
+        addField(page, "Filter by category", categoryFilter);
+        LinearLayout budgetExpenseList = new LinearLayout(this);
+        budgetExpenseList.setOrientation(LinearLayout.VERTICAL);
+        page.addView(budgetExpenseList);
+        renderBudgetExpenses(budgetExpenseList, "All categories");
+        categoryFilter.setOnItemClickListener((parent, view, position, id) ->
+                renderBudgetExpenses(budgetExpenseList, categoryFilter.getText().toString()));
+        Button allActivity = button("View all activity", false);
+        allActivity.setOnClickListener(v -> showTab(1));
+        page.addView(allActivity);
+    }
+
+
+
+    private void buildSavingsScreen() {
+        header("Savings", "Track your goals, contributions, withdrawals, deadlines, and progress.");
+        List<WorkDatabase.SavingsGoal> goalsForSummary = database.getSavingsGoals();
+        int activeGoalsCount = 0;
+        int completedGoalsCount = 0;
+        for (WorkDatabase.SavingsGoal goal : goalsForSummary) {
+            if (goal.isCompleted()) completedGoalsCount++;
+            else activeGoalsCount++;
+        }
+        LinearLayout overview = cardContainer();
+        overview.addView(text("TOTAL SAVINGS", 11, true));
+        overview.addView(text(money(database.getTotalSavingsBalance()), 28, true));
+        overview.addView(text("Available to Spend: " + money(getAvailableCashBalance()), 13, false));
+        page.addView(overview);
+        rowCards("Active goals", String.valueOf(activeGoalsCount), "Completed goals", String.valueOf(completedGoalsCount));
+
         section("Savings overview");
         LinearLayout savingsSummary = cardContainer();
         savingsSummary.addView(text("Total savings", 13, false));
@@ -1374,7 +1460,7 @@ public final class MainActivity extends FragmentActivity {
                         .setPositiveButton("Delete", (dialog, which) -> {
                             if (database.deleteSavingsGoal(goal.id)) {
                                 toast("Savings goal deleted.");
-                                showTab(2);
+                                showTab(3);
                             } else toast("Could not delete savings goal.");
                         }).show());
                 goalActions.addView(contribute);
@@ -1399,26 +1485,7 @@ public final class MainActivity extends FragmentActivity {
             for (String activity : savingsActivity) addListItem(savingsActivityList, activity);
         }
 
-        section("Expenses");
-        MaterialAutoCompleteTextView categoryFilter = new MaterialAutoCompleteTextView(this);
-        List<String> filterOptions = new ArrayList<>();
-        filterOptions.add("All categories");
-        filterOptions.addAll(database.getDistinctExpenseCategories());
-        categoryFilter.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, filterOptions));
-        categoryFilter.setText("All categories", false);
-        categoryFilter.setInputType(InputType.TYPE_NULL);
-        addField(page, "Filter by category", categoryFilter);
-        LinearLayout budgetExpenseList = new LinearLayout(this);
-        budgetExpenseList.setOrientation(LinearLayout.VERTICAL);
-        page.addView(budgetExpenseList);
-        renderBudgetExpenses(budgetExpenseList, "All categories");
-        categoryFilter.setOnItemClickListener((parent, view, position, id) ->
-                renderBudgetExpenses(budgetExpenseList, categoryFilter.getText().toString()));
-        Button allActivity = button("View all activity", false);
-        allActivity.setOnClickListener(v -> showTab(1));
-        page.addView(allActivity);
     }
-
 
     private void showSavingsGoalDialog(WorkDatabase.SavingsGoal goal) {
         LinearLayout form = new LinearLayout(this);
@@ -1455,7 +1522,7 @@ public final class MainActivity extends FragmentActivity {
                         : database.updateSavingsGoal(goal.id, name, target, targetDate);
                 if (!saved) throw new IllegalArgumentException("Could not save this savings goal.");
                 dialog.dismiss();
-                showTab(2);
+                showTab(3);
             } catch (IllegalArgumentException ex) {
                 toast(ex.getMessage());
             }
@@ -1579,7 +1646,7 @@ public final class MainActivity extends FragmentActivity {
                             return;
                         }
                         toast("Savings transferred successfully.");
-                        showTab(2);
+                        showTab(3);
                     } catch (IllegalArgumentException ex) {
                         toast(ex.getMessage());
                     }
