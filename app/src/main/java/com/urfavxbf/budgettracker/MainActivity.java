@@ -2925,7 +2925,7 @@ public final class MainActivity extends FragmentActivity {
                                         opening.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
                                 .apply();
                         Toast.makeText(this, "Starting cash balance saved", Toast.LENGTH_SHORT).show();
-                        showTab(3);
+                        showTab(4);
                     }).show();
         } catch (IllegalArgumentException ex) {
             toast(ex.getMessage());
@@ -2952,7 +2952,7 @@ public final class MainActivity extends FragmentActivity {
                                         opening.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString())
                                 .apply();
                         Toast.makeText(this, "Starting savings balance saved", Toast.LENGTH_SHORT).show();
-                        showTab(3);
+                        showTab(4);
                     }).show();
         } catch (IllegalArgumentException ex) {
             toast(ex.getMessage());
@@ -3084,7 +3084,7 @@ public final class MainActivity extends FragmentActivity {
                 .setPositiveButton("Delete", (dialog, which) -> {
                     if (database.deletePaydayPayment(payment.cutoffStart, payment.cutoffEnd)) {
                         Toast.makeText(this, "Salary payment deleted", Toast.LENGTH_SHORT).show();
-                        showTab(3);
+                        showTab(4);
                     } else {
                         toast("Could not delete this salary payment.");
                     }
@@ -3136,7 +3136,7 @@ public final class MainActivity extends FragmentActivity {
                     .apply();
             Toast.makeText(this, limit.signum() == 0
                     ? "Spending limit disabled" : "Spending budget saved", Toast.LENGTH_SHORT).show();
-            showTab(3);
+            showTab(4);
         } catch (IllegalArgumentException ex) {
             toast(ex.getMessage());
         }
@@ -3185,7 +3185,7 @@ public final class MainActivity extends FragmentActivity {
                     .apply();
             PaydayReminderScheduler.schedule(this);
             Toast.makeText(this, "Cutoff and payday settings saved", Toast.LENGTH_SHORT).show();
-            showTab(3);
+            showTab(4);
         } catch (NumberFormatException ex) {
             toast("Enter a valid payday day from 1 to 31.");
         } catch (IllegalArgumentException ex) {
