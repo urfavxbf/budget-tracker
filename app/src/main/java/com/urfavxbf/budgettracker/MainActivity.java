@@ -1362,12 +1362,9 @@ public final class MainActivity extends FragmentActivity {
         page.addView(overview);
         rowCards("Active goals", String.valueOf(activeGoalsCount), "Completed goals", String.valueOf(completedGoalsCount));
 
-        section("Savings overview");
-        LinearLayout savingsSummary = cardContainer();
-        savingsSummary.addView(text("Total savings", 13, false));
-        savingsSummary.addView(text(money(database.getTotalSavingsBalance()), 25, true));
-        savingsSummary.addView(text("Available to Spend: " + money(getAvailableCashBalance()), 13, false));
-        savingsSummary.addView(text("Contributions transfer money from Available to Spend into savings. Withdrawals return money to Available to Spend.", 12, false));
+        section("Savings actions");
+        LinearLayout savingsActions = cardContainer();
+        savingsActions.addView(text("Contributions move money from Available to Spend into savings. Withdrawals return money to Available to Spend.", 13, false));
         MaterialButton withdrawSavings = button("Withdraw from savings", false);
         withdrawSavings.setOnClickListener(v -> {
             List<WorkDatabase.SavingsGoal> goals = database.getSavingsGoals();
@@ -1377,8 +1374,8 @@ public final class MainActivity extends FragmentActivity {
             }
             showSavingsWithdrawalGoalPicker(goals);
         });
-        savingsSummary.addView(withdrawSavings);
-        page.addView(savingsSummary);
+        savingsActions.addView(withdrawSavings);
+        page.addView(savingsActions);
 
         section("Savings goals");
         TextView savingsGoalsInfo = text("Create a target, track contributions, and see how close you are to your goal. Contributions increase total savings and reduce Available to Spend.", 13, false);
