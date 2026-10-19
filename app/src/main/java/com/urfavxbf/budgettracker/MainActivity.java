@@ -3689,7 +3689,7 @@ public final class MainActivity extends FragmentActivity {
             float top = dp(8);
             int muted = resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant);
             int track = resolveColor(com.google.android.material.R.attr.colorOutlineVariant);
-            int accent = resolveColor(com.google.android.material.R.attr.colorPrimary);
+            int accent = resolveColor(android.R.attr.colorAccent);
             int spentColor = budgetAmount > 0 && spentAmount > budgetAmount
                     ? android.graphics.Color.rgb(198, 40, 40) : accent;
 
@@ -3713,7 +3713,7 @@ public final class MainActivity extends FragmentActivity {
             float spentTrackTop = top + dp(19);
             float budgetTrackTop = top + rowHeight + dp(19);
             float barHeight = dp(6);
-            float max = Math.max(budgetAmount, spentAmount);
+            double max = Math.max(budgetAmount, spentAmount);
             if (max <= 0d) max = 1d;
             float spentFraction = (float) Math.min(1d, spentAmount / max);
             float budgetFraction = budgetAmount > 0d ? (float) Math.min(1d, budgetAmount / max) : 0f;
