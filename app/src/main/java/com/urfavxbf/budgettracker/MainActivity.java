@@ -598,7 +598,6 @@ public final class MainActivity extends FragmentActivity {
         snapshot.addView(limitText);
 
         budgetComparisonChart = new BudgetComparisonChart();
-        budgetComparisonChart.setValues(spent.doubleValue(), budgetBase.doubleValue());
         LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(292));
         chartParams.bottomMargin = dp(12);
         snapshot.addView(budgetComparisonChart, chartParams);
