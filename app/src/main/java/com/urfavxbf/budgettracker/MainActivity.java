@@ -530,9 +530,48 @@ public final class MainActivity extends FragmentActivity {
         expenseColumn.addView(expenseValue);
         split.addView(expenseColumn, new LinearLayout.LayoutParams(0, -2, 1f));
         balance.addView(split);
+
+        View detailDivider = new View(this);
+        detailDivider.setBackgroundColor(0x553B4A68);
+        LinearLayout.LayoutParams detailDividerParams = new LinearLayout.LayoutParams(-1, dp(1));
+        detailDividerParams.topMargin = dp(14);
+        detailDividerParams.bottomMargin = dp(12);
+        balance.addView(detailDivider, detailDividerParams);
+
+        LinearLayout upcomingDetails = new LinearLayout(this);
+        upcomingDetails.setOrientation(LinearLayout.HORIZONTAL);
+        upcomingDetails.setGravity(Gravity.CENTER_VERTICAL);
+
+        LinearLayout expectedColumn = new LinearLayout(this);
+        expectedColumn.setOrientation(LinearLayout.VERTICAL);
+        TextView expectedLabel = text("EXPECTED SALARY", 10, true);
+        expectedLabel.setTextColor(0xFFB8C7E3);
+        expectedColumn.addView(expectedLabel);
+        TextView expectedValue = text(money(expectedUpcomingSalary), 16, true);
+        expectedValue.setTextColor(0xFFFFFFFF);
+        expectedValue.setPadding(0, dp(4), 0, 0);
+        expectedColumn.addView(expectedValue);
+        upcomingDetails.addView(expectedColumn, new LinearLayout.LayoutParams(0, -2, 1f));
+
+        View upcomingDivider = new View(this);
+        upcomingDivider.setBackgroundColor(0x553B4A68);
+        LinearLayout.LayoutParams upcomingDividerParams = new LinearLayout.LayoutParams(dp(1), dp(38));
+        upcomingDividerParams.leftMargin = dp(10);
+        upcomingDividerParams.rightMargin = dp(14);
+        upcomingDetails.addView(upcomingDivider, upcomingDividerParams);
+
+        LinearLayout nextPaydayColumn = new LinearLayout(this);
+        nextPaydayColumn.setOrientation(LinearLayout.VERTICAL);
+        TextView nextPaydayLabel = text("NEXT PAYDAY", 10, true);
+        nextPaydayLabel.setTextColor(0xFFB8C7E3);
+        nextPaydayColumn.addView(nextPaydayLabel);
+        TextView nextPaydayValue = text(upcomingPayday.format(DateTimeFormatter.ofPattern("MMM d, yyyy")), 16, true);
+        nextPaydayValue.setTextColor(0xFFFFFFFF);
+        nextPaydayValue.setPadding(0, dp(4), 0, 0);
+        nextPaydayColumn.addView(nextPaydayValue);
+        upcomingDetails.addView(nextPaydayColumn, new LinearLayout.LayoutParams(0, -2, 1f));
+        balance.addView(upcomingDetails);
         page.addView(balance);
-        rowCards("Expected salary", money(expectedUpcomingSalary), "Next payday",
-                upcomingPayday.format(DateTimeFormatter.ofPattern("MMM d")));
 
         View actionSpacer = space(dp(18));
         page.addView(actionSpacer, new LinearLayout.LayoutParams(1, dp(18)));
