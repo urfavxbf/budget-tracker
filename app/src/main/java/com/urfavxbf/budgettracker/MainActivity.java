@@ -615,6 +615,20 @@ public final class MainActivity extends FragmentActivity {
         budgetSummaryView.setLineSpacing(dp(5), 1.0f);
         snapshot.addView(budgetSummaryView);
         page.addView(snapshot);
+
+        LinearLayout trendCard = cardContainer();
+        trendCard.setPadding(dp(14), dp(14), dp(14), dp(10));
+        trendCard.addView(text("INCOME VS EXPENSES", 11, true));
+        TextView trendSubtitle = text("Monthly trend · last 6 months", 12, false);
+        trendSubtitle.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        trendCard.addView(trendSubtitle);
+        com.github.mikephil.charting.charts.LineChart monthlyTrend =
+                FinanceCharts.monthlyIncomeExpense(this, database);
+        trendCard.addView(monthlyTrend, new LinearLayout.LayoutParams(-1, dp(230)));
+        LinearLayout.LayoutParams trendCardParams = new LinearLayout.LayoutParams(-1, -2);
+        trendCardParams.topMargin = dp(12);
+        page.addView(trendCard, trendCardParams);
+
         LinearLayout.LayoutParams snapshotParams = (LinearLayout.LayoutParams) snapshot.getLayoutParams();
         snapshotParams.topMargin = dp(18);
         snapshot.setLayoutParams(snapshotParams);
@@ -1336,6 +1350,28 @@ public final class MainActivity extends FragmentActivity {
         }
         page.addView(categoryCard);
 
+        LinearLayout categoryChartsCard = cardContainer();
+        categoryChartsCard.setPadding(dp(14), dp(14), dp(14), dp(12));
+        categoryChartsCard.addView(text("SPENDING ANALYTICS", 11, true));
+        TextView categoryChartsSubtitle = text(
+                "Recorded expenses for the current payday cycle", 12, false);
+        categoryChartsSubtitle.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        categoryChartsCard.addView(categoryChartsSubtitle);
+        com.github.mikephil.charting.charts.PieChart categoryDonut =
+                FinanceCharts.categoryDonut(this, categoryTotals);
+        categoryChartsCard.addView(categoryDonut, new LinearLayout.LayoutParams(-1, dp(230)));
+        TextView comparisonTitle = text("Actual vs category limit", 14, true);
+        LinearLayout.LayoutParams comparisonTitleParams = new LinearLayout.LayoutParams(-1, -2);
+        comparisonTitleParams.topMargin = dp(8);
+        categoryChartsCard.addView(comparisonTitle, comparisonTitleParams);
+        com.github.mikephil.charting.charts.BarChart categoryComparison =
+                FinanceCharts.categoryBudgetComparison(this, new ArrayList<>(categories.values()),
+                        categoryTotals, categoryLimits);
+        categoryChartsCard.addView(categoryComparison, new LinearLayout.LayoutParams(-1, dp(250)));
+        LinearLayout.LayoutParams categoryChartsParams = new LinearLayout.LayoutParams(-1, -2);
+        categoryChartsParams.topMargin = dp(12);
+        page.addView(categoryChartsCard, categoryChartsParams);
+
         MaterialButton addExpense = button("＋ Add expense", true);
         addExpense.setOnClickListener(v -> showExpenseDialog(null));
         LinearLayout.LayoutParams addExpenseParams = new LinearLayout.LayoutParams(-1, -2);
@@ -1423,6 +1459,16 @@ public final class MainActivity extends FragmentActivity {
         page.addView(addSavingsGoal);
         List<WorkDatabase.SavingsGoal> savingsGoals = database.getSavingsGoals();
         savingsGoals.sort((left, right) -> Boolean.compare(left.isCompleted(), right.isCompleted()));
+        if (!savingsGoals.isEmpty()) {
+            section("Savings goal progress");
+            LinearLayout goalsChartCard = cardContainer();
+            goalsChartCard.setPadding(dp(14), dp(14), dp(14), dp(10));
+            goalsChartCard.addView(text("SAVED VS TARGET", 11, true));
+            com.github.mikephil.charting.charts.BarChart savingsGoalChart =
+                    FinanceCharts.savingsGoalComparison(this, savingsGoals);
+            goalsChartCard.addView(savingsGoalChart, new LinearLayout.LayoutParams(-1, dp(230)));
+            page.addView(goalsChartCard);
+        }
         if (savingsGoals.isEmpty()) {
             page.addView(emptyState("No savings goals yet", "Try an emergency fund, a gadget, travel, or another personal target."));
         } else {
