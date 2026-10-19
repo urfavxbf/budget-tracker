@@ -1959,56 +1959,126 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void buildSettingsScreen() {
-        header("Settings", "Set your usual pay rates and cutoff schedule.");
-        LinearLayout card = cardContainer();
-        page.addView(card);
-        addSection(card, "Salary defaults");
-        hourlyRateInput = field("Rate amount", pref("pay_rate", pref("hourly_rate", "100.00")), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        regularHoursInput = field("Regular hours per day", pref("regular_hours", "8"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        overtimeMultiplierInput = field("OT multiplier", pref("ot_multiplier", "1.25"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        allowanceInput = field("Daily allowance", pref("allowance", "0.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        deductionInput = field("Daily deduction", pref("deduction", "0.00"), InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        payRateTypeInput = createRateTypeSpinner();
-        addField(card, "Pay rate type", payRateTypeInput);
-        addField(card, "Rate amount (₱)", hourlyRateInput);
-        updateRateLabel(payRateTypeInput, hourlyRateInput);
-        addField(card, "Regular hours", regularHoursInput);
-        addField(card, "Ordinary OT multiplier", overtimeMultiplierInput);
-        addField(card, "Daily allowance (₱)", allowanceInput);
-        addField(card, "Daily deduction (₱)", deductionInput);
-        Button save = button("Save salary defaults", true);
-        save.setOnClickListener(v -> saveSalaryDefaults());
-        card.addView(save);
+        header("Settings", "Manage your pay, payday schedule, balances, and spending limits.");
 
-        section("Cutoff and payday schedule");
-        TextView scheduleInfo = text("Cutoff period and payday are different settings. The default cutoff periods stay 1st–15th and 16th–month-end; choose the separate payday for each period.", 13, false);
-        scheduleInfo.setPadding(0, 0, 0, dp(8));
-        page.addView(scheduleInfo);
-        firstPaydayInput = field("Payday day (1–31)", pref("first_cutoff_payday", "22"), InputType.TYPE_CLASS_NUMBER);
-        secondPaydayInput = field("Payday day (1–31)", pref("second_cutoff_payday", "7"), InputType.TYPE_CLASS_NUMBER);
-        addField(page, "Payday for 1st–15th cutoff (same month)", firstPaydayInput);
-        addField(page, "Payday for 16th–month-end cutoff (following month)", secondPaydayInput);
+        LinearLayout salaryCard = cardContainer();
+        addSection(salaryCard, "Salary and work defaults");
+        TextView salaryInfo = text("These values are used to estimate your pay from recorded shifts.", 13, false);
+        salaryInfo.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        salaryInfo.setPadding(0, 0, 0, dp(10));
+        salaryCard.addView(salaryInfo);
+
+        hourlyRateInput = field("Rate amount", pref("pay_rate", pref("hourly_rate", "100.00")),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        regularHoursInput = field("Regular hours per day", pref("regular_hours", "8"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        overtimeMultiplierInput = field("OT multiplier", pref("ot_multiplier", "1.25"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        allowanceInput = field("Daily allowance", pref("allowance", "0.00"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        deductionInput = field("Daily deduction", pref("deduction", "0.00"),
+                InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        payRateTypeInput = createRateTypeSpinner();
+        addField(salaryCard, "Pay rate type", payRateTypeInput);
+        addField(salaryCard, "Rate amount (₱)", hourlyRateInput);
+        updateRateLabel(payRateTypeInput, hourlyRateInput);
+        addField(salaryCard, "Regular hours per day", regularHoursInput);
+        addField(salaryCard, "Ordinary OT multiplier", overtimeMultiplierInput);
+        addField(salaryCard, "Daily allowance (₱)", allowanceInput);
+        addField(salaryCard, "Daily deduction (₱)", deductionInput);
+        Button saveSalary = button("Save salary defaults", true);
+        saveSalary.setOnClickListener(v -> saveSalaryDefaults());
+        salaryCard.addView(saveSalary);
+        page.addView(salaryCard);
+
+        LinearLayout scheduleCard = cardContainer();
+        addSection(scheduleCard, "Cutoff and payday");
+        TextView scheduleInfo = text(
+                "Cutoff periods and payday dates are separate. The default cutoff periods remain 1st–15th and 16th–month-end.",
+                13, false);
+        scheduleInfo.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        scheduleInfo.setPadding(0, 0, 0, dp(10));
+        scheduleCard.addView(scheduleInfo);
+        firstPaydayInput = field("Payday day (1–31)", pref("first_cutoff_payday", "22"),
+                InputType.TYPE_CLASS_NUMBER);
+        secondPaydayInput = field("Payday day (1–31)", pref("second_cutoff_payday", "7"),
+                InputType.TYPE_CLASS_NUMBER);
+        addField(scheduleCard, "Payday for 1st–15th cutoff (same month)", firstPaydayInput);
+        addField(scheduleCard, "Payday for 16th–month-end cutoff (following month)", secondPaydayInput);
+
+        LinearLayout cutoffSummaries = new LinearLayout(this);
+        cutoffSummaries.setOrientation(LinearLayout.HORIZONTAL);
+        cutoffSummaries.setGravity(Gravity.TOP);
+        LinearLayout firstCutoff = cardContainer();
+        firstCutoff.setPadding(dp(12), dp(12), dp(12), dp(12));
+        TextView firstTitle = text("FIRST CUTOFF", 10, true);
+        firstTitle.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        firstCutoff.addView(firstTitle);
+        firstCutoff.addView(text("1st–15th", 15, true));
+        TextView firstPaydaySummary = text(
+                "Payday: " + pref("first_cutoff_payday", "22") + "th of the month", 12, false);
+        firstPaydaySummary.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        firstCutoff.addView(firstPaydaySummary);
+
+        LinearLayout secondCutoff = cardContainer();
+        secondCutoff.setPadding(dp(12), dp(12), dp(12), dp(12));
+        TextView secondTitle = text("SECOND CUTOFF", 10, true);
+        secondTitle.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        secondCutoff.addView(secondTitle);
+        secondCutoff.addView(text("16th–month-end", 15, true));
+        TextView secondPaydaySummary = text(
+                "Payday: " + pref("second_cutoff_payday", "7") + "th of following month", 12, false);
+        secondPaydaySummary.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        secondCutoff.addView(secondPaydaySummary);
+
+        cutoffSummaries.addView(firstCutoff, new LinearLayout.LayoutParams(0, -1, 1f));
+        View cutoffGap = new View(this);
+        cutoffSummaries.addView(cutoffGap, new LinearLayout.LayoutParams(dp(8), 1));
+        cutoffSummaries.addView(secondCutoff, new LinearLayout.LayoutParams(0, -1, 1f));
+        LinearLayout.LayoutParams summaryParams = new LinearLayout.LayoutParams(-1, -2);
+        summaryParams.topMargin = dp(4);
+        summaryParams.bottomMargin = dp(10);
+        scheduleCard.addView(cutoffSummaries, summaryParams);
         Button saveSchedule = button("Save cutoff and payday settings", true);
         saveSchedule.setOnClickListener(v -> savePaydaySettings());
-        page.addView(saveSchedule);
-        card("1st cutoff", "1st–15th of each month", "Payday: " + pref("first_cutoff_payday", "22") + "th of the month");
-        card("2nd cutoff", "16th–last day of each month", "Payday: " + pref("second_cutoff_payday", "7") + "th of the following month");
+        scheduleCard.addView(saveSchedule);
+        page.addView(scheduleCard);
 
         section("Saved salary payments");
-        TextView paymentsInfo = text("Edit a salary payment here if you need to correct the amount or date. Editing updates the existing cutoff record, so it will not add the salary to your balance twice.", 13, false);
+        TextView paymentsInfo = text(
+                "Correct a saved payment without adding the salary to your balance twice. Changes apply to its existing cutoff record.",
+                13, false);
+        paymentsInfo.setTextColor(resolveColor(android.R.attr.textColorSecondary));
         paymentsInfo.setPadding(0, 0, 0, dp(8));
         page.addView(paymentsInfo);
         List<WorkDatabase.PaydayPayment> savedPayments = database.getPaydayPayments(100);
         if (savedPayments.isEmpty()) {
-            page.addView(emptyState("No salary payments saved", "Recorded payday salaries will appear here for editing."));
+            page.addView(emptyState("No salary payments yet",
+                    "Recorded payday salaries will appear here when you save a received payment."));
         } else {
             for (WorkDatabase.PaydayPayment payment : savedPayments) {
                 LinearLayout paymentCard = cardContainer();
-                paymentCard.addView(text("Received: " + money(new BigDecimal(payment.receivedAmount)), 16, true));
-                paymentCard.addView(text("Date received: " + payment.paydayDate, 13, false));
-                paymentCard.addView(text("Cutoff: " + payment.cutoffStart + " to " + payment.cutoffEnd, 13, false));
-                paymentCard.addView(text("Expected: " + money(new BigDecimal(payment.expectedAmount)), 13, false));
-                Button editPayment = button("Edit saved salary", false);
+                LinearLayout paymentHeading = new LinearLayout(this);
+                paymentHeading.setGravity(Gravity.CENTER_VERTICAL);
+                paymentHeading.addView(text("Received", 12, false),
+                        new LinearLayout.LayoutParams(0, -2, 1f));
+                paymentHeading.addView(text(money(new BigDecimal(payment.receivedAmount)), 18, true));
+                paymentCard.addView(paymentHeading);
+                TextView paymentDate = text("Date received · " + payment.paydayDate, 13, false);
+                paymentDate.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+                paymentDate.setPadding(0, dp(4), 0, 0);
+                paymentCard.addView(paymentDate);
+                TextView paymentCutoff = text(
+                        "Cutoff · " + payment.cutoffStart + " to " + payment.cutoffEnd, 13, false);
+                paymentCutoff.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+                paymentCard.addView(paymentCutoff);
+                TextView expected = text("Expected · " + money(new BigDecimal(payment.expectedAmount)), 13, false);
+                expected.setPadding(0, dp(2), 0, dp(8));
+                paymentCard.addView(expected);
+
+                LinearLayout paymentActions = new LinearLayout(this);
+                paymentActions.setOrientation(LinearLayout.HORIZONTAL);
+                Button editPayment = button("Edit salary", false);
                 editPayment.setOnClickListener(v -> {
                     try {
                         showPaydayPaymentDialog(CutoffPeriod.forDate(LocalDate.parse(payment.cutoffStart)));
@@ -2016,51 +2086,64 @@ public final class MainActivity extends FragmentActivity {
                         toast("Could not open this saved salary payment.");
                     }
                 });
-                paymentCard.addView(editPayment);
-                Button deletePayment = button("Delete saved salary", false);
+                paymentActions.addView(editPayment, new LinearLayout.LayoutParams(0, -2, 1f));
+                Button deletePayment = button("Delete", false);
                 deletePayment.setOnClickListener(v -> confirmDeletePaydayPayment(payment));
-                paymentCard.addView(deletePayment);
+                LinearLayout.LayoutParams deletePaymentParams = new LinearLayout.LayoutParams(0, -2, 1f);
+                deletePaymentParams.leftMargin = dp(8);
+                paymentActions.addView(deletePayment, deletePaymentParams);
+                paymentCard.addView(paymentActions);
                 page.addView(paymentCard);
             }
         }
 
-        section("Starting cash balance");
-        TextView openingInfo = text("Enter the cash you had when you began tracking. All expenses saved in this app are subtracted from this amount, and confirmed payday payments are added.", 13, false);
-        openingInfo.setPadding(0, 0, 0, dp(8));
-        page.addView(openingInfo);
+        LinearLayout balancesCard = cardContainer();
+        addSection(balancesCard, "Starting balances");
+        TextView openingInfo = text(
+                "Set the balances you had when you started tracking. Opening savings is included in opening cash but excluded from Available to Spend.",
+                13, false);
+        openingInfo.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        openingInfo.setPadding(0, 0, 0, dp(10));
+        balancesCard.addView(openingInfo);
         openingBalanceInput = field("0.00", pref("opening_cash_balance", "0.00"),
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        addField(page, "Opening cash balance (₱)", openingBalanceInput);
-        Button saveOpening = button("Save starting balance", true);
+        addField(balancesCard, "Opening cash balance (₱)", openingBalanceInput);
+        Button saveOpening = button("Save starting cash", true);
         saveOpening.setOnClickListener(v -> saveOpeningBalance());
-        page.addView(saveOpening);
+        balancesCard.addView(saveOpening);
 
-        section("Starting savings balance");
-        TextView savingsInfo = text("Enter savings already included in your opening cash balance. This amount is excluded from Available to Spend and can cover overspending when needed.", 13, false);
-        savingsInfo.setPadding(0, 0, 0, dp(8));
-        page.addView(savingsInfo);
         openingSavingsInput = field("0.00", pref("opening_savings_balance", "0.00"),
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        addField(page, "Opening savings balance (₱)", openingSavingsInput);
-        Button saveSavings = button("Save starting savings", true);
+        addField(balancesCard, "Opening savings balance (₱)", openingSavingsInput);
+        Button saveSavings = button("Save starting savings", false);
         saveSavings.setOnClickListener(v -> saveOpeningSavingsBalance());
-        page.addView(saveSavings);
+        balancesCard.addView(saveSavings);
+        page.addView(balancesCard);
 
-        section("Spending budget");
-        TextView budgetInfo = text("Set a spending cap for each salary cycle. The dashboard tracks expenses since the most recently recorded payday against this limit. Enter 0 to disable the cap.", 13, false);
-        budgetInfo.setPadding(0, 0, 0, dp(8));
-        page.addView(budgetInfo);
+        LinearLayout budgetCard = cardContainer();
+        addSection(budgetCard, "Spending budget");
+        TextView budgetInfo = text(
+                "Set a spending cap for each salary cycle. Expenses since the most recently recorded payday count toward this limit. Enter 0 to disable it.",
+                13, false);
+        budgetInfo.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        budgetInfo.setPadding(0, 0, 0, dp(10));
+        budgetCard.addView(budgetInfo);
         spendingBudgetInput = field("0.00", pref("spending_budget", "0.00"),
                 InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        addField(page, "Spending limit per salary cycle (₱)", spendingBudgetInput);
+        addField(budgetCard, "Spending limit per salary cycle (₱)", spendingBudgetInput);
         Button saveBudget = button("Save spending budget", true);
         saveBudget.setOnClickListener(v -> saveSpendingBudget());
-        page.addView(saveBudget);
+        budgetCard.addView(saveBudget);
+        page.addView(budgetCard);
 
-        section("About your data");
-        TextView info = text("Your entries are stored locally on this device. Expected pay is estimated from saved shifts. Record the amount actually received on payday to update total cash. Savings are tracked separately and excluded from available-to-spend cash. Old salary and expense history is preserved when a new salary cycle begins.", 14, false);
-        info.setPadding(dp(4), dp(4), dp(4), dp(12));
-        page.addView(info);
+        LinearLayout dataCard = cardContainer();
+        addSection(dataCard, "About your data");
+        TextView dataInfo = text(
+                "Your entries are stored locally on this device. Expected pay is estimated from saved shifts. Record the amount actually received on payday to update total cash. Savings are tracked separately and excluded from available-to-spend cash. Your salary and expense history is preserved when a new salary cycle begins.",
+                13, false);
+        dataInfo.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        dataCard.addView(dataInfo);
+        page.addView(dataCard);
     }
 
     private void addBreakRow(String hours) {
