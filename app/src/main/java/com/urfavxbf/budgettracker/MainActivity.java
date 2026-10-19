@@ -599,12 +599,13 @@ public final class MainActivity extends FragmentActivity {
 
         budgetComparisonChart = new BudgetComparisonChart();
         budgetComparisonChart.setValues(spent.doubleValue(), budgetBase.doubleValue());
-        LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(112));
+        LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(292));
         chartParams.bottomMargin = dp(12);
         snapshot.addView(budgetComparisonChart, chartParams);
 
         budgetProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         budgetProgressBar.setMax(100);
+        budgetProgressBar.setVisibility(View.GONE);
         budgetProgressBar.setProgressTintList(ColorStateList.valueOf(green));
         budgetProgressBar.setProgressBackgroundTintList(ColorStateList.valueOf(resolveColor(com.google.android.material.R.attr.colorOutlineVariant)));
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(8));
@@ -2681,9 +2682,6 @@ public final class MainActivity extends FragmentActivity {
         }
 
         budgetBase = BudgetInsights.resolveBudgetBase(cycleBudget, spendingLimit);
-        if (budgetComparisonChart != null) {
-            budgetComparisonChart.setValues(spent.doubleValue(), budgetBase.doubleValue());
-        }
         StringBuilder summary = new StringBuilder();
         summary.append("Cycle started: ").append(cycleStart.format(DateTimeFormatter.ofPattern("MMM d, yyyy")))
                 .append("\nPayday in ").append(daysUntilPayday)
@@ -2751,6 +2749,10 @@ public final class MainActivity extends FragmentActivity {
 
         Map<String, BigDecimal> categoryTotals =
                 database.getExpenseTotalsByCategory(cycleStart.toString(), today.toString());
+        if (budgetComparisonChart != null) {
+            budgetComparisonChart.setValues(spent.doubleValue(), budgetBase.doubleValue(),
+                    dailyGuide.doubleValue(), daysUntilPayday, categoryTotals, hasDailyGuide);
+        }
         if (categoryTotals.isEmpty()) {
             summary.append("\nNo expenses recorded for this cutoff yet.");
         } else {
@@ -3659,92 +3661,164 @@ public final class MainActivity extends FragmentActivity {
      * Lightweight native canvas chart for the dashboard's current salary-cycle budget.
      * Uses the same values as the budget progress summary; no placeholder data is shown.
      */
+    /**
+     * Infographic-style budget monitor: progress ring, budget remaining, daily guide,
+     * and the leading spending categories for the active payday cycle.
+     */
     private final class BudgetComparisonChart extends View {
-        private final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Paint paint =
+                new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
         private double spentAmount;
         private double budgetAmount;
+        private double dailyGuideAmount;
+        private long daysUntilPayday;
+        private boolean hasDailyGuide;
+        private final List<Map.Entry<String, BigDecimal>> categories = new ArrayList<>();
 
         BudgetComparisonChart() {
             super(MainActivity.this);
-            setContentDescription("Budget comparison chart showing actual spending compared with the current cycle budget");
+            setContentDescription("Budget infographic showing budget used, remaining budget, daily spending guide, and top spending categories for the current payday cycle");
         }
 
-        void setValues(double spent, double budget) {
+        void setValues(double spent, double budget, double dailyGuide, long daysLeft,
+                       Map<String, BigDecimal> categoryTotals, boolean dailyGuideAvailable) {
             spentAmount = Math.max(0d, spent);
             budgetAmount = Math.max(0d, budget);
+            dailyGuideAmount = Math.max(0d, dailyGuide);
+            daysUntilPayday = Math.max(0, daysLeft);
+            hasDailyGuide = dailyGuideAvailable;
+            categories.clear();
+            if (categoryTotals != null) {
+                for (Map.Entry<String, BigDecimal> entry : categoryTotals.entrySet()) {
+                    categories.add(new java.util.AbstractMap.SimpleImmutableEntry<>(
+                            entry.getKey(), entry.getValue()));
+                }
+                categories.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+            }
             invalidate();
+        }
+
+        private void text(android.graphics.Canvas canvas, String value, float x, float y,
+                          float size, int color, boolean medium) {
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setTypeface(android.graphics.Typeface.create(
+                    "sans-serif" + (medium ? "-medium" : ""), android.graphics.Typeface.NORMAL));
+            paint.setTextSize(size);
+            paint.setColor(color);
+            canvas.drawText(value, x, y, paint);
         }
 
         @Override
         protected void onDraw(android.graphics.Canvas canvas) {
             super.onDraw(canvas);
-            float density = getResources().getDisplayMetrics().density;
             float left = dp(2);
-            float right = getWidth() - dp(2);
-            float labelWidth = dp(76);
-            float barLeft = left + labelWidth;
-            float barRight = right - dp(2);
-            float barWidth = Math.max(dp(24), barRight - barLeft);
-            float rowHeight = dp(39);
-            float top = dp(8);
+            float width = Math.max(dp(80), getWidth() - dp(4));
+            int ink = resolveColor(com.google.android.material.R.attr.colorOnSurface);
             int muted = resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant);
             int track = resolveColor(com.google.android.material.R.attr.colorOutlineVariant);
-            int accent = resolveColor(android.R.attr.colorAccent);
-            int spentColor = budgetAmount > 0 && spentAmount > budgetAmount
-                    ? android.graphics.Color.rgb(198, 40, 40) : accent;
+            int accent = resolveColor(androidx.appcompat.R.attr.colorPrimary);
+            int danger = resolveColor(android.R.attr.colorError);
+            int good = android.graphics.Color.rgb(35, 133, 109);
+            int usedColor = budgetAmount > 0 && spentAmount / budgetAmount >= 1d ? danger
+                    : (budgetAmount > 0 && spentAmount / budgetAmount >= .8d ? 0xFFE5A34A : good);
 
-            paint.setStyle(android.graphics.Paint.Style.FILL);
-            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
-            paint.setTextSize(dp(11));
-            paint.setColor(muted);
-            canvas.drawText("Spent", left, top + dp(13), paint);
-            canvas.drawText("Budget", left, top + rowHeight + dp(13), paint);
-
-            paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
-            paint.setTextSize(dp(10));
-            paint.setColor(muted);
-            String spentText = money(BigDecimal.valueOf(spentAmount));
-            String budgetText = budgetAmount > 0 ? money(BigDecimal.valueOf(budgetAmount)) : "Not set";
-            canvas.drawText(spentText, barLeft, top + dp(13), paint);
-            canvas.drawText(budgetText, barLeft, top + rowHeight + dp(13), paint);
-
-            float graphLeft = barLeft;
-            float graphWidth = barWidth;
-            float spentTrackTop = top + dp(19);
-            float budgetTrackTop = top + rowHeight + dp(19);
-            float barHeight = dp(6);
-            double max = Math.max(budgetAmount, spentAmount);
-            if (max <= 0d) max = 1d;
-            float spentFraction = (float) Math.min(1d, spentAmount / max);
-            float budgetFraction = budgetAmount > 0d ? (float) Math.min(1d, budgetAmount / max) : 0f;
-
+            float ringRadius = dp(39);
+            float ringX = left + ringRadius + dp(4);
+            float ringY = dp(51);
+            paint.setStyle(android.graphics.Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(9));
+            paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
             paint.setColor(track);
-            canvas.drawRoundRect(graphLeft, spentTrackTop, graphLeft + graphWidth, spentTrackTop + barHeight,
-                    barHeight / 2f, barHeight / 2f, paint);
-            canvas.drawRoundRect(graphLeft, budgetTrackTop, graphLeft + graphWidth, budgetTrackTop + barHeight,
-                    barHeight / 2f, barHeight / 2f, paint);
-            paint.setColor(spentColor);
-            if (spentFraction > 0f) {
-                canvas.drawRoundRect(graphLeft, spentTrackTop, graphLeft + Math.max(barHeight, graphWidth * spentFraction),
-                        spentTrackTop + barHeight, barHeight / 2f, barHeight / 2f, paint);
+            canvas.drawCircle(ringX, ringY, ringRadius, paint);
+            if (budgetAmount > 0) {
+                float sweep = (float) (Math.min(1d, spentAmount / budgetAmount) * 360d);
+                paint.setColor(usedColor);
+                canvas.drawArc(ringX - ringRadius, ringY - ringRadius,
+                        ringX + ringRadius, ringY + ringRadius, -90f, sweep, false, paint);
             }
-            paint.setColor(accent);
-            if (budgetFraction > 0f) {
-                canvas.drawRoundRect(graphLeft, budgetTrackTop, graphLeft + Math.max(barHeight, graphWidth * budgetFraction),
-                        budgetTrackTop + barHeight, barHeight / 2f, barHeight / 2f, paint);
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            String percent = budgetAmount > 0
+                    ? Math.round(spentAmount / budgetAmount * 100d) + "%" : "—";
+            paint.setTextAlign(android.graphics.Paint.Align.CENTER);
+            text(canvas, percent, ringX, ringY + dp(4), dp(20), ink, true);
+            text(canvas, "used", ringX, ringY + dp(19), dp(10), muted, false);
+            paint.setTextAlign(android.graphics.Paint.Align.LEFT);
+
+            float infoX = left + dp(102);
+            float infoWidth = Math.max(dp(100), width - dp(106));
+            text(canvas, "BUDGET USED", infoX, dp(17), dp(10), muted, true);
+            String spentText = money(BigDecimal.valueOf(spentAmount));
+            String budgetText = budgetAmount > 0 ? "of " + money(BigDecimal.valueOf(budgetAmount))
+                    : "No budget set";
+            text(canvas, spentText, infoX, dp(40), dp(19), ink, true);
+            text(canvas, budgetText, infoX, dp(58), dp(11), muted, false);
+            if (budgetAmount > 0 && spentAmount > budgetAmount) {
+                text(canvas, "Over by " + money(BigDecimal.valueOf(spentAmount - budgetAmount)),
+                        infoX, dp(78), dp(11), danger, true);
+            } else if (budgetAmount > 0) {
+                text(canvas, money(BigDecimal.valueOf(Math.max(0d, budgetAmount - spentAmount)))
+                                + " remaining",
+                        infoX, dp(78), dp(11), good, true);
+            } else {
+                text(canvas, "Set a limit to track progress", infoX, dp(78), dp(10), muted, false);
             }
 
-            if (budgetAmount > 0d && spentAmount > budgetAmount) {
+            float gap = dp(10);
+            float cardTop = dp(103);
+            float cardHeight = dp(48);
+            float cardWidth = (width - gap) / 2f;
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setColor(resolveColor(com.google.android.material.R.attr.colorSurfaceContainerLow));
+            canvas.drawRoundRect(left, cardTop, left + cardWidth, cardTop + cardHeight,
+                    dp(10), dp(10), paint);
+            canvas.drawRoundRect(left + cardWidth + gap, cardTop, left + cardWidth * 2 + gap,
+                    cardTop + cardHeight, dp(10), dp(10), paint);
+            text(canvas, "CYCLE LEFT", left + dp(10), cardTop + dp(16), dp(9), muted, true);
+            text(canvas, daysUntilPayday == 0 ? "Payday today" : daysUntilPayday + " days",
+                    left + dp(10), cardTop + dp(35), dp(13), ink, true);
+            float secondX = left + cardWidth + gap + dp(10);
+            text(canvas, "DAILY SPENDING GUIDE", secondX, cardTop + dp(16), dp(9), muted, true);
+            text(canvas, hasDailyGuide ? money(BigDecimal.valueOf(dailyGuideAmount)) : "Not available",
+                    secondX, cardTop + dp(35), dp(13), ink, true);
+
+            float sectionTop = dp(169);
+            text(canvas, "Spending breakdown", left, sectionTop, dp(12), ink, true);
+            if (categories.isEmpty()) {
+                text(canvas, "No expenses recorded in this cycle yet.", left, sectionTop + dp(24),
+                        dp(11), muted, false);
+                return;
+            }
+            BigDecimal largest = categories.get(0).getValue().max(BigDecimal.ZERO);
+            int count = Math.min(3, categories.size());
+            int[] colors = {0xFF4787D7, 0xFFA17AD3, 0xFFE5A34A};
+            float rowTop = sectionTop + dp(19);
+            float barRight = left + width;
+            for (int i = 0; i < count; i++) {
+                Map.Entry<String, BigDecimal> item = categories.get(i);
+                float y = rowTop + i * dp(34);
+                String name = item.getKey() == null || item.getKey().trim().isEmpty()
+                        ? "Uncategorized" : item.getKey();
+                if (name.length() > 20) name = name.substring(0, 18) + "…";
+                text(canvas, name, left, y + dp(10), dp(10), muted, false);
+                String amount = money(item.getValue());
                 paint.setTextSize(dp(10));
-                paint.setColor(spentColor);
-                canvas.drawText("Over budget by " + money(BigDecimal.valueOf(spentAmount - budgetAmount)),
-                        left, top + rowHeight * 2 + dp(13), paint);
-            } else if (budgetAmount <= 0d) {
-                paint.setTextSize(dp(10));
-                paint.setColor(muted);
-                canvas.drawText("Set a budget to track your spending limit", left, top + rowHeight * 2 + dp(13), paint);
+                paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                        android.graphics.Typeface.NORMAL));
+                float amountWidth = paint.measureText(amount);
+                paint.setColor(ink);
+                canvas.drawText(amount, barRight - amountWidth, y + dp(10), paint);
+                float barY = y + dp(17);
+                float barHeight = dp(5);
+                float barWidth = Math.max(dp(1), width - dp(2));
+                paint.setColor(track);
+                canvas.drawRoundRect(left, barY, left + barWidth, barY + barHeight,
+                        barHeight / 2f, barHeight / 2f, paint);
+                float fraction = largest.signum() > 0
+                        ? item.getValue().max(BigDecimal.ZERO).floatValue() / largest.floatValue() : 0f;
+                paint.setColor(colors[i % colors.length]);
+                canvas.drawRoundRect(left, barY, left + Math.max(dp(2), barWidth * Math.min(1f, fraction)),
+                        barY + barHeight, barHeight / 2f, barHeight / 2f, paint);
             }
         }
     }
-
 }
