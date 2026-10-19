@@ -1309,12 +1309,19 @@ public final class MainActivity extends FragmentActivity {
                 if (leftHasLimit != rightHasLimit) return leftHasLimit ? -1 : 1;
                 return String.CASE_INSENSITIVE_ORDER.compare(left, right);
             });
+            BigDecimal largestCategorySpend = BigDecimal.ZERO;
+            for (BigDecimal categorySpend : categoryTotals.values()) {
+                if (categorySpend != null && categorySpend.compareTo(largestCategorySpend) > 0) {
+                    largestCategorySpend = categorySpend;
+                }
+            }
             for (int i = 0; i < categoryOrder.size(); i++) {
                 String category = categoryOrder.get(i);
                 BigDecimal categorySpent = categoryTotals.get(category);
                 if (categorySpent == null) categorySpent = BigDecimal.ZERO.setScale(2);
                 BigDecimal categoryLimit = categoryLimits.get(category);
-                addCategoryBudgetRowToCard(categoryCard, category, categorySpent, categoryLimit);
+                addCategoryBudgetRowToCard(categoryCard, category, categorySpent,
+                        categoryLimit, largestCategorySpend);
                 if (i < categoryOrder.size() - 1) {
                     View separator = new View(this);
                     separator.setBackgroundColor(withAlpha(
@@ -1768,7 +1775,8 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void addCategoryBudgetRowToCard(LinearLayout card, String category,
-                                             BigDecimal spent, BigDecimal limit) {
+                                             BigDecimal spent, BigDecimal limit,
+                                             BigDecimal largestCategorySpend) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
 
@@ -1797,9 +1805,11 @@ public final class MainActivity extends FragmentActivity {
         ProgressBar bar = new ProgressBar(this, null,
                 android.R.attr.progressBarStyleHorizontal);
         bar.setMax(100);
-        int pct = limit != null && limit.signum() > 0
+        BigDecimal graphBase = limit != null && limit.signum() > 0
+                ? limit : largestCategorySpend;
+        int pct = graphBase != null && graphBase.signum() > 0
                 ? spent.multiply(BigDecimal.valueOf(100))
-                    .divide(limit, 0, java.math.RoundingMode.HALF_UP)
+                    .divide(graphBase, 0, java.math.RoundingMode.HALF_UP)
                     .max(BigDecimal.ZERO).min(BigDecimal.valueOf(100)).intValue()
                 : 0;
         bar.setProgress(pct);
