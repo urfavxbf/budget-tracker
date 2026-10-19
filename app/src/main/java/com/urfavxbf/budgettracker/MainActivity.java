@@ -74,6 +74,7 @@ public final class MainActivity extends FragmentActivity {
     private EditText openingBalanceInput;
     private EditText openingSavingsInput;
     private ProgressBar budgetProgressBar;
+    private BudgetComparisonChart budgetComparisonChart;
     private WorkDatabase database;
     private long editingWorkEntryId = -1;
     private long editingExpenseId = -1;
@@ -595,6 +596,13 @@ public final class MainActivity extends FragmentActivity {
         limitText.setTextColor(ink);
         limitText.setPadding(0, dp(16), 0, dp(10));
         snapshot.addView(limitText);
+
+        budgetComparisonChart = new BudgetComparisonChart();
+        budgetComparisonChart.setValues(spent.doubleValue(), budgetBase.doubleValue());
+        LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(-1, dp(112));
+        chartParams.bottomMargin = dp(12);
+        snapshot.addView(budgetComparisonChart, chartParams);
+
         budgetProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         budgetProgressBar.setMax(100);
         budgetProgressBar.setProgressTintList(ColorStateList.valueOf(green));
@@ -2673,6 +2681,9 @@ public final class MainActivity extends FragmentActivity {
         }
 
         budgetBase = BudgetInsights.resolveBudgetBase(cycleBudget, spendingLimit);
+        if (budgetComparisonChart != null) {
+            budgetComparisonChart.setValues(spent.doubleValue(), budgetBase.doubleValue());
+        }
         StringBuilder summary = new StringBuilder();
         summary.append("Cycle started: ").append(cycleStart.format(DateTimeFormatter.ofPattern("MMM d, yyyy")))
                 .append("\nPayday in ").append(daysUntilPayday)
@@ -3643,4 +3654,97 @@ public final class MainActivity extends FragmentActivity {
             this.hours = hours;
         }
     }
+
+    /**
+     * Lightweight native canvas chart for the dashboard's current salary-cycle budget.
+     * Uses the same values as the budget progress summary; no placeholder data is shown.
+     */
+    private final class BudgetComparisonChart extends View {
+        private final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private double spentAmount;
+        private double budgetAmount;
+
+        BudgetComparisonChart() {
+            super(MainActivity.this);
+            setContentDescription("Budget comparison chart showing actual spending compared with the current cycle budget");
+        }
+
+        void setValues(double spent, double budget) {
+            spentAmount = Math.max(0d, spent);
+            budgetAmount = Math.max(0d, budget);
+            invalidate();
+        }
+
+        @Override
+        protected void onDraw(android.graphics.Canvas canvas) {
+            super.onDraw(canvas);
+            float density = getResources().getDisplayMetrics().density;
+            float left = dp(2);
+            float right = getWidth() - dp(2);
+            float labelWidth = dp(76);
+            float barLeft = left + labelWidth;
+            float barRight = right - dp(2);
+            float barWidth = Math.max(dp(24), barRight - barLeft);
+            float rowHeight = dp(39);
+            float top = dp(8);
+            int muted = resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant);
+            int track = resolveColor(com.google.android.material.R.attr.colorOutlineVariant);
+            int accent = resolveColor(com.google.android.material.R.attr.colorPrimary);
+            int spentColor = budgetAmount > 0 && spentAmount > budgetAmount
+                    ? android.graphics.Color.rgb(198, 40, 40) : accent;
+
+            paint.setStyle(android.graphics.Paint.Style.FILL);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL));
+            paint.setTextSize(dp(11));
+            paint.setColor(muted);
+            canvas.drawText("Spent", left, top + dp(13), paint);
+            canvas.drawText("Budget", left, top + rowHeight + dp(13), paint);
+
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL));
+            paint.setTextSize(dp(10));
+            paint.setColor(muted);
+            String spentText = money(BigDecimal.valueOf(spentAmount));
+            String budgetText = budgetAmount > 0 ? money(BigDecimal.valueOf(budgetAmount)) : "Not set";
+            canvas.drawText(spentText, barLeft, top + dp(13), paint);
+            canvas.drawText(budgetText, barLeft, top + rowHeight + dp(13), paint);
+
+            float graphLeft = barLeft;
+            float graphWidth = barWidth;
+            float spentTrackTop = top + dp(19);
+            float budgetTrackTop = top + rowHeight + dp(19);
+            float barHeight = dp(6);
+            float max = Math.max(budgetAmount, spentAmount);
+            if (max <= 0d) max = 1d;
+            float spentFraction = (float) Math.min(1d, spentAmount / max);
+            float budgetFraction = budgetAmount > 0d ? (float) Math.min(1d, budgetAmount / max) : 0f;
+
+            paint.setColor(track);
+            canvas.drawRoundRect(graphLeft, spentTrackTop, graphLeft + graphWidth, spentTrackTop + barHeight,
+                    barHeight / 2f, barHeight / 2f, paint);
+            canvas.drawRoundRect(graphLeft, budgetTrackTop, graphLeft + graphWidth, budgetTrackTop + barHeight,
+                    barHeight / 2f, barHeight / 2f, paint);
+            paint.setColor(spentColor);
+            if (spentFraction > 0f) {
+                canvas.drawRoundRect(graphLeft, spentTrackTop, graphLeft + Math.max(barHeight, graphWidth * spentFraction),
+                        spentTrackTop + barHeight, barHeight / 2f, barHeight / 2f, paint);
+            }
+            paint.setColor(accent);
+            if (budgetFraction > 0f) {
+                canvas.drawRoundRect(graphLeft, budgetTrackTop, graphLeft + Math.max(barHeight, graphWidth * budgetFraction),
+                        budgetTrackTop + barHeight, barHeight / 2f, barHeight / 2f, paint);
+            }
+
+            if (budgetAmount > 0d && spentAmount > budgetAmount) {
+                paint.setTextSize(dp(10));
+                paint.setColor(spentColor);
+                canvas.drawText("Over budget by " + money(BigDecimal.valueOf(spentAmount - budgetAmount)),
+                        left, top + rowHeight * 2 + dp(13), paint);
+            } else if (budgetAmount <= 0d) {
+                paint.setTextSize(dp(10));
+                paint.setColor(muted);
+                canvas.drawText("Set a budget to track your spending limit", left, top + rowHeight * 2 + dp(13), paint);
+            }
+        }
+    }
+
 }
