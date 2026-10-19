@@ -598,7 +598,7 @@ public final class MainActivity extends FragmentActivity {
         snapshotHeader.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout snapshotTitles = new LinearLayout(this);
         snapshotTitles.setOrientation(LinearLayout.VERTICAL);
-        TextView snapshotTitle = text("Budget snapshot", 16, true);
+        TextView snapshotTitle = text("Budget snapshot", 19, true);
         snapshotTitle.setTextColor(ink);
         android.graphics.drawable.Drawable snapshotIcon = getDrawable(R.drawable.ic_budget).mutate();
         snapshotIcon.setTint(accent);
@@ -657,7 +657,7 @@ public final class MainActivity extends FragmentActivity {
 
         LinearLayout trendCard = cardContainer();
         trendCard.setPadding(dp(14), dp(14), dp(14), dp(10));
-        trendCard.addView(text("INCOME VS EXPENSES", 11, true));
+        trendCard.addView(text("INCOME VS EXPENSES", 14, true));
         TextView trendSubtitle = text("Monthly trend · last 6 months", 12, false);
         trendSubtitle.setTextColor(resolveColor(android.R.attr.textColorSecondary));
         trendCard.addView(trendSubtitle);
@@ -685,7 +685,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout recentHeader = new LinearLayout(this);
         recentHeader.setGravity(Gravity.CENTER_VERTICAL);
         recentHeader.setPadding(0, dp(20), 0, dp(8));
-        TextView recentTitle = text("Recent transactions", 16, true);
+        TextView recentTitle = text("Recent transactions", 19, true);
         recentTitle.setTextColor(ink);
         recentHeader.addView(recentTitle, new LinearLayout.LayoutParams(0, -2, 1f));
         TextView seeAll = text("See all  ›", 11, true);
@@ -712,7 +712,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout dashboardSavingsCard = cardContainer();
         LinearLayout dashboardSavingsHeader = new LinearLayout(this);
         dashboardSavingsHeader.setGravity(Gravity.CENTER_VERTICAL);
-        TextView dashboardSavingsTitle = text("Savings", 16, true);
+        TextView dashboardSavingsTitle = text("Savings", 19, true);
         android.graphics.drawable.Drawable dashboardSavingsIcon = getDrawable(R.drawable.ic_savings).mutate();
         dashboardSavingsIcon.setTint(accent);
         dashboardSavingsTitle.setCompoundDrawablesWithIntrinsicBounds(dashboardSavingsIcon, null, null, null);
@@ -1313,7 +1313,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout categoryHeader = new LinearLayout(this);
         categoryHeader.setGravity(Gravity.CENTER_VERTICAL);
         categoryHeader.setPadding(0, dp(8), 0, dp(8));
-        TextView categoryTitle = text("Category budgets", 20, true);
+        TextView categoryTitle = text("Category budgets", 22, true);
         categoryHeader.addView(categoryTitle, new LinearLayout.LayoutParams(0, -2, 1f));
         MaterialButton addCategory = compactButton("＋ Add limit", true);
         addCategory.setOnClickListener(v -> showCategoryBudgetDialog(null));
@@ -2547,7 +2547,7 @@ public final class MainActivity extends FragmentActivity {
             LinearLayout dateHeader = new LinearLayout(this);
             dateHeader.setOrientation(LinearLayout.HORIZONTAL);
             dateHeader.setGravity(Gravity.CENTER_VERTICAL);
-            TextView dateTitle = text(prettyDate, 14, true);
+            TextView dateTitle = text(prettyDate, 16, true);
             dateTitle.setTextColor(resolveColor(android.R.attr.textColorPrimary));
             dateHeader.addView(dateTitle, new LinearLayout.LayoutParams(0, -2, 1f));
             TextView itemCount = text((day.workEntries.size() + day.expenses.size()) + " items", 11, true);
@@ -3535,7 +3535,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void header(String title, String subtitle) {
-        TextView titleView = text(title, 28, true);
+        TextView titleView = text(title, 32, true);
         int headerIcon = iconForLabel(title);
         if (headerIcon != 0) {
             android.graphics.drawable.Drawable icon = getDrawable(headerIcon).mutate();
@@ -3556,7 +3556,7 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void addSection(LinearLayout parent, String label) {
-        TextView heading = text(label, 18, true);
+        TextView heading = text(label, 21, true);
         int sectionIcon = iconForLabel(label);
         if (sectionIcon != 0) {
             android.graphics.drawable.Drawable icon = getDrawable(sectionIcon).mutate();
