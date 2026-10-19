@@ -1235,16 +1235,10 @@ public final class MainActivity extends FragmentActivity {
         TextView budgetDetailView = text(budgetDetail, 13, false);
         budgetDetailView.setTextColor(resolveColor(android.R.attr.textColorSecondary));
         overview.addView(budgetDetailView);
-        ProgressBar progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setMax(100);
-        int usedPercent = budgetBase.signum() > 0
-                ? spent.multiply(BigDecimal.valueOf(100))
-                    .divide(budgetBase, 0, java.math.RoundingMode.HALF_UP)
-                    .max(BigDecimal.ZERO).min(BigDecimal.valueOf(100)).intValue() : 0;
-        progress.setProgress(usedPercent);
-        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(8));
-        progressParams.topMargin = dp(12);
-        overview.addView(progress, progressParams);
+        BudgetComparisonChart budgetInfographic = new BudgetComparisonChart();
+        LinearLayout.LayoutParams infographicParams = new LinearLayout.LayoutParams(-1, dp(292));
+        infographicParams.topMargin = dp(10);
+        overview.addView(budgetInfographic, infographicParams);
         page.addView(overview);
 
         rowCards("Spent this cycle", money(spent), "Available cash", money(availableCash));
@@ -1278,6 +1272,9 @@ public final class MainActivity extends FragmentActivity {
 
         Map<String, BigDecimal> categoryTotals =
                 database.getExpenseTotalsByCategory(cycleStart.toString(), today.toString());
+        budgetInfographic.setValues(spent.doubleValue(), budgetBase.doubleValue(),
+                dailyGuide.doubleValue(), daysUntilPayday, categoryTotals,
+                budgetBase.signum() > 0 && daysUntilPayday > 0);
         Map<String, BigDecimal> categoryLimits = database.getCategoryBudgetLimits();
         Map<String, String> categories = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         for (String name : new String[]{"Food & Groceries", "Transportation", "Bills", "Savings", "Personal", "Shopping", "Others"}) {
@@ -1285,8 +1282,21 @@ public final class MainActivity extends FragmentActivity {
         }
         for (String name : database.getDistinctExpenseCategories()) categories.put(name, name);
         for (String name : categoryLimits.keySet()) categories.put(name, name);
+
+        LinearLayout categoryCard = cardContainer();
+        categoryCard.setPadding(dp(16), dp(16), dp(16), dp(14));
+        categoryCard.addView(text("SPENDING BY CATEGORY", 11, true));
+        TextView categoryCardSubtitle = text(
+                "Current payday cycle · actual spending compared with each category limit", 12, false);
+        categoryCardSubtitle.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        LinearLayout.LayoutParams categorySubtitleParams = new LinearLayout.LayoutParams(-1, -2);
+        categorySubtitleParams.topMargin = dp(4);
+        categorySubtitleParams.bottomMargin = dp(12);
+        categoryCard.addView(categoryCardSubtitle, categorySubtitleParams);
+
         if (categories.isEmpty()) {
-            page.addView(emptyState("No categories yet", "Add an expense or create a category budget limit."));
+            categoryCard.addView(emptyState("No categories yet",
+                    "Add an expense or create a category budget limit."));
         } else {
             List<String> categoryOrder = new ArrayList<>(categories.values());
             categoryOrder.sort((left, right) -> {
@@ -1299,13 +1309,25 @@ public final class MainActivity extends FragmentActivity {
                 if (leftHasLimit != rightHasLimit) return leftHasLimit ? -1 : 1;
                 return String.CASE_INSENSITIVE_ORDER.compare(left, right);
             });
-            for (String category : categoryOrder) {
+            for (int i = 0; i < categoryOrder.size(); i++) {
+                String category = categoryOrder.get(i);
                 BigDecimal categorySpent = categoryTotals.get(category);
                 if (categorySpent == null) categorySpent = BigDecimal.ZERO.setScale(2);
                 BigDecimal categoryLimit = categoryLimits.get(category);
-                addCategoryBudgetRow(category, categorySpent, categoryLimit);
+                addCategoryBudgetRowToCard(categoryCard, category, categorySpent, categoryLimit);
+                if (i < categoryOrder.size() - 1) {
+                    View separator = new View(this);
+                    separator.setBackgroundColor(withAlpha(
+                            resolveColor(android.R.attr.textColorSecondary), 0x28));
+                    LinearLayout.LayoutParams separatorParams =
+                            new LinearLayout.LayoutParams(-1, dp(1));
+                    separatorParams.topMargin = dp(10);
+                    separatorParams.bottomMargin = dp(10);
+                    categoryCard.addView(separator, separatorParams);
+                }
             }
         }
+        page.addView(categoryCard);
 
         MaterialButton addExpense = button("＋ Add expense", true);
         addExpense.setOnClickListener(v -> showExpenseDialog(null));
@@ -1745,55 +1767,74 @@ public final class MainActivity extends FragmentActivity {
         }
     }
 
-    private void addCategoryBudgetRow(String category, BigDecimal spent, BigDecimal limit) {
-        LinearLayout card = cardContainer();
-        card.setPadding(dp(16), dp(14), dp(16), dp(14));
+    private void addCategoryBudgetRowToCard(LinearLayout card, String category,
+                                             BigDecimal spent, BigDecimal limit) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+
         LinearLayout heading = new LinearLayout(this);
         heading.setGravity(Gravity.CENTER_VERTICAL);
         android.widget.ImageView categoryIcon = new android.widget.ImageView(this);
         categoryIcon.setImageResource(R.drawable.ic_category);
         categoryIcon.setColorFilter(resolveColor(androidx.appcompat.R.attr.colorPrimary));
         categoryIcon.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-        LinearLayout.LayoutParams categoryIconParams = new LinearLayout.LayoutParams(dp(24), dp(24));
-        categoryIconParams.rightMargin = dp(10);
-        heading.addView(categoryIcon, categoryIconParams);
-        TextView title = text(category, 15, true);
-        title.setMaxLines(2);
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(20), dp(20));
+        iconParams.rightMargin = dp(9);
+        heading.addView(categoryIcon, iconParams);
+
+        TextView title = text(category, 14, true);
+        title.setMaxLines(1);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
         heading.addView(title, new LinearLayout.LayoutParams(0, -2, 1f));
+
         TextView amount = text(limit == null || limit.signum() <= 0
-                ? money(spent) + " spent" : money(spent) + " / " + money(limit), 12, true);
+                ? money(spent) : money(spent) + " / " + money(limit), 12, true);
         amount.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        amount.setMaxLines(2);
+        amount.setMaxLines(1);
         heading.addView(amount);
-        card.addView(heading);
-        if (limit != null && limit.signum() > 0) {
-            ProgressBar bar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-            bar.setMax(100);
-            int pct = spent.multiply(BigDecimal.valueOf(100))
+        row.addView(heading);
+
+        ProgressBar bar = new ProgressBar(this, null,
+                android.R.attr.progressBarStyleHorizontal);
+        bar.setMax(100);
+        int pct = limit != null && limit.signum() > 0
+                ? spent.multiply(BigDecimal.valueOf(100))
                     .divide(limit, 0, java.math.RoundingMode.HALF_UP)
-                    .max(BigDecimal.ZERO).min(BigDecimal.valueOf(100)).intValue();
-            bar.setProgress(pct);
-            LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(-1, dp(6));
-            barParams.topMargin = dp(8);
-            card.addView(bar, barParams);
-            BigDecimal remaining = limit.subtract(spent);
-            TextView remainingText = text(remaining.signum() < 0
-                    ? "Over limit by " + money(remaining.abs())
-                    : money(remaining) + " remaining", 12, false);
-            remainingText.setTextColor(remaining.signum() < 0
-                    ? resolveColor(android.R.attr.colorError)
-                    : resolveColor(android.R.attr.textColorSecondary));
-            card.addView(remainingText);
-        } else {
-            TextView unset = text("No category limit set", 12, false);
-            unset.setTextColor(resolveColor(android.R.attr.textColorSecondary));
-            card.addView(unset);
+                    .max(BigDecimal.ZERO).min(BigDecimal.valueOf(100)).intValue()
+                : 0;
+        bar.setProgress(pct);
+        if (limit != null && limit.signum() > 0 && spent.compareTo(limit) > 0) {
+            bar.setProgressTintList(ColorStateList.valueOf(
+                    resolveColor(androidx.appcompat.R.attr.colorError)));
         }
+        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(-1, dp(6));
+        barParams.topMargin = dp(8);
+        row.addView(bar, barParams);
+
+        String status;
+        int statusColor;
+        if (limit == null || limit.signum() <= 0) {
+            status = "No category limit set";
+            statusColor = resolveColor(android.R.attr.textColorSecondary);
+        } else {
+            BigDecimal remaining = limit.subtract(spent);
+            status = remaining.signum() < 0
+                    ? "Over limit by " + money(remaining.abs())
+                    : money(remaining) + " remaining";
+            statusColor = remaining.signum() < 0
+                    ? resolveColor(androidx.appcompat.R.attr.colorError)
+                    : resolveColor(android.R.attr.textColorSecondary);
+        }
+        TextView statusView = text(status, 11, false);
+        statusView.setTextColor(statusColor);
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(-1, -2);
+        statusParams.topMargin = dp(3);
+        row.addView(statusView, statusParams);
+
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         actions.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        actions.setPadding(0, dp(8), 0, 0);
+        actions.setPadding(0, dp(3), 0, 0);
         MaterialButton edit = compactButton(limit == null ? "Set limit" : "Edit", false);
         edit.setOnClickListener(v -> showCategoryBudgetDialog(category));
         actions.addView(edit);
@@ -1802,7 +1843,7 @@ public final class MainActivity extends FragmentActivity {
             delete.setTextColor(resolveColor(androidx.appcompat.R.attr.colorError));
             delete.setBackgroundTintList(ColorStateList.valueOf(
                     withAlpha(resolveColor(androidx.appcompat.R.attr.colorError), 0x12)));
-            LinearLayout.LayoutParams deleteParams = (LinearLayout.LayoutParams) delete.getLayoutParams();
+            LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(-2, -2);
             deleteParams.leftMargin = dp(8);
             delete.setLayoutParams(deleteParams);
             delete.setOnClickListener(v -> new MaterialAlertDialogBuilder(this)
@@ -1820,8 +1861,8 @@ public final class MainActivity extends FragmentActivity {
                     }).show());
             actions.addView(delete);
         }
-        card.addView(actions);
-        page.addView(card);
+        row.addView(actions);
+        card.addView(row);
     }
 
     private void showCategoryBudgetDialog(String existingCategory) {
