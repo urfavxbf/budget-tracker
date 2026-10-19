@@ -2712,7 +2712,7 @@ public final class MainActivity extends FragmentActivity {
             int usedPercent = spent.multiply(BigDecimal.valueOf(100))
                     .divide(budgetBase, 0, java.math.RoundingMode.HALF_UP)
                     .max(BigDecimal.ZERO).intValue();
-            budgetProgressBar.setVisibility(View.VISIBLE);
+            budgetProgressBar.setVisibility(View.GONE);
             budgetProgressBar.setProgress(Math.min(100, usedPercent));
 
             BigDecimal budgetRemaining = budgetBase.subtract(spent);
@@ -3768,7 +3768,7 @@ public final class MainActivity extends FragmentActivity {
             float cardHeight = dp(48);
             float cardWidth = (width - gap) / 2f;
             paint.setStyle(android.graphics.Paint.Style.FILL);
-            paint.setColor(resolveColor(com.google.android.material.R.attr.colorSurfaceContainerLow));
+            paint.setColor(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant));
             canvas.drawRoundRect(left, cardTop, left + cardWidth, cardTop + cardHeight,
                     dp(10), dp(10), paint);
             canvas.drawRoundRect(left + cardWidth + gap, cardTop, left + cardWidth * 2 + gap,
