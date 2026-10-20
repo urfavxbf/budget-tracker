@@ -7,6 +7,7 @@ import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.appcompat.app.AlertDialog;
 import com.google.android.material.datepicker.MaterialDatePicker;
+import com.airbnb.lottie.LottieAnimationView;
 import com.google.android.material.timepicker.MaterialTimePicker;
 import com.google.android.material.timepicker.TimeFormat;
 import android.content.res.ColorStateList;
@@ -83,6 +84,7 @@ public final class MainActivity extends FragmentActivity {
     private boolean lastSaveSucceeded;
     private boolean paydayDialogShowing;
     private boolean updatingNavigation;
+    private boolean showSuccessAnimationOnNextTab;
     private View openSwipeContent;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -256,6 +258,35 @@ public final class MainActivity extends FragmentActivity {
             case 4: buildSettingsScreen(); break;
             default: buildDashboard();
         }
+        animatePageEntrance();
+        if (showSuccessAnimationOnNextTab) {
+            showSuccessAnimationOnNextTab = false;
+            showSaveSuccessAnimation();
+        }
+    }
+
+    private void animatePageEntrance() {
+        if (page == null) return;
+        page.setAlpha(0f);
+        page.setTranslationY(dp(6));
+        page.animate().alpha(1f).translationY(0f).setDuration(180L).start();
+    }
+
+    private void showSaveSuccessAnimation() {
+        if (page == null) return;
+        LottieAnimationView animation = new LottieAnimationView(this);
+        animation.setAnimation("success_check.json");
+        animation.setRepeatCount(0);
+        animation.setContentDescription("Saved successfully");
+        animation.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(52));
+        params.bottomMargin = dp(4);
+        page.addView(animation, 0, params);
+        animation.playAnimation();
+        animation.postDelayed(() -> {
+            if (animation.getParent() == page) page.removeView(animation);
+            animation.cancelAnimation();
+        }, 1200L);
     }
 
     private boolean isFirstTimeSetupRequired() {
@@ -2320,6 +2351,7 @@ public final class MainActivity extends FragmentActivity {
             refreshHistory();
             refreshBudget();
             Toast.makeText(this, updatingEntry ? "Shift updated" : "Shift saved", Toast.LENGTH_SHORT).show();
+            showSuccessAnimationOnNextTab = true;
             lastSaveSucceeded = true;
         } catch (DateTimeParseException ex) {
             toast("Check date format (YYYY-MM-DD) and time format (HH:mm).");
@@ -2373,6 +2405,7 @@ public final class MainActivity extends FragmentActivity {
                         : "Warning: available to spend is exhausted; spending exceeds available cash.";
             }
             Toast.makeText(this, saveMessage, Toast.LENGTH_LONG).show();
+            showSuccessAnimationOnNextTab = true;
             lastSaveSucceeded = true;
         } catch (DateTimeParseException ex) {
             toast("Use YYYY-MM-DD for the expense date.");
