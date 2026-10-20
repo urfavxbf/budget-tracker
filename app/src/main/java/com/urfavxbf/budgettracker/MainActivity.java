@@ -283,26 +283,53 @@ public final class MainActivity extends FragmentActivity {
     private void showSaveSuccessAnimation() {
         if (successOverlay == null) return;
         successOverlay.removeAllViews();
-        LottieAnimationView animation = new LottieAnimationView(this);
-        animation.setAnimation("success_check.json");
-        animation.setRepeatCount(0);
-        animation.setContentDescription("Saved successfully");
-        animation.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-        animation.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
-        successOverlay.addView(animation, new FrameLayout.LayoutParams(dp(132), dp(132), Gravity.CENTER));
+
+        // Draw a check mark directly instead of relying on the Lottie asset's circle layer.
+        // This keeps the success feedback unmistakably a green check on every device.
+        View checkMark = new View(this) {
+            private final android.graphics.Paint paint = new android.graphics.Paint(
+                    android.graphics.Paint.ANTI_ALIAS_FLAG);
+            private final android.graphics.Path path = new android.graphics.Path();
+
+            @Override protected void onDraw(android.graphics.Canvas canvas) {
+                super.onDraw(canvas);
+                float scale = Math.min(getWidth(), getHeight()) / 132f;
+                canvas.save();
+                canvas.translate((getWidth() - 132f * scale) / 2f,
+                        (getHeight() - 132f * scale) / 2f);
+                canvas.scale(scale, scale);
+
+                paint.setColor(android.graphics.Color.rgb(35, 166, 108));
+                paint.setStyle(android.graphics.Paint.Style.STROKE);
+                paint.setStrokeWidth(10f);
+                paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);
+                paint.setStrokeJoin(android.graphics.Paint.Join.ROUND);
+
+                path.reset();
+                path.moveTo(28f, 68f);
+                path.lineTo(53f, 91f);
+                path.lineTo(105f, 39f);
+                canvas.drawPath(path, paint);
+                canvas.restore();
+            }
+        };
+        checkMark.setContentDescription("Saved successfully");
+        checkMark.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        successOverlay.addView(checkMark,
+                new FrameLayout.LayoutParams(dp(132), dp(132), Gravity.CENTER));
+        checkMark.setScaleX(0.65f);
+        checkMark.setScaleY(0.65f);
         successOverlay.setAlpha(0f);
         successOverlay.setVisibility(View.VISIBLE);
         successOverlay.animate().alpha(1f).setDuration(140L).start();
-        animation.playAnimation();
-        animation.postDelayed(() -> {
+        checkMark.animate().scaleX(1f).scaleY(1f).setDuration(220L).start();
+
+        checkMark.postDelayed(() -> {
             if (successOverlay != null) {
                 successOverlay.animate().alpha(0f).setDuration(180L).withEndAction(() -> {
                     successOverlay.setVisibility(View.GONE);
                     successOverlay.removeAllViews();
-                    animation.cancelAnimation();
                 }).start();
-            } else {
-                animation.cancelAnimation();
             }
         }, 950L);
     }
