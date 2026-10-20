@@ -55,6 +55,7 @@ public final class MainActivity extends FragmentActivity {
     private final List<BreakInput> breakInputs = new ArrayList<>();
     private LinearLayout page;
     private BottomNavigationView bottomNav;
+    private FrameLayout successOverlay;
     private static final int NAV_HOME_ID = 1;
     private static final int NAV_HISTORY_ID = 2;
     private static final int NAV_SETTINGS_ID = 3;
@@ -177,7 +178,15 @@ public final class MainActivity extends FragmentActivity {
         bottomNav.setItemRippleColor(ColorStateList.valueOf(
                 withAlpha(resolveColor(androidx.appcompat.R.attr.colorPrimary), 0x33)));
         shell.addView(bottomNav, new LinearLayout.LayoutParams(-1, dp(80)));
-        setContentView(shell);
+        FrameLayout root = new FrameLayout(this);
+        root.addView(shell, new FrameLayout.LayoutParams(-1, -1));
+        successOverlay = new FrameLayout(this);
+        successOverlay.setGravity(Gravity.CENTER);
+        successOverlay.setBackgroundColor(0x33000000);
+        successOverlay.setVisibility(View.GONE);
+        successOverlay.setClickable(true);
+        root.addView(successOverlay, new FrameLayout.LayoutParams(-1, -1));
+        setContentView(root);
         buildBottomNav();
     }
 
@@ -273,20 +282,30 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showSaveSuccessAnimation() {
-        if (page == null) return;
+        if (successOverlay == null) return;
+        successOverlay.removeAllViews();
         LottieAnimationView animation = new LottieAnimationView(this);
         animation.setAnimation("success_check.json");
         animation.setRepeatCount(0);
         animation.setContentDescription("Saved successfully");
         animation.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, dp(52));
-        params.bottomMargin = dp(4);
-        page.addView(animation, 0, params);
+        animation.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);
+        successOverlay.addView(animation, new FrameLayout.LayoutParams(dp(132), dp(132), Gravity.CENTER));
+        successOverlay.setAlpha(0f);
+        successOverlay.setVisibility(View.VISIBLE);
+        successOverlay.animate().alpha(1f).setDuration(140L).start();
         animation.playAnimation();
         animation.postDelayed(() -> {
-            if (animation.getParent() == page) page.removeView(animation);
-            animation.cancelAnimation();
-        }, 1200L);
+            if (successOverlay != null) {
+                successOverlay.animate().alpha(0f).setDuration(180L).withEndAction(() -> {
+                    successOverlay.setVisibility(View.GONE);
+                    successOverlay.removeAllViews();
+                    animation.cancelAnimation();
+                }).start();
+            } else {
+                animation.cancelAnimation();
+            }
+        }, 950L);
     }
 
     private boolean isFirstTimeSetupRequired() {
