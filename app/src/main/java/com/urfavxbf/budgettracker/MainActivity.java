@@ -181,7 +181,6 @@ public final class MainActivity extends FragmentActivity {
         FrameLayout root = new FrameLayout(this);
         root.addView(shell, new FrameLayout.LayoutParams(-1, -1));
         successOverlay = new FrameLayout(this);
-        successOverlay.setGravity(Gravity.CENTER);
         successOverlay.setBackgroundColor(0x33000000);
         successOverlay.setVisibility(View.GONE);
         successOverlay.setClickable(true);
