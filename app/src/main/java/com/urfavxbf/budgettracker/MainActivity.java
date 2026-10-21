@@ -566,7 +566,8 @@ public final class MainActivity extends FragmentActivity {
         TextView hello = text("Good day", 12, false);
         hello.setTextColor(muted);
         greeting.addView(hello);
-        TextView title = text("My finances", 25, true);
+        TextView title = text(PersonalizationOptions.dashboardTitle(
+                pref("ui_dashboard_title", "My finances")), 25, true);
         title.setTextColor(ink);
         greeting.addView(title);
         top.addView(greeting, new LinearLayout.LayoutParams(0, -2, 1f));
@@ -1341,6 +1342,9 @@ public final class MainActivity extends FragmentActivity {
                 "Shopping", "Entertainment", "Rent", "Utilities",
                 "Education", "Personal care", "Other"
         };
+        for (String category : configuredExpenseCategories()) {
+            addCategorySuggestion(categories, category);
+        }
         for (String category : commonCategories) {
             addCategorySuggestion(categories, category);
         }
@@ -1351,6 +1355,14 @@ public final class MainActivity extends FragmentActivity {
             addCategorySuggestion(categories, category);
         }
         return categories;
+    }
+
+    private List<String> configuredExpenseCategories() {
+        try {
+            return PersonalizationOptions.parseCategories(pref("ui_expense_categories", ""));
+        } catch (IllegalArgumentException ignored) {
+            return java.util.Collections.emptyList();
+        }
     }
 
     private void addCategorySuggestion(List<String> categories, String category) {
@@ -1462,6 +1474,7 @@ public final class MainActivity extends FragmentActivity {
         for (String name : new String[]{"Food & Groceries", "Transportation", "Bills", "Savings", "Personal", "Shopping", "Others"}) {
             categories.put(name, name);
         }
+        for (String name : configuredExpenseCategories()) categories.put(name, name);
         for (String name : database.getDistinctExpenseCategories()) categories.put(name, name);
         for (String name : categoryLimits.keySet()) categories.put(name, name);
 
@@ -2153,6 +2166,11 @@ public final class MainActivity extends FragmentActivity {
         addField(appearance, "Text size", textSize);
         addField(appearance, "Spacing", spacing);
         addField(appearance, "Open app on", startup);
+        EditText dashboardTitle = field("My finances",
+                pref("ui_dashboard_title", "My finances"), InputType.TYPE_CLASS_TEXT);
+        dashboardTitle.setFilters(new android.text.InputFilter[]{
+                new android.text.InputFilter.LengthFilter(32)});
+        addField(appearance, "Dashboard heading", dashboardTitle);
 
         Button apply = button("Apply display preferences", true);
         apply.setOnClickListener(view -> {
@@ -2161,6 +2179,8 @@ public final class MainActivity extends FragmentActivity {
                     .putString("ui_text_size", PersonalizationOptions.TEXT_SIZES[textSize.getSelectedItemPosition()])
                     .putString("ui_spacing", PersonalizationOptions.SPACING[spacing.getSelectedItemPosition()])
                     .putInt("ui_start_tab", startup.getSelectedItemPosition())
+                    .putString("ui_dashboard_title",
+                            PersonalizationOptions.dashboardTitle(value(dashboardTitle)))
                     .apply();
             recreate(); // Recreate views with the new theme; existing data and tab are preserved.
         });
@@ -2205,13 +2225,46 @@ public final class MainActivity extends FragmentActivity {
                     android.content.SharedPreferences.Editor editor =
                             getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                                     .remove("ui_accent").remove("ui_text_size")
-                                    .remove("ui_spacing").remove("ui_start_tab");
+                                    .remove("ui_spacing").remove("ui_start_tab")
+                                    .remove("ui_dashboard_title").remove("ui_expense_categories");
                     for (String key : PersonalizationOptions.DASHBOARD_KEYS) editor.remove(key);
                     editor.apply();
                     recreate();
                 }).show());
         dashboard.addView(reset);
         page.addView(dashboard);
+
+        LinearLayout categoriesCard = cardContainer();
+        addSection(categoriesCard, "Custom expense categories");
+        TextView categoryHelp = text(
+                "Enter one category per line (up to 20, 32 characters each). " +
+                "These become suggestions when adding expenses and category limits. " +
+                "Existing transaction categories are not deleted.", 13, false);
+        categoryHelp.setPadding(0, 0, 0, dp(8));
+        categoriesCard.addView(categoryHelp);
+        EditText categoryInput = new EditText(this);
+        categoryInput.setInputType(InputType.TYPE_CLASS_TEXT |
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        categoryInput.setSingleLine(false);
+        categoryInput.setMinLines(3);
+        categoryInput.setMaxLines(8);
+        categoryInput.setText(pref("ui_expense_categories", ""));
+        categoryInput.setHint("Subscriptions\nPet care\nTravel");
+        categoriesCard.addView(categoryInput, new LinearLayout.LayoutParams(-1, -2));
+        Button saveCategories = button("Save custom categories", true);
+        saveCategories.setOnClickListener(view -> {
+            try {
+                List<String> normalized = PersonalizationOptions.parseCategories(
+                        categoryInput.getText().toString());
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                        .putString("ui_expense_categories", String.join("\n", normalized)).apply();
+                toast("Saved " + normalized.size() + " custom categories.");
+            } catch (IllegalArgumentException ex) {
+                toast(ex.getMessage());
+            }
+        });
+        categoriesCard.addView(saveCategories);
+        page.addView(categoriesCard);
     }
 
     private android.widget.Spinner personalizationPicker(String[] options, int selected) {
