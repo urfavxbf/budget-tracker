@@ -43,4 +43,24 @@ public class PersonalizationOptionsTest {
         assertEquals(1, PersonalizationOptions.optionIndex("Compact",
                 PersonalizationOptions.SPACING, 0));
     }
+    @Test public void customCategoriesAreTrimmedDeduplicatedAndOrdered() {
+        assertEquals(java.util.Arrays.asList("Food", "Transport", "Bills"),
+                PersonalizationOptions.parseCategories(" Food \\nTransport\\nfood\\nBills"));
+    }
+
+    @Test public void emptyCustomCategoryListProducesNoSuggestions() {
+        assertEquals(0, PersonalizationOptions.parseCategories("  \\n  ").size());
+    }
+
+    @Test public void categoryNameLongerThanThirtyTwoCharactersIsRejected() {
+        org.junit.Assert.assertThrows(IllegalArgumentException.class,
+                () -> PersonalizationOptions.parseCategories(
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ-very-long-category"));
+    }
+
+    @Test public void dashboardTitleFallsBackWhenBlank() {
+        assertEquals("My finances", PersonalizationOptions.dashboardTitle("  "));
+        assertEquals("My monthly overview", PersonalizationOptions.dashboardTitle(" My monthly overview "));
+    }
+
 }
