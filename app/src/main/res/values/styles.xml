@@ -24,28 +24,28 @@
         <item name="materialAlertDialogTheme">@style/ThemeOverlay.Material3.MaterialAlertDialog</item>
         <item name="textInputStyle">@style/Widget.Material3.TextInputLayout.FilledBox</item>
     </style>
-    <style name="ThemeOverlay.BudgetTracker.Blue">
+    <style name="BudgetTrackerAccentBlue">
         <item name="colorPrimary">#3755C7</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorSecondaryContainer">#DEE4FF</item>
         <item name="colorOnSecondaryContainer">#192454</item>
         <item name="android:colorAccent">#3755C7</item>
     </style>
-    <style name="ThemeOverlay.BudgetTracker.Teal">
+    <style name="BudgetTrackerAccentTeal">
         <item name="colorPrimary">#006B61</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorSecondaryContainer">#C4F1E9</item>
         <item name="colorOnSecondaryContainer">#053C35</item>
         <item name="android:colorAccent">#006B61</item>
     </style>
-    <style name="ThemeOverlay.BudgetTracker.Violet">
+    <style name="BudgetTrackerAccentViolet">
         <item name="colorPrimary">#6A49A5</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorSecondaryContainer">#EBDDFA</item>
         <item name="colorOnSecondaryContainer">#342052</item>
         <item name="android:colorAccent">#6A49A5</item>
     </style>
-    <style name="ThemeOverlay.BudgetTracker.Rose">
+    <style name="BudgetTrackerAccentRose">
         <item name="colorPrimary">#A43261</item>
         <item name="colorOnPrimary">#FFFFFF</item>
         <item name="colorSecondaryContainer">#FFD9E6</item>
