@@ -35,14 +35,7 @@ gradle.settingsEvaluated { evaluatedSettings ->
     def cogoRepositories = repositories.findAll { repository ->
         repository instanceof org.gradle.api.artifacts.repositories.MavenArtifactRepository &&
                 repository.url.scheme == 'file' &&
-                repository.url.path.replaceFirst('/+
-    }
-    cogoRepositories.each { repository ->
-        repositories.remove(repository)
-        repositories.add(repository)
-    }
-}
-, '').endsWith('/localMvnRepository')
+                repository.url.path.replaceFirst('/+$', '').endsWith('/localMvnRepository')
     }
     cogoRepositories.each { repository ->
         repositories.remove(repository)
