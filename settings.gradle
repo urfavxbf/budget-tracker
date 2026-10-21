@@ -1,4 +1,14 @@
 pluginManagement {
+    // CoGo 26.38+ runs Gradle 9.6.1 and ships AGP 9.3.1 in its offline Maven repo.
+    // Preserve AGP 8.7.3 for the existing Gradle 8.9 build.
+    resolutionStrategy {
+        eachPlugin {
+            if (requested.id.id == 'com.android.application' &&
+                    org.gradle.util.GradleVersion.current() >= org.gradle.util.GradleVersion.version('9.6')) {
+                useVersion('9.3.1')
+            }
+        }
+    }
     repositories {
         google()
         mavenCentral()
