@@ -16,9 +16,17 @@ Native Android salary tracker and payday budget planner. Package: `com.urfavxbf.
 - Unit tests for regular overtime math, overnight shifts, break interval validation in the calculator, payday reminder scheduling policy, and daily spending-guide limits.
 - GitHub Actions workflow for unit tests and debug APK build.
 
+## Build on Android with Code on the Go
+
+This project supports Android phone-only development using Code on the Go (CoGo). Open the **repository root** as the Gradle project (the app module is `app/`). Current CoGo releases (26.38+) bundle **Gradle 9.6.1** and **Android Gradle Plugin 9.3.1** in an IDE-managed local Maven repository. The project's `settings.gradle` selects this supported AGP version when running Gradle 9.6+, while Gradle 8.9 keeps AGP 8.7.3 for the legacy build. This avoids requesting unavailable older plugin dependencies from CoGo's offline cache.
+
+After switching branches or updating the project, sync/reload Gradle and run `:app:assembleDebug` with CoGo's installed toolchain. Keep the IDE assets / offline Maven repository installed. If an error refers only to `/data/data/com.itsaky.androidide/files/home/maven/localMvnRepository`, inspect the active Gradle version and IDE asset installation before adding new dependencies. Do not manually place arbitrary JARs into the IDE's private repository.
+
+GitHub Actions tests both Gradle versions. A successful CI build does **not** prove that a device's offline Maven assets are complete or that the APK was installed successfully.
+
 ## Open in Android Studio
 
-Open this repository as an existing Gradle project. Use JDK 17 and install Android SDK Platform 35 / Build Tools 35.0.0.
+Open this repository as an existing Gradle project. Use JDK 17 and install Android SDK Platform 35 / Build Tools 35.0.0 (and Build Tools 36.0.0 for AGP 9.3.1).
 
 ## Important limitations
 
