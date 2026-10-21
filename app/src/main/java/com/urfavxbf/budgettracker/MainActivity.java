@@ -165,10 +165,10 @@ public final class MainActivity extends FragmentActivity {
                 PersonalizationOptions.ACCENTS, 0);
         int themeOverlay;
         switch (accent) {
-            case 1: themeOverlay = R.style.ThemeOverlay_BudgetTracker_Blue; break;
-            case 2: themeOverlay = R.style.ThemeOverlay_BudgetTracker_Teal; break;
-            case 3: themeOverlay = R.style.ThemeOverlay_BudgetTracker_Violet; break;
-            case 4: themeOverlay = R.style.ThemeOverlay_BudgetTracker_Rose; break;
+            case 1: themeOverlay = R.style.BudgetTrackerAccentBlue; break;
+            case 2: themeOverlay = R.style.BudgetTrackerAccentTeal; break;
+            case 3: themeOverlay = R.style.BudgetTrackerAccentViolet; break;
+            case 4: themeOverlay = R.style.BudgetTrackerAccentRose; break;
             default: return; // Keep Material You / the device's existing theme.
         }
         getTheme().applyStyle(themeOverlay, true);
