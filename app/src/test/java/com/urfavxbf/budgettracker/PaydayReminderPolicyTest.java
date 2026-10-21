@@ -14,7 +14,7 @@ public class PaydayReminderPolicyTest {
         LocalDate payday = LocalDate.of(2026, 10, 22);
         LocalDateTime now = LocalDateTime.of(2026, 10, 22, 8, 0);
         assertTrue(PaydayReminderPolicy.shouldSchedule(payday, payday,
-                payday.atTime(9, 0), now, false));
+                payday.atTime(9, 0), now, false, true));
     }
 
     @Test
@@ -22,7 +22,7 @@ public class PaydayReminderPolicyTest {
         LocalDate payday = LocalDate.of(2026, 10, 22);
         LocalDateTime now = LocalDateTime.of(2026, 10, 22, 10, 0);
         assertTrue(PaydayReminderPolicy.shouldSchedule(payday, payday,
-                payday.atTime(9, 0), now, false));
+                payday.atTime(9, 0), now, false, true));
     }
 
     @Test
@@ -30,7 +30,7 @@ public class PaydayReminderPolicyTest {
         LocalDate payday = LocalDate.of(2026, 10, 22);
         LocalDateTime now = LocalDateTime.of(2026, 10, 22, 10, 0);
         assertFalse(PaydayReminderPolicy.shouldSchedule(payday, payday,
-                payday.atTime(9, 0), now, true));
+                payday.atTime(9, 0), now, true, true));
     }
 
     @Test
@@ -39,6 +39,30 @@ public class PaydayReminderPolicyTest {
         LocalDate today = LocalDate.of(2026, 10, 8);
         LocalDateTime now = LocalDateTime.of(2026, 10, 8, 10, 0);
         assertFalse(PaydayReminderPolicy.shouldSchedule(payday, today,
-                payday.atTime(9, 0), now, false));
+                payday.atTime(9, 0), now, false, true));
     }
+    @Test
+    public void skipsFuturePaydayWhenNotificationsAreOptedOut() {
+        LocalDate payday = LocalDate.of(2026, 10, 22);
+        LocalDateTime now = LocalDateTime.of(2026, 10, 21, 8, 0);
+        assertFalse(PaydayReminderPolicy.shouldSchedule(payday, now.toLocalDate(),
+                payday.atTime(9, 0), now, false, false));
+    }
+
+    @Test
+    public void skipsMissedPaydayWhenNotificationsAreOptedOut() {
+        LocalDate payday = LocalDate.of(2026, 10, 22);
+        LocalDateTime now = LocalDateTime.of(2026, 10, 22, 10, 0);
+        assertFalse(PaydayReminderPolicy.shouldSchedule(payday, payday,
+                payday.atTime(9, 0), now, false, false));
+    }
+
+    @Test
+    public void neverRearmsAnAlreadyDeliveredReminder() {
+        LocalDate payday = LocalDate.of(2026, 10, 22);
+        LocalDateTime now = LocalDateTime.of(2026, 10, 22, 8, 0);
+        assertFalse(PaydayReminderPolicy.shouldSchedule(payday, payday,
+                payday.atTime(9, 0), now, true, true));
+    }
+
 }
