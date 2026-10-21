@@ -10,8 +10,9 @@ public final class PaydayReminderPolicy {
     /** Allows a missed reminder only on the current payday, and only once. */
     public static boolean shouldSchedule(LocalDate payday, LocalDate today,
                                          LocalDateTime trigger, LocalDateTime now,
-                                         boolean alreadyDelivered) {
+                                         boolean alreadyDelivered, boolean notificationsEnabled) {
+        if (!notificationsEnabled || alreadyDelivered) return false;
         if (!trigger.isBefore(now)) return true;
-        return payday.equals(today) && !alreadyDelivered;
+        return payday.equals(today);
     }
 }

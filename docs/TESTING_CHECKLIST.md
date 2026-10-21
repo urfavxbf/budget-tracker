@@ -7,7 +7,7 @@ Single source of truth for regression testing. Update statuses only after the te
 - [x] Philippine payroll: ordinary overtime, night differential, holiday/rest-day multipliers, invalid night minutes.
 - [x] Cutoff/payday calendar: boundaries, leap years, month-end, year rollover, latest/next payday.
 - [x] Budget insights: budget thresholds, daily guide, available cash bounds, savings draw.
-- [x] Payday reminder policy: future, missed, delivered, stale reminders.
+- [x] Payday reminder policy: future, missed, delivered, stale reminders, opt-out, and no rearming after delivery.
 - [ ] Full CI on current branch passes before merge.
 
 ## Financial regression scenarios
@@ -47,7 +47,8 @@ Single source of truth for regression testing. Update statuses only after the te
 - [ ] Record/edit/delete payday payment; inspect allocation/carryover.
 - [ ] Dashboard summaries agree with Savings and budget screens.
 - [ ] Navigation, keyboard validation, scrolling, and light/dark theme.
-- [ ] Payday reminders respect opt-in and do not re-arm stale reminders.
+- [ ] Payday reminders respect opt-in, cancel pending alarms after opt-out, and do not re-arm stale reminders.
+- [ ] Enabling/disabling payday reminders in Settings persists after restarting the app.
 
 ## Rules to avoid repeated work
 1. Checked automated items must have committed tests.

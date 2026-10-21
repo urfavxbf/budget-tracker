@@ -23,6 +23,14 @@ public final class PaydayReminderReceiver extends BroadcastReceiver {
             return;
         }
 
+        // A broadcast may already be queued when the user opts out.
+        // Never mark it delivered or show a notification after opt-out.
+        if (!context.getSharedPreferences("salary_preferences", Context.MODE_PRIVATE)
+                .getBoolean("notifications_enabled", false)) {
+            PaydayReminderScheduler.schedule(context);
+            return;
+        }
+
         String start = intent.getStringExtra(PaydayReminderScheduler.EXTRA_CUTOFF_START);
         String end = intent.getStringExtra(PaydayReminderScheduler.EXTRA_CUTOFF_END);
         String payday = intent.getStringExtra(PaydayReminderScheduler.EXTRA_PAYDAY_DATE);
