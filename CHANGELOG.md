@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.0 — Personalization foundation
+
+### Added
+- Settings controls for accent palettes, text size, spacing, startup tab and dashboard heading.
+- Six independently configurable Home dashboard sections.
+- Custom expense-category suggestions for expense entry and category budget limits.
+- Reset-to-defaults control that never erases financial records or salary settings.
+
+### Verification
+- Pure personalization policy tests.
+- Gradle 8.9 and 9.6.1 CI with CoGo AndroidX fallback regression.
+- Real-device UI and data-retention smoke tests still required.
+
+### Notes
+- This is the first customization milestone; advanced dashboard ordering, dark-mode overrides, chart options, and category icons remain planned.
+- No database migration is required.
+
+
 ## 0.3.0
 
 ### Added

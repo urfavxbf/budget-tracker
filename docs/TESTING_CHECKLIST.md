@@ -39,6 +39,18 @@ Single source of truth for regression testing. Update statuses only after the te
 - [ ] Edit/delete operations preserve related salary, expense, and savings records.
 - [ ] Empty states, zero balances, negative inputs, and large currency values are safe.
 
+## Personalization regression scenarios
+- [ ] Existing user upgrades to 0.4.0 with all saved shifts, expenses, payments and savings unchanged.
+- [ ] Switch accent palettes in both day/night device modes; verify readable text/icon contrast.
+- [ ] Small/Normal/Large text fits all Settings and dashboard cards at Android large accessibility font scale.
+- [ ] Compact/Comfortable spacing does not clip controls or hide navigation.
+- [ ] Start tab preference survives force close and restart; current tab persists through theme recreation.
+- [ ] Each dashboard visibility checkbox hides the correct card only; alerts and underlying ledger still work.
+- [ ] Custom categories show in expense and category-budget suggestions without rewriting existing entries.
+- [ ] Empty and invalid category input is handled with an appropriate message.
+- [ ] Reset personalization restores default display without clearing budgets, pay, savings or notification opt-in.
+- [ ] Physical device Code on the Go release/debug APK smoke test (not yet run).
+
 ## Manual Android device/emulator checklist
 - [ ] Fresh install and first-launch setup.
 - [ ] Upgrade path with existing saved data.

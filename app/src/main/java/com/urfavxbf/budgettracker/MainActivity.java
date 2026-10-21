@@ -62,6 +62,8 @@ public final class MainActivity extends FragmentActivity {
     private static final int NAV_BUDGET_ID = 4;
     private static final int NAV_SAVINGS_ID = 5;
     private int currentTab = 0;
+    private float personalizedTextScale = 1.0f;
+    private boolean compactLayout;
     private EditText dateInput, timeInInput, timeOutInput;
     private EditText totalHoursInput;
     private CheckBox hoursOnlyMode;
@@ -96,6 +98,20 @@ public final class MainActivity extends FragmentActivity {
             finish();
             return;
         }
+        android.content.SharedPreferences personalization =
+                getSharedPreferences(PREFS, MODE_PRIVATE);
+        personalizedTextScale = PersonalizationOptions.textScale(
+                PersonalizationOptions.optionIndex(
+                        personalization.getString("ui_text_size", "Normal"),
+                        PersonalizationOptions.TEXT_SIZES, 1));
+        compactLayout = "Compact".equalsIgnoreCase(
+                personalization.getString("ui_spacing", "Comfortable"));
+        applyPersonalizationAccent(personalization.getString("ui_accent", "System"));
+        int initialTab = PersonalizationOptions.boundedIndex(
+                personalization.getInt("ui_start_tab", 0), TAB_NAMES.length, 0);
+        currentTab = savedInstanceState == null ? initialTab
+                : PersonalizationOptions.boundedIndex(
+                        savedInstanceState.getInt("visible_tab", initialTab), TAB_NAMES.length, initialTab);
         database = new WorkDatabase(this);
         getWindow().setStatusBarColor(resolveColor(com.google.android.material.R.attr.colorSurface));
         getWindow().setNavigationBarColor(resolveColor(com.google.android.material.R.attr.colorSurface));
@@ -139,6 +155,29 @@ public final class MainActivity extends FragmentActivity {
         }
     }
 
+    @Override protected void onSaveInstanceState(Bundle outState) {
+        outState.putInt("visible_tab", currentTab);
+        super.onSaveInstanceState(outState);
+    }
+
+    private void applyPersonalizationAccent(String savedAccent) {
+        int accent = PersonalizationOptions.optionIndex(savedAccent,
+                PersonalizationOptions.ACCENTS, 0);
+        int themeOverlay;
+        switch (accent) {
+            case 1: themeOverlay = R.style.BudgetTrackerAccentBlue; break;
+            case 2: themeOverlay = R.style.BudgetTrackerAccentTeal; break;
+            case 3: themeOverlay = R.style.BudgetTrackerAccentViolet; break;
+            case 4: themeOverlay = R.style.BudgetTrackerAccentRose; break;
+            default: return; // Keep Material You / the device's existing theme.
+        }
+        getTheme().applyStyle(themeOverlay, true);
+    }
+
+    private boolean dashboardSectionEnabled(String key) {
+        return getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(key, true);
+    }
+
     @Override protected void onDestroy() {
         if (database != null) database.close();
         super.onDestroy();
@@ -164,7 +203,8 @@ public final class MainActivity extends FragmentActivity {
         scroll.setFillViewport(true);
         page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(dp(20), dp(20), dp(20), dp(28));
+        page.setPadding(dp(compactLayout ? 12 : 20), dp(compactLayout ? 12 : 20),
+                dp(compactLayout ? 12 : 20), dp(compactLayout ? 16 : 28));
         scroll.addView(page, new ScrollView.LayoutParams(-1, -2));
         shell.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1f));
 
@@ -177,7 +217,7 @@ public final class MainActivity extends FragmentActivity {
                 resolveColor(com.google.android.material.R.attr.colorSecondaryContainer)));
         bottomNav.setItemRippleColor(ColorStateList.valueOf(
                 withAlpha(resolveColor(androidx.appcompat.R.attr.colorPrimary), 0x33)));
-        shell.addView(bottomNav, new LinearLayout.LayoutParams(-1, dp(80)));
+        shell.addView(bottomNav, new LinearLayout.LayoutParams(-1, dp(compactLayout ? 72 : 80)));
         FrameLayout root = new FrameLayout(this);
         root.addView(shell, new FrameLayout.LayoutParams(-1, -1));
         successOverlay = new FrameLayout(this);
@@ -513,8 +553,12 @@ public final class MainActivity extends FragmentActivity {
         final int muted = resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant);
         final int accent = resolveColor(androidx.appcompat.R.attr.colorPrimary);
         final int green = resolveColor(androidx.appcompat.R.attr.colorPrimary);
-        final int navy = 0xFF1A2647;
-        page.setPadding(dp(20), dp(24), dp(20), dp(24));
+        // Tint the primary balance card toward the selected accent, while keeping
+        // a dark-enough surface for its white text and budget figures.
+        final int navy = androidx.core.graphics.ColorUtils.blendARGB(
+                accent, 0xFF101B37, 0.65f);
+        page.setPadding(dp(compactLayout ? 12 : 20), dp(compactLayout ? 16 : 24),
+                dp(compactLayout ? 12 : 20), dp(compactLayout ? 16 : 24));
 
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
@@ -525,7 +569,8 @@ public final class MainActivity extends FragmentActivity {
         TextView hello = text("Good day", 12, false);
         hello.setTextColor(muted);
         greeting.addView(hello);
-        TextView title = text("My finances", 25, true);
+        TextView title = text(PersonalizationOptions.dashboardTitle(
+                pref("ui_dashboard_title", "My finances")), 25, true);
         title.setTextColor(ink);
         greeting.addView(title);
         top.addView(greeting, new LinearLayout.LayoutParams(0, -2, 1f));
@@ -648,6 +693,7 @@ public final class MainActivity extends FragmentActivity {
         upcomingDetails.addView(nextPaydayColumn, new LinearLayout.LayoutParams(0, -2, 1f));
         balance.addView(upcomingDetails);
         page.addView(balance);
+        balance.setVisibility(dashboardSectionEnabled("dashboard_balance") ? View.VISIBLE : View.GONE);
 
         View actionSpacer = space(dp(18));
         page.addView(actionSpacer, new LinearLayout.LayoutParams(1, dp(18)));
@@ -665,6 +711,9 @@ public final class MainActivity extends FragmentActivity {
         actions.addView(actionTile("▦", "Calendar", actionBackground, actionAccent,
                 this::buildCalendarScreen), new LinearLayout.LayoutParams(0, dp(76), 1f));
         page.addView(actions);
+        boolean showShortcuts = dashboardSectionEnabled("dashboard_shortcuts");
+        actionSpacer.setVisibility(showShortcuts ? View.VISIBLE : View.GONE);
+        actions.setVisibility(showShortcuts ? View.VISIBLE : View.GONE);
 
         LinearLayout snapshot = cardContainer();
         snapshot.setPadding(dp(16), dp(16), dp(16), dp(16));
@@ -730,6 +779,7 @@ public final class MainActivity extends FragmentActivity {
         budgetSummaryView.setLineSpacing(dp(5), 1.0f);
         snapshot.addView(budgetSummaryView);
         page.addView(snapshot);
+        snapshot.setVisibility(dashboardSectionEnabled("dashboard_budget") ? View.VISIBLE : View.GONE);
 
         LinearLayout trendCard = cardContainer();
         trendCard.setPadding(dp(14), dp(14), dp(14), dp(10));
@@ -743,6 +793,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout.LayoutParams trendCardParams = new LinearLayout.LayoutParams(-1, -2);
         trendCardParams.topMargin = dp(12);
         page.addView(trendCard, trendCardParams);
+        trendCard.setVisibility(dashboardSectionEnabled("dashboard_trend") ? View.VISIBLE : View.GONE);
 
         LinearLayout.LayoutParams snapshotParams = (LinearLayout.LayoutParams) snapshot.getLayoutParams();
         snapshotParams.topMargin = dp(18);
@@ -775,6 +826,10 @@ public final class MainActivity extends FragmentActivity {
         historyContainer = new LinearLayout(this);
         historyContainer.setOrientation(LinearLayout.VERTICAL);
         page.addView(historyContainer);
+        boolean showRecent = dashboardSectionEnabled("dashboard_recent");
+        recentHeader.setVisibility(showRecent ? View.VISIBLE : View.GONE);
+        recentFilter.setVisibility(showRecent ? View.VISIBLE : View.GONE);
+        historyContainer.setVisibility(showRecent ? View.VISIBLE : View.GONE);
         refreshDashboardActivity();
         maybePromptForSavingsAllocation();
 
@@ -801,6 +856,8 @@ public final class MainActivity extends FragmentActivity {
         dashboardSavingsCard.addView(text(money(database.getTotalSavingsBalance()), 24, true));
         dashboardSavingsCard.addView(text(dashboardActiveGoals + " active goals · " + dashboardCompletedGoals + " completed", 12, false));
         page.addView(dashboardSavingsCard);
+        dashboardSavingsCard.setVisibility(dashboardSectionEnabled("dashboard_savings")
+                ? View.VISIBLE : View.GONE);
 
         TextView disclaimer = text("Salary amounts are estimates until you record a confirmed payday payment. Available-to-spend cash excludes reserved savings.", 11, false);
         disclaimer.setTextColor(muted);
@@ -1288,6 +1345,9 @@ public final class MainActivity extends FragmentActivity {
                 "Shopping", "Entertainment", "Rent", "Utilities",
                 "Education", "Personal care", "Other"
         };
+        for (String category : configuredExpenseCategories()) {
+            addCategorySuggestion(categories, category);
+        }
         for (String category : commonCategories) {
             addCategorySuggestion(categories, category);
         }
@@ -1298,6 +1358,14 @@ public final class MainActivity extends FragmentActivity {
             addCategorySuggestion(categories, category);
         }
         return categories;
+    }
+
+    private List<String> configuredExpenseCategories() {
+        try {
+            return PersonalizationOptions.parseCategories(pref("ui_expense_categories", ""));
+        } catch (IllegalArgumentException ignored) {
+            return java.util.Collections.emptyList();
+        }
     }
 
     private void addCategorySuggestion(List<String> categories, String category) {
@@ -1409,6 +1477,7 @@ public final class MainActivity extends FragmentActivity {
         for (String name : new String[]{"Food & Groceries", "Transportation", "Bills", "Savings", "Personal", "Shopping", "Others"}) {
             categories.put(name, name);
         }
+        for (String name : configuredExpenseCategories()) categories.put(name, name);
         for (String name : database.getDistinctExpenseCategories()) categories.put(name, name);
         for (String name : categoryLimits.keySet()) categories.put(name, name);
 
@@ -2073,8 +2142,148 @@ public final class MainActivity extends FragmentActivity {
                 }).show();
     }
 
+    /** Presentation preferences are kept separate from the financial ledger and pay settings. */
+    private void buildPersonalizationSettings() {
+        LinearLayout appearance = cardContainer();
+        addSection(appearance, "Personalization");
+        TextView description = text("Choose a color, reading size, layout density, and the tab " +
+                "shown when opening the app. Your saved financial records are never changed.", 13, false);
+        description.setPadding(0, 0, 0, dp(12));
+        appearance.addView(description);
+
+        android.widget.Spinner accent = personalizationPicker(
+                PersonalizationOptions.ACCENTS, PersonalizationOptions.optionIndex(
+                        pref("ui_accent", "System"), PersonalizationOptions.ACCENTS, 0));
+        android.widget.Spinner textSize = personalizationPicker(
+                PersonalizationOptions.TEXT_SIZES, PersonalizationOptions.optionIndex(
+                        pref("ui_text_size", "Normal"), PersonalizationOptions.TEXT_SIZES, 1));
+        android.widget.Spinner spacing = personalizationPicker(
+                PersonalizationOptions.SPACING, PersonalizationOptions.optionIndex(
+                        pref("ui_spacing", "Comfortable"), PersonalizationOptions.SPACING, 0));
+        int startTab = PersonalizationOptions.boundedIndex(
+                getSharedPreferences(PREFS, MODE_PRIVATE).getInt("ui_start_tab", 0),
+                PersonalizationOptions.START_TABS.length, 0);
+        android.widget.Spinner startup = personalizationPicker(
+                PersonalizationOptions.START_TABS, startTab);
+        addField(appearance, "Accent color", accent);
+        addField(appearance, "Text size", textSize);
+        addField(appearance, "Spacing", spacing);
+        addField(appearance, "Open app on", startup);
+        EditText dashboardTitle = field("My finances",
+                pref("ui_dashboard_title", "My finances"), InputType.TYPE_CLASS_TEXT);
+        dashboardTitle.setFilters(new android.text.InputFilter[]{
+                new android.text.InputFilter.LengthFilter(32)});
+        addField(appearance, "Dashboard heading", dashboardTitle);
+
+        Button apply = button("Apply display preferences", true);
+        apply.setOnClickListener(view -> {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putString("ui_accent", PersonalizationOptions.ACCENTS[accent.getSelectedItemPosition()])
+                    .putString("ui_text_size", PersonalizationOptions.TEXT_SIZES[textSize.getSelectedItemPosition()])
+                    .putString("ui_spacing", PersonalizationOptions.SPACING[spacing.getSelectedItemPosition()])
+                    .putInt("ui_start_tab", startup.getSelectedItemPosition())
+                    .putString("ui_dashboard_title",
+                            PersonalizationOptions.dashboardTitle(value(dashboardTitle)))
+                    .apply();
+            recreate(); // Recreate views with the new theme; existing data and tab are preserved.
+        });
+        appearance.addView(apply);
+        page.addView(appearance);
+
+        LinearLayout dashboard = cardContainer();
+        addSection(dashboard, "Dashboard sections");
+        TextView dashboardDescription = text(
+                "Show or hide sections on Home. This only changes what you see, not your records.",
+                13, false);
+        dashboardDescription.setPadding(0, 0, 0, dp(8));
+        dashboard.addView(dashboardDescription);
+
+        CheckBox[] sections = new CheckBox[PersonalizationOptions.DASHBOARD_KEYS.length];
+        for (int i = 0; i < sections.length; i++) {
+            CheckBox box = new CheckBox(this);
+            box.setText(PersonalizationOptions.DASHBOARD_LABELS[i]);
+            box.setChecked(dashboardSectionEnabled(PersonalizationOptions.DASHBOARD_KEYS[i]));
+            dashboard.addView(box);
+            sections[i] = box;
+        }
+        Button saveDashboard = button("Save dashboard layout", true);
+        saveDashboard.setOnClickListener(view -> {
+            android.content.SharedPreferences.Editor editor =
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit();
+            for (int i = 0; i < sections.length; i++) {
+                editor.putBoolean(PersonalizationOptions.DASHBOARD_KEYS[i], sections[i].isChecked());
+            }
+            editor.apply();
+            showTab(0);
+            toast("Dashboard layout saved.");
+        });
+        dashboard.addView(saveDashboard);
+        Button reset = button("Reset personalization to defaults", false);
+        reset.setOnClickListener(view -> new MaterialAlertDialogBuilder(this)
+                .setTitle("Reset personalization?")
+                .setMessage("Reset appearance and dashboard visibility only. " +
+                        "Salary, expenses, savings, and other financial settings will stay unchanged.")
+                .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
+                .setPositiveButton("Reset", (dialog, which) -> {
+                    android.content.SharedPreferences.Editor editor =
+                            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                                    .remove("ui_accent").remove("ui_text_size")
+                                    .remove("ui_spacing").remove("ui_start_tab")
+                                    .remove("ui_dashboard_title").remove("ui_expense_categories");
+                    for (String key : PersonalizationOptions.DASHBOARD_KEYS) editor.remove(key);
+                    editor.apply();
+                    recreate();
+                }).show());
+        dashboard.addView(reset);
+        page.addView(dashboard);
+
+        LinearLayout categoriesCard = cardContainer();
+        addSection(categoriesCard, "Custom expense categories");
+        TextView categoryHelp = text(
+                "Enter one category per line (up to 20, 32 characters each). " +
+                "These become suggestions when adding expenses and category limits. " +
+                "Existing transaction categories are not deleted.", 13, false);
+        categoryHelp.setPadding(0, 0, 0, dp(8));
+        categoriesCard.addView(categoryHelp);
+        EditText categoryInput = new EditText(this);
+        categoryInput.setInputType(InputType.TYPE_CLASS_TEXT |
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        categoryInput.setSingleLine(false);
+        categoryInput.setMinLines(3);
+        categoryInput.setMaxLines(8);
+        categoryInput.setText(pref("ui_expense_categories", ""));
+        categoryInput.setHint("Subscriptions\nPet care\nTravel");
+        categoriesCard.addView(categoryInput, new LinearLayout.LayoutParams(-1, -2));
+        Button saveCategories = button("Save custom categories", true);
+        saveCategories.setOnClickListener(view -> {
+            try {
+                List<String> normalized = PersonalizationOptions.parseCategories(
+                        categoryInput.getText().toString());
+                getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                        .putString("ui_expense_categories", String.join("\n", normalized)).apply();
+                toast("Saved " + normalized.size() + " custom categories.");
+            } catch (IllegalArgumentException ex) {
+                toast(ex.getMessage());
+            }
+        });
+        categoriesCard.addView(saveCategories);
+        page.addView(categoriesCard);
+    }
+
+    private android.widget.Spinner personalizationPicker(String[] options, int selected) {
+        android.widget.Spinner spinner = new android.widget.Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
+                android.R.layout.simple_spinner_item, options);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinner.setAdapter(adapter);
+        spinner.setSelection(PersonalizationOptions.boundedIndex(selected, options.length, 0));
+        spinner.setMinimumHeight(dp(48));
+        return spinner;
+    }
+
     private void buildSettingsScreen() {
         header("Settings", "Manage your pay, payday schedule, balances, and spending limits.");
+        buildPersonalizationSettings();
 
         LinearLayout salaryCard = cardContainer();
         addSection(salaryCard, "Salary and work defaults");
@@ -3713,14 +3922,15 @@ public final class MainActivity extends FragmentActivity {
     private LinearLayout cardContainer() {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(16), dp(16), dp(16), dp(16));
+        int cardPadding = dp(compactLayout ? 11 : 16);
+        card.setPadding(cardPadding, cardPadding, cardPadding, cardPadding);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant));
         bg.setCornerRadius(dp(24));
         bg.setStroke(dp(1), resolveColor(com.google.android.material.R.attr.colorOutlineVariant));
         card.setBackground(bg);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-        params.bottomMargin = dp(10);
+        params.bottomMargin = dp(compactLayout ? 6 : 10);
         card.setLayoutParams(params);
         return card;
     }
@@ -3771,7 +3981,7 @@ public final class MainActivity extends FragmentActivity {
         edit.setHint(hint);
         edit.setText(initial);
         edit.setInputType(inputType);
-        edit.setTextSize(16);
+        edit.setTextSize(16 * personalizedTextScale);
         edit.setPadding(dp(12), 0, dp(12), 0);
         edit.setSelectAllOnFocus(false);
         edit.setLayoutParams(new LinearLayout.LayoutParams(-1, dp(52)));
@@ -3803,7 +4013,7 @@ public final class MainActivity extends FragmentActivity {
         MaterialButton button = new MaterialButton(this);
         button.setText(label);
         button.setAllCaps(false);
-        button.setTextSize(13);
+        button.setTextSize(13 * personalizedTextScale);
         button.setMinWidth(0);
         button.setMinimumWidth(0);
         button.setMinHeight(dp(40));
@@ -3838,7 +4048,7 @@ public final class MainActivity extends FragmentActivity {
         MaterialButton button = new MaterialButton(this);
         button.setText(label);
         button.setAllCaps(false);
-        button.setTextSize(14);
+        button.setTextSize(14 * personalizedTextScale);
         int iconRes = iconForLabel(label);
         if (iconRes != 0) {
             button.setIconResource(iconRes);
@@ -3897,7 +4107,7 @@ public final class MainActivity extends FragmentActivity {
     private TextView text(String value, int size, boolean bold) {
         TextView view = new TextView(this);
         view.setText(value);
-        view.setTextSize(size);
+        view.setTextSize(size * personalizedTextScale);
         view.setTextColor(resolveColor(android.R.attr.textColorPrimary));
         if (bold) view.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         return view;
