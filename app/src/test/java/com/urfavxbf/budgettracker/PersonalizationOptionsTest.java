@@ -45,11 +45,11 @@ public class PersonalizationOptionsTest {
     }
     @Test public void customCategoriesAreTrimmedDeduplicatedAndOrdered() {
         assertEquals(java.util.Arrays.asList("Food", "Transport", "Bills"),
-                PersonalizationOptions.parseCategories(" Food \\nTransport\\nfood\\nBills"));
+                PersonalizationOptions.parseCategories(" Food \nTransport\nfood\nBills"));
     }
 
     @Test public void emptyCustomCategoryListProducesNoSuggestions() {
-        assertEquals(0, PersonalizationOptions.parseCategories("  \\n  ").size());
+        assertEquals(0, PersonalizationOptions.parseCategories("  \n  ").size());
     }
 
     @Test public void categoryNameLongerThanThirtyTwoCharactersIsRejected() {
