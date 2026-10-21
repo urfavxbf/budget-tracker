@@ -553,7 +553,10 @@ public final class MainActivity extends FragmentActivity {
         final int muted = resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant);
         final int accent = resolveColor(androidx.appcompat.R.attr.colorPrimary);
         final int green = resolveColor(androidx.appcompat.R.attr.colorPrimary);
-        final int navy = 0xFF1A2647;
+        // Tint the primary balance card toward the selected accent, while keeping
+        // a dark-enough surface for its white text and budget figures.
+        final int navy = androidx.core.graphics.ColorUtils.blendARGB(
+                accent, 0xFF101B37, 0.65f);
         page.setPadding(dp(compactLayout ? 12 : 20), dp(compactLayout ? 16 : 24),
                 dp(compactLayout ? 12 : 20), dp(compactLayout ? 16 : 24));
 
