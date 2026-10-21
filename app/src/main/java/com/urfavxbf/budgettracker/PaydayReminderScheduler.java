@@ -30,6 +30,11 @@ public final class PaydayReminderScheduler {
         Context app = context.getApplicationContext();
         AlarmManager alarmManager = (AlarmManager) app.getSystemService(Context.ALARM_SERVICE);
         if (alarmManager == null) return;
+        if (!app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getBoolean("notifications_enabled", false)) {
+            cancelScheduledAlarm(app, alarmManager);
+            return;
+        }
 
         LocalDate today = LocalDate.now();
         int firstPayday = readDay(app, "first_cutoff_payday", 22);
@@ -49,7 +54,7 @@ public final class PaydayReminderScheduler {
                 LocalDate payday = cutoff.payday(firstPayday, secondPayday);
                 LocalDateTime trigger = payday.atTime(9, 0);
                 boolean delivered = wasDelivered(app, payday, cutoff);
-                if (!PaydayReminderPolicy.shouldSchedule(payday, today, trigger, now, delivered)) {
+                if (!PaydayReminderPolicy.shouldSchedule(payday, today, trigger, now, delivered, true)) {
                     continue;
                 }
                 if (trigger.isBefore(now)) {
@@ -77,6 +82,18 @@ public final class PaydayReminderScheduler {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerMillis, pendingIntent);
         } else {
             alarmManager.set(AlarmManager.RTC_WAKEUP, triggerMillis, pendingIntent);
+        }
+    }
+
+    /** Removes a previously scheduled alarm when the user disables reminders. */
+    private static void cancelScheduledAlarm(Context app, AlarmManager alarmManager) {
+        Intent intent = new Intent(app, PaydayReminderReceiver.class)
+                .setAction(ACTION_PAYDAY_REMINDER);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(app, 7124, intent,
+                PendingIntent.FLAG_NO_CREATE | PendingIntent.FLAG_IMMUTABLE);
+        if (pendingIntent != null) {
+            alarmManager.cancel(pendingIntent);
+            pendingIntent.cancel();
         }
     }
 
