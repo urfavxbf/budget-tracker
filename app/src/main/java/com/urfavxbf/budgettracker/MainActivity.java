@@ -2159,6 +2159,28 @@ public final class MainActivity extends FragmentActivity {
         scheduleCard.addView(saveSchedule);
         page.addView(scheduleCard);
 
+        LinearLayout remindersCard = cardContainer();
+        addSection(remindersCard, "Payday reminders");
+        TextView reminderInfo = text(
+                "Get a reminder on your payday to record the amount actually received. " +
+                "You can turn reminders off at any time.",
+                13, false);
+        reminderInfo.setTextColor(resolveColor(android.R.attr.textColorSecondary));
+        remindersCard.addView(reminderInfo);
+        CheckBox remindersEnabled = new CheckBox(this);
+        remindersEnabled.setText("Enable payday reminder notifications");
+        remindersEnabled.setChecked(getSharedPreferences(PREFS, MODE_PRIVATE)
+                .getBoolean("notifications_enabled", false));
+        remindersEnabled.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                    .putBoolean("notifications_enabled", isChecked).apply();
+            PaydayReminderScheduler.schedule(this);
+            if (isChecked) requestNotificationPermissionIfNeeded();
+            toast(isChecked ? "Payday reminders enabled" : "Payday reminders disabled");
+        });
+        remindersCard.addView(remindersEnabled);
+        page.addView(remindersCard);
+
         section("Saved salary payments");
         TextView paymentsInfo = text(
                 "Correct a saved payment without adding the salary to your balance twice. Changes apply to its existing cutoff record.",
