@@ -38,3 +38,23 @@ jobs:
           gradle-version: ${{ matrix.gradle }}
       - name: Run unit tests and assemble debug APK
         run: gradle testDebugUnitTest assembleDebug
+      - name: Reproduce CoGo missing AndroidX AAR fallback
+        if: matrix.gradle == '9.6.1'
+        shell: bash
+        run: |
+          LOCAL_REPO="$RUNNER_TEMP/cogo-fixtures/localMvnRepository"
+          ARTIFACT_DIR="$LOCAL_REPO/androidx/activity/activity/1.8.0"
+          mkdir -p "$ARTIFACT_DIR"
+          cat > "$ARTIFACT_DIR/activity-1.8.0.pom" <<'POM'
+          <project xmlns="http://maven.apache.org/POM/4.0.0">
+            <modelVersion>4.0.0</modelVersion>
+            <groupId>androidx.activity</groupId>
+            <artifactId>activity</artifactId>
+            <version>1.8.0</version>
+            <packaging>aar</packaging>
+          </project>
+          POM
+          SIMULATED_COGO_MAVEN="$LOCAL_REPO" gradle \
+            -I .github/tests/simulate-cogo-repo-init.gradle \
+            :app:processDebugNavigationResources
+

@@ -25,3 +25,20 @@ dependencyResolutionManagement {
 }
 rootProject.name = "BudgetTracker"
 include(":app")
+// CoGo injects its bundled local Maven repository at index 0 after settings
+// evaluation. Some AndroidX modules in that repository have metadata but not
+// their actual AAR. Gradle then sticks to the incomplete local repository and
+// never consults Google's complete artifact. Reorder only that injected repo,
+// retaining it as the last fallback for IDE-specific/offline dependencies.
+gradle.settingsEvaluated { evaluatedSettings ->
+    def repositories = evaluatedSettings.dependencyResolutionManagement.repositories
+    def cogoRepositories = repositories.findAll { repository ->
+        repository instanceof org.gradle.api.artifacts.repositories.MavenArtifactRepository &&
+                repository.url.scheme == 'file' &&
+                repository.url.path.replaceFirst('/+$', '').endsWith('/localMvnRepository')
+    }
+    cogoRepositories.each { repository ->
+        repositories.remove(repository)
+        repositories.add(repository)
+    }
+}

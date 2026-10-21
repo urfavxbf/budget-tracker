@@ -1,0 +1,12 @@
+// Simulate Code on the Go's COTGSettingsPlugin, which adds its bundled Maven
+// repository at index 0 in settingsEvaluated, before project settings listeners.
+gradle.settingsEvaluated { settings ->
+    String path = System.getenv('SIMULATED_COGO_MAVEN')
+    if (path == null || path.isEmpty()) {
+        throw new GradleException('SIMULATED_COGO_MAVEN is required')
+    }
+    def repos = settings.dependencyResolutionManagement.repositories
+    def localRepo = repos.maven { url = uri(path) }
+    repos.remove(localRepo)
+    repos.add(0, localRepo)
+}
