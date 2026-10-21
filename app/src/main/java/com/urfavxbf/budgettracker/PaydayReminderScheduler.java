@@ -30,8 +30,9 @@ public final class PaydayReminderScheduler {
         Context app = context.getApplicationContext();
         AlarmManager alarmManager = (AlarmManager) app.getSystemService(Context.ALARM_SERVICE);
         if (alarmManager == null) return;
-        if (!app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getBoolean("notifications_enabled", false)) {
+        boolean remindersEnabled = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .getBoolean("notifications_enabled", false);
+        if (!remindersEnabled) {
             cancelScheduledAlarm(app, alarmManager);
             return;
         }
@@ -54,7 +55,7 @@ public final class PaydayReminderScheduler {
                 LocalDate payday = cutoff.payday(firstPayday, secondPayday);
                 LocalDateTime trigger = payday.atTime(9, 0);
                 boolean delivered = wasDelivered(app, payday, cutoff);
-                if (!PaydayReminderPolicy.shouldSchedule(payday, today, trigger, now, delivered, true)) {
+                if (!PaydayReminderPolicy.shouldSchedule(payday, today, trigger, now, delivered, remindersEnabled)) {
                     continue;
                 }
                 if (trigger.isBefore(now)) {
