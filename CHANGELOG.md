@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Respect payday reminder opt-in before scheduling or delivering notifications.
+- Cancel any pending payday alarm when notifications are disabled.
+- Do not re-arm an already delivered payday reminder.
+
+### Improved
+- Add a payday reminder checkbox in Settings so opt-in can be changed after onboarding.
+
+### Verification
+- Unit tests cover opt-out and delivered-reminder scheduling policy.
+- Physical-device notification and permission-flow testing remains pending.
+
+
 ## 0.3.0
 
 ### Added
