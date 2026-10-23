@@ -67,3 +67,13 @@ Single source of truth for regression testing. Update statuses only after the te
 3. Green CI proves only checks configured in CI; it does not prove UI/SQLite integration unless included.
 4. Before a feature, review this list and add only new regression cases it introduces.
 5. Rerun verified scenarios only after relevant code changes or suspected regressions.
+
+## 0.4.1 signed release candidate checks
+- [ ] Both Gradle matrix jobs complete unit tests, lint, debug APK, unsigned release APK and AAB builds.
+- [ ] Verify the APK signing identity and APK Signature Scheme v1/v2 on the exact shipped APK.
+- [ ] Verify the AAB JAR signature and published SHA-256 checksums.
+- [ ] Install signed release APK on a clean Android 16 device/emulator and verify navigation, data entry, finance calculations and dark/light layouts.
+- [ ] Test existing user upgrade from an earlier **release-signed** build with the same key and verify financial data survives.
+- [ ] Verify notification permission and scheduled payday reminders on Android 13+ and Android 16.
+- [ ] Test back navigation, window insets and edge-to-edge rendering on Android 16 (API 36).
+- [ ] Confirm Play Console compliance, data safety and privacy disclosures before any store rollout.

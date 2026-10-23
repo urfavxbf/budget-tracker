@@ -4,7 +4,7 @@ Native Android salary tracker and payday budget planner. Package: `com.urfavxbf.
 
 ## Current MVP
 
-- Java 17 / Android Gradle project, min SDK 26, target SDK 35.
+- Java 17 / Android Gradle project, min SDK 26, target SDK 36.
 - Adaptive system light/dark theme.
 - Daily time-in/time-out entry; earlier time-out is interpreted as an overnight shift.
 - Multiple break-duration entries that are summed for salary calculation. The current UI does not capture each break's start/end time, so it cannot validate whether breaks fall within the shift or overlap.
@@ -18,17 +18,24 @@ Native Android salary tracker and payday budget planner. Package: `com.urfavxbf.
 
 ## Build on Android with Code on the Go
 
-This project supports Android phone-only development using Code on the Go (CoGo). Open the **repository root** as the Gradle project (the app module is `app/`). Current CoGo releases (26.38+) bundle **Gradle 9.6.1** and **Android Gradle Plugin 9.3.1** in an IDE-managed local Maven repository. The project's `settings.gradle` selects this supported AGP version when running Gradle 9.6+, while Gradle 8.9 keeps AGP 8.7.3 for the legacy build. This avoids requesting unavailable older plugin dependencies from CoGo's offline cache.
+This project supports Android phone-only development using Code on the Go (CoGo). Open the **repository root** as the Gradle project (the app module is `app/`). Current CoGo releases (26.38+) bundle **Gradle 9.6.1** and **Android Gradle Plugin 9.3.1** in an IDE-managed local Maven repository. The project's `settings.gradle` selects this supported AGP version when running Gradle 9.6+, while Gradle 8.13 uses AGP 8.13.2 for the legacy build. This avoids requesting unavailable older plugin dependencies from CoGo's offline cache.
 
 CoGo also injects its local Maven repository *before* Google Maven. If its local copy advertises an AndroidX module but lacks the `.aar` file (such as `androidx.activity:activity:1.8.0`), Gradle may fail rather than try Google Maven. `settings.gradle` moves **only CoGo's injected local dependency repository** after the normal remote repositories during settings evaluation, preserving the local repository as a fallback for IDE-provided artifacts. Disable `--offline` in CoGo's Build & Run > Gradle options and use a network connection on the first build to download missing app libraries. The project does not bundle third-party AARs.
 
 After switching branches or updating the project, sync/reload Gradle and run `:app:assembleDebug` with CoGo's installed toolchain. Keep the IDE assets / offline Maven repository installed. If an error refers only to `/data/data/com.itsaky.androidide/files/home/maven/localMvnRepository`, inspect the active Gradle version and IDE asset installation before adding new dependencies. Do not manually place arbitrary JARs into the IDE's private repository.
 
-GitHub Actions tests both Gradle versions. A successful CI build does **not** prove that a device's offline Maven assets are complete or that the APK was installed successfully.
+GitHub Actions tests Gradle 8.13 and 9.6.1. A successful CI build does **not** prove that a device's offline Maven assets are complete or that the APK was installed successfully.
 
 ## Open in Android Studio
 
 Open this repository as an existing Gradle project. Use JDK 17 and install Android SDK Platform 35 / Build Tools 35.0.0 (and Build Tools 36.0.0 for AGP 9.3.1).
+
+## Release distribution
+
+- CI builds and unit-tests debug and unsigned release outputs. Debug APK is available as a short-lived Actions artifact **for internal testing only**.
+- Signed release APK (direct Android installation) and signed AAB (Google Play upload) are published on GitHub Releases only after configuring a persistent upload keystore in repository secrets and pushing a matching `vX.Y.Z` tag.
+- See [release signing, verification and distribution instructions](docs/RELEASE.md). **Do not uninstall an existing debug build containing financial data:** production signing does not match its debug signing certificate, and reinstalling will erase local data.
+- The app targets Android 16 (API 36) for current Play requirements. Device regressions, Play Console setup and policy declarations remain prerequisites for Play publication.
 
 ## Important limitations
 

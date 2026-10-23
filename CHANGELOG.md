@@ -1,3 +1,16 @@
+## 0.4.1 — Android release infrastructure
+
+### Changed
+- Raise target and compile SDK to Android 16 (API 36) to meet the 2026 Google Play submission requirement.
+- Update the Gradle 8.x build to Gradle 8.13 with Android Gradle Plugin 8.13.2; retain CoGo Gradle 9.6.1 and Android Gradle Plugin 9.3.1 compatibility.
+- Add signed APK/AAB release automation gated on permanent GitHub Actions signing secrets and a matching version tag.
+- Add signature verification, SHA-256 checksums, release documentation and CI debug APK artifacts for internal testing.
+
+### Release gates
+- A persistent signing key and matching four repository secrets must be configured before publishing.
+- Android 16 runtime UI/notification/SQLite upgrade regression tests have not yet been completed on a physical device.
+- Publishing to Google Play requires its own account, app listing, policy declarations and rollout approval.
+
 # Changelog
 
 ## 0.4.0 — Personalization foundation

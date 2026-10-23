@@ -2,16 +2,47 @@ plugins {
     id 'com.android.application'
 }
 
+// A release is only signed when a persistent private keystore is supplied.
+// Never fall back to the debug signing key for distribution.
+def releaseKeystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
+def releaseKeystorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+def releaseKeyAlias = System.getenv('ANDROID_KEY_ALIAS')
+def releaseKeyPassword = System.getenv('ANDROID_KEY_PASSWORD')
+def hasReleaseSigning = [releaseKeystorePath, releaseKeystorePassword, releaseKeyAlias, releaseKeyPassword].every { it != null && !it.isBlank() }
+
 android {
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseKeystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+                enableV1Signing true
+                enableV2Signing true
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
+            // Keep reflection-heavy dependencies functional pending measured R8 rollout.
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
     namespace 'com.urfavxbf.budgettracker'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         applicationId 'com.urfavxbf.budgettracker'
         minSdk 26
-        targetSdk 35
-        versionCode 4
-        versionName '0.4.0'
+        targetSdk 36
+        versionCode 5
+        versionName '0.4.1'
         testInstrumentationRunner 'android.test.InstrumentationTestRunner'
     }
 

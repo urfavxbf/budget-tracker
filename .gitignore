@@ -9,3 +9,10 @@ captures/
 .externalNativeBuild/
 .cxx/
 google-services.json
+
+# Private release credentials (never commit these)
+*.jks
+*.keystore
+*.p12
+keystore.properties
+release-keystore*
