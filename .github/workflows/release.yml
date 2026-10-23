@@ -129,27 +129,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Only create a tag after unit tests, lint, both signatures and checksums pass.
-          # GitHub-token-created tags do not trigger a second Actions run.
-          if [[ "$GITHUB_REF" == 'refs/heads/main' ]]; then
-            tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha' 2>/dev/null || true)"
-            if [[ -n "$tag_sha" ]]; then
-              test "$tag_sha" = "$(git rev-parse HEAD)" || { echo "Tag points to another commit; refusing to overwrite"; exit 1; }
-            else
-              gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
-                -f "ref=refs/tags/$RELEASE_TAG" \
-                -f "sha=$(git rev-parse HEAD)" >/dev/null
-            fi
+          # GitHub's partial-ref endpoint can return a nonempty null value for
+          # missing tags. Check the exact remote reference instead.
+          existing_sha="$(git ls-remote --refs origin "refs/tags/$RELEASE_TAG" | awk 'NR==1 {print $1}')"
+          current_sha="$(git rev-parse HEAD)"
+          if [[ -n "$existing_sha" && "$existing_sha" != "$current_sha" ]]; then
+            echo "Tag already points to a different commit; refusing to overwrite"
+            exit 1
           fi
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "Release already exists; refusing to replace published assets"
             exit 1
           fi
-          gh release create "$RELEASE_TAG" dist/* \
-            --title "Budget Tracker $RELEASE_TAG (Pre-release)" \
-            --notes-file docs/RELEASE_NOTES_0.4.1.md \
-            --prerelease \
-            --verify-tag
+          # GitHub CLI creates the lightweight tag pointing at the exact tested
+          # commit when it doesn't exist yet. No tag is made before verification.
+          release_args=(--title "Budget Tracker $RELEASE_TAG (Pre-release)"
+            --notes-file docs/RELEASE_NOTES_0.4.1.md --prerelease)
+          if [[ -z "$existing_sha" ]]; then
+            release_args+=(--target "$current_sha")
+          else
+            release_args+=(--verify-tag)
+          fi
+          gh release create "$RELEASE_TAG" dist/* "${release_args[@]}"
 
       - name: Remove temporary signing key
         if: always()
