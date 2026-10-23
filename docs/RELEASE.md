@@ -39,9 +39,9 @@ In GitHub: **Settings → Secrets and variables → Actions → New repository s
 1. Merge release PR only after both GitHub Actions CI matrix jobs pass.
 2. Complete the manual Android 16 and data-retention checklist in [TESTING_CHECKLIST.md](TESTING_CHECKLIST.md).
 3. Ensure `versionName` and `versionCode` are updated once per published version. For this candidate they are `0.4.1` and `5`.
-4. Add a signed Git tag from the tested `main` commit (example `v0.4.1`) and push it. The tag must match `versionName`.
-5. GitHub Actions `Android Signed Release` rejects missing credentials, mismatched version tags and failed tests. It generates a **signed APK** and **signed AAB**, verifies APK/AAB signatures, computes SHA-256 and creates a GitHub Release with all three files. It will not upload to Google Play automatically.
-6. Download the APK from GitHub Releases to install directly. Retain the signed AAB for Play Console internal testing and staged rollout once all policy/UX checks pass.
+4. Release candidate: after verifying CI and configuring signing secrets, use **Actions → Android Signed Release → Run workflow** on `main` with tag `v0.4.1`. The workflow creates the tag only **after** signing, tests, lint and cryptographic verification pass. Alternatively push a matching, existing version tag. A one-time `[publish-signed-rc-v0.4.1]` commit marker on `main` can trigger the same workflow automatically.
+5. GitHub Actions `Android Signed Release` rejects missing credentials, mismatched version tags and failed tests. It generates a **signed APK** and **signed AAB**, verifies APK/AAB signatures, computes SHA-256 and creates a GitHub **pre-release** with all three files. It will not upload to Google Play automatically. Only promote the pre-release to stable after physical-device and financial-data regression checks.
+6. Download the signed pre-release APK from GitHub Releases for device testing. Be careful with existing debug-signed installations. Retain the signed AAB for Play Console internal testing and staged rollout once all policy/UX checks pass.
 
 The workflow can also be rerun manually via **Actions → Android Signed Release → Run workflow**, specifying an **existing** `vX.Y.Z` tag. Avoid reusing a published versionCode or rewriting existing release tags.
 
