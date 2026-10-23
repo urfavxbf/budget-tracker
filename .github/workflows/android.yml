@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        gradle: ['8.9', '9.6.1']
+        gradle: ['8.13', '9.6.1']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,13 +31,21 @@ jobs:
             exit 1
           fi
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" --install "platform-tools" "platforms;android-35" "build-tools;35.0.0" "build-tools;36.0.0"
+          "$SDKMANAGER" --install "platform-tools" "platforms;android-36" "build-tools;35.0.0" "build-tools;36.0.0"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: ${{ matrix.gradle }}
-      - name: Run unit tests and assemble debug APK
-        run: gradle testDebugUnitTest assembleDebug
+      - name: Run unit tests, lint and build APK/AAB
+        run: gradle testDebugUnitTest lintDebug assembleDebug assembleRelease bundleRelease
+      - name: Upload debug APK for internal device smoke tests
+        if: matrix.gradle == '8.13'
+        uses: actions/upload-artifact@v4
+        with:
+          name: budget-tracker-debug-ci
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
       - name: Reproduce CoGo missing AndroidX AAR fallback
         if: matrix.gradle == '9.6.1'
         shell: bash
