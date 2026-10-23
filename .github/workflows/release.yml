@@ -4,12 +4,14 @@ on:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
+    branches: [main]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing vX.Y.Z tag to package and publish'
+        description: 'vX.Y.Z candidate tag; run from main to create it only after signed checks pass'
         type: string
         required: true
+        default: 'v0.4.1'
 
 permissions:
   contents: write
@@ -20,25 +22,36 @@ concurrency:
 
 jobs:
   signed-release:
+    # Ordinary main commits do not create releases. A dedicated audited commit
+    # marker triggers this one-off signed release candidate after CI on the PR.
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish-signed-rc-v0.4.1]')) }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout exact release tag
+      - name: Checkout exact source commit
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
-      - name: Validate existing tag and Android version
+      - name: Validate candidate tag and Android version
         shell: bash
         env:
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || 'v0.4.1' }}
         run: |
           set -euo pipefail
-          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid tag"; exit 1; }
-          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG" || { echo "Tag does not exist"; exit 1; }
-          test "$(git rev-parse HEAD)" = "$(git rev-list -n 1 "$RELEASE_TAG")" || { echo "Checkout and release tag differ"; exit 1; }
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid version tag"; exit 1; }
           actual="$(sed -nE "s/^[[:space:]]*versionName '([^']+)'.*/\1/p" app/build.gradle)"
-          test "${RELEASE_TAG#v}" = "$actual" || { echo "Tag and app versionName differ"; exit 1; }
+          test "${RELEASE_TAG#v}" = "$actual" || { echo "Release tag and versionName mismatch"; exit 1; }
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            test "${GITHUB_REF#refs/tags/}" = "$RELEASE_TAG" || { echo "Tag ref mismatch"; exit 1; }
+            git show-ref --verify --quiet "refs/tags/$RELEASE_TAG" || { echo "Tag not present"; exit 1; }
+            test "$(git rev-list -n 1 "$RELEASE_TAG")" = "$(git rev-parse HEAD)" || { echo "Tag SHA mismatch"; exit 1; }
+          else
+            test "$GITHUB_REF" = 'refs/heads/main' || { echo "Candidate must originate from main"; exit 1; }
+            if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+              test "$(git rev-list -n 1 "$RELEASE_TAG")" = "$(git rev-parse HEAD)" || { echo "Existing tag points to a different commit"; exit 1; }
+            fi
+          fi
           echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
 
       - name: Configure JDK 17
@@ -110,15 +123,32 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish GitHub Release
+      - name: Create immutable tag and publish signed pre-release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
+          # Only create a tag after unit tests, lint, both signatures and checksums pass.
+          # GitHub-token-created tags do not trigger a second Actions run.
+          if [[ "$GITHUB_REF" == 'refs/heads/main' ]]; then
+            tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha' 2>/dev/null || true)"
+            if [[ -n "$tag_sha" ]]; then
+              test "$tag_sha" = "$(git rev-parse HEAD)" || { echo "Tag points to another commit; refusing to overwrite"; exit 1; }
+            else
+              gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+                -f "ref=refs/tags/$RELEASE_TAG" \
+                -f "sha=$(git rev-parse HEAD)" >/dev/null
+            fi
+          fi
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release already exists; refusing to replace published assets"
+            exit 1
+          fi
           gh release create "$RELEASE_TAG" dist/* \
-            --title "Budget Tracker $RELEASE_TAG" \
+            --title "Budget Tracker $RELEASE_TAG (Pre-release)" \
             --notes-file docs/RELEASE_NOTES_0.4.1.md \
+            --prerelease \
             --verify-tag
 
       - name: Remove temporary signing key
